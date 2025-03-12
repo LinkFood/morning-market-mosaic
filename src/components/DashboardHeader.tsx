@@ -1,23 +1,24 @@
-
-import { RefreshCcw, Settings, Sun, Moon, Laptop } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { clearAllCacheData } from "@/services/apiService";
-import SettingsModal from "./SettingsModal";
-import { useTheme } from "./theme-provider";
-import { 
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MoonIcon, SunIcon } from "lucide-react";
+import { BarChart3, RefreshCw, Settings } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
+import SettingsModal from "@/components/SettingsModal";
+import { UserSettings } from "@/types/marketTypes";
 
 interface DashboardHeaderProps {
   lastUpdated: Date | null;
   refreshData: () => void;
   isRefreshing: boolean;
-  userSettings: any;
-  updateUserSettings: (settings: any) => void;
+  userSettings: UserSettings;
+  updateUserSettings: (settings: UserSettings) => void;
 }
 
 const DashboardHeader = ({
@@ -25,86 +26,79 @@ const DashboardHeader = ({
   refreshData,
   isRefreshing,
   userSettings,
-  updateUserSettings
+  updateUserSettings,
 }: DashboardHeaderProps) => {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true
-    });
-  };
-  
-  const handleRefresh = () => {
-    clearAllCacheData();
-    refreshData();
-  };
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   return (
-    <header className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 py-4 mb-4 bg-card rounded-lg shadow-sm transition-colors duration-300">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Morning Market Mosaic</h1>
-        <p className="text-sm text-muted-foreground">
-          {lastUpdated 
-            ? `Last updated at ${formatTime(lastUpdated)}`
-            : "Loading market data..."}
-        </p>
-      </div>
-      
-      <div className="flex space-x-2 mt-3 md:mt-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+    <header className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-3xl font-bold">Market Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refreshData}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          
+          <Link to="/fed">
             <Button variant="outline" size="sm">
-              {theme === "light" && <Sun className="h-4 w-4 mr-2" />}
-              {theme === "dark" && <Moon className="h-4 w-4 mr-2" />}
-              {theme === "system" && <Laptop className="h-4 w-4 mr-2" />}
-              Theme
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Fed Data
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setTheme("light")}>
-              <Sun className="h-4 w-4 mr-2" />
-              Light
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("dark")}>
-              <Moon className="h-4 w-4 mr-2" />
-              Dark
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("system")}>
-              <Laptop className="h-4 w-4 mr-2" />
-              System
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-        
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => setIsSettingsOpen(true)}
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Settings
-        </Button>
+          </Link>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                {theme === 'light' ? (
+                  <SunIcon className="h-[1.2rem] w-[1.2rem]" />
+                ) : (
+                  <MoonIcon className="h-[1.2rem] w-[1.2rem]" />
+                )}
+                <span className="sr-only">Toggle theme</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setTheme("light")}>
+                Light
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("dark")}>
+                Dark
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("system")}>
+                System
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <Button variant="outline" size="icon" onClick={() => setIsSettingsOpen(true)}>
+            <Settings className="h-[1.2rem] w-[1.2rem]" />
+            <span className="sr-only">Settings</span>
+          </Button>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground">
+          Real-time market data and analysis
+        </p>
+        {lastUpdated && (
+          <p className="text-sm text-muted-foreground">
+            Last updated: {lastUpdated.toLocaleString()}
+          </p>
+        )}
       </div>
       
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)}
         settings={userSettings}
-        updateSettings={updateUserSettings}
+        onSave={updateUserSettings}
       />
     </header>
   );
