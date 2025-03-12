@@ -7,7 +7,7 @@ import {
   getCategoryTTL, 
   getSeriesTTL 
 } from "./cacheUtils";
-import { CacheItem } from "./types";
+import { CacheItem, TimeSpan } from "./types";
 
 /**
  * Fetch with caching utility that includes timeout
@@ -53,11 +53,15 @@ export async function fetchWithCache<T>(
 /**
  * Get data for a specific economic category
  */
-export async function getEconomicCategory(category: string, forceRefresh: boolean = false) {
-  console.log(`Getting data for category: ${category}, forceRefresh: ${forceRefresh}`);
+export async function getEconomicCategory(
+  category: string, 
+  timeSpan: number = TimeSpan.FIVE_YEARS,
+  forceRefresh: boolean = false
+) {
+  console.log(`Getting data for category: ${category}, timeSpan: ${timeSpan} months, forceRefresh: ${forceRefresh}`);
   return fetchWithCache(
-    `fred_${category.toLowerCase()}`,
-    async () => invokeFredFunction({ category, forceRefresh }),
+    `fred_${category.toLowerCase()}_${timeSpan}`,
+    async () => invokeFredFunction({ category, timeSpan, forceRefresh }),
     getCategoryTTL(category),
     forceRefresh
   );
@@ -66,11 +70,15 @@ export async function getEconomicCategory(category: string, forceRefresh: boolea
 /**
  * Get data for a specific series
  */
-export async function getEconomicSeries(seriesId: string, forceRefresh: boolean = false) {
-  console.log(`Getting data for series: ${seriesId}, forceRefresh: ${forceRefresh}`);
+export async function getEconomicSeries(
+  seriesId: string, 
+  timeSpan: number = TimeSpan.FIVE_YEARS,
+  forceRefresh: boolean = false
+) {
+  console.log(`Getting data for series: ${seriesId}, timeSpan: ${timeSpan} months, forceRefresh: ${forceRefresh}`);
   return fetchWithCache(
-    `fred_series_${seriesId}`,
-    async () => invokeFredFunction({ seriesId, forceRefresh }),
+    `fred_series_${seriesId}_${timeSpan}`,
+    async () => invokeFredFunction({ seriesId, timeSpan, forceRefresh }),
     getSeriesTTL(seriesId),
     forceRefresh
   );

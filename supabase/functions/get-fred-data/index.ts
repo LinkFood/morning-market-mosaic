@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -47,6 +46,28 @@ const SERIES_GROUPS = {
   ]
 };
 
+// Calculate appropriate observation limit based on timeSpan and frequency
+function calculateObservationLimit(timeSpan: number, frequency: string): number {
+  if (!timeSpan) return 30; // Default to 30 observations
+  
+  switch (frequency) {
+    case "DAILY":
+      // Approx. 252 trading days per year (21 trading days per month)
+      return Math.min(5000, Math.ceil(timeSpan * 21));
+    case "WEEKLY":
+      // 4.3 weeks per month
+      return Math.min(1000, Math.ceil(timeSpan * 4.3));
+    case "MONTHLY":
+      // 1:1 mapping for months
+      return Math.min(500, timeSpan);
+    case "QUARTERLY":
+      // 1 quarter = 3 months
+      return Math.min(200, Math.ceil(timeSpan / 3));
+    default:
+      return Math.min(500, timeSpan);
+  }
+}
+
 // Function to fetch data with retry logic
 async function fetchWithRetry(url: string, options = {}, retries = 3, backoff = 300) {
   try {
@@ -73,14 +94,34 @@ async function fetchWithRetry(url: string, options = {}, retries = 3, backoff = 
 }
 
 // Fetch series observations with improved parameters to ensure latest data
-async function fetchSeriesObservations(seriesId: string, limit = 12, sortOrder = "desc") {
+async function fetchSeriesObservations(seriesId: string, timeSpan = 12, sortOrder = "desc") {
+  // Find the series to determine its frequency
+  let frequency = "MONTHLY"; // default
+  for (const category in SERIES_GROUPS) {
+    for (const series of SERIES_GROUPS[category as keyof typeof SERIES_GROUPS]) {
+      if (series.id === seriesId) {
+        frequency = series.frequency;
+        break;
+      }
+    }
+  }
+  
+  // Calculate appropriate limit based on timeSpan and frequency
+  const limit = calculateObservationLimit(timeSpan, frequency);
+  
   // Add frequency and observation_end=9999-12-31 to ensure we get the most recent data
   // The observation_end date in the future ensures we get all data up to the present
   const todayDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
   
-  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=${sortOrder}&limit=${limit}&observation_end=${todayDate}`;
+  // Calculate the start date based on timeSpan (in months)
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - timeSpan);
+  const formattedStartDate = startDate.toISOString().split('T')[0];
   
-  console.log(`Fetching FRED data for ${seriesId} with end date ${todayDate}`);
+  // Use observation_start and observation_end for more precise date ranges
+  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=${sortOrder}&limit=${limit}&observation_start=${formattedStartDate}&observation_end=${todayDate}`;
+  
+  console.log(`Fetching FRED data for ${seriesId} with end date ${todayDate} and limit ${limit}`);
   return fetchWithRetry(url);
 }
 
@@ -107,8 +148,8 @@ function formatReleaseDate(dateString: string): string {
 }
 
 // Process inflation data
-async function processInflationData(seriesId: string) {
-  const data = await fetchSeriesObservations(seriesId, 13);
+async function processInflationData(seriesId: string, timeSpan = 12) {
+  const data = await fetchSeriesObservations(seriesId, timeSpan);
   
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
@@ -141,7 +182,7 @@ async function processInflationData(seriesId: string) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.slice(0, 12).reverse().map(obs => ({
+    trend: data.observations.reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -149,8 +190,8 @@ async function processInflationData(seriesId: string) {
 }
 
 // Process interest rate data
-async function processInterestRateData(seriesId: string) {
-  const data = await fetchSeriesObservations(seriesId, 30);
+async function processInterestRateData(seriesId: string, timeSpan = 12) {
+  const data = await fetchSeriesObservations(seriesId, timeSpan);
   
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
@@ -181,7 +222,7 @@ async function processInterestRateData(seriesId: string) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.slice(0, 30).reverse().map(obs => ({
+    trend: data.observations.reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -189,8 +230,8 @@ async function processInterestRateData(seriesId: string) {
 }
 
 // Process economic growth data
-async function processGrowthData(seriesId: string) {
-  const data = await fetchSeriesObservations(seriesId, 8);
+async function processGrowthData(seriesId: string, timeSpan = 12) {
+  const data = await fetchSeriesObservations(seriesId, timeSpan);
   
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
@@ -216,7 +257,7 @@ async function processGrowthData(seriesId: string) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.slice(0, 8).reverse().map(obs => ({
+    trend: data.observations.reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -224,10 +265,9 @@ async function processGrowthData(seriesId: string) {
 }
 
 // Process employment data
-async function processEmploymentData(seriesId: string) {
+async function processEmploymentData(seriesId: string, timeSpan = 12) {
   // For weekly initial claims, we need more data points
-  const limit = seriesId === "ICSA" ? 52 : 12;
-  const data = await fetchSeriesObservations(seriesId, limit);
+  const data = await fetchSeriesObservations(seriesId, timeSpan);
   
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
@@ -265,7 +305,7 @@ async function processEmploymentData(seriesId: string) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.slice(0, Math.min(52, data.observations.length)).reverse().map(obs => ({
+    trend: data.observations.reverse().map(obs => ({
       date: obs.date,
       value: seriesId === "ICSA" ? Math.round(parseFloat(obs.value) / 1000) : parseFloat(obs.value)
     }))
@@ -273,8 +313,8 @@ async function processEmploymentData(seriesId: string) {
 }
 
 // Process market data
-async function processMarketData(seriesId: string) {
-  const data = await fetchSeriesObservations(seriesId, 30);
+async function processMarketData(seriesId: string, timeSpan = 12) {
+  const data = await fetchSeriesObservations(seriesId, timeSpan);
   
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
@@ -307,7 +347,7 @@ async function processMarketData(seriesId: string) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.slice(0, 30).reverse().map(obs => ({
+    trend: data.observations.reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -322,9 +362,9 @@ serve(async (req) => {
   }
   
   try {
-    const { seriesId, category, forceRefresh } = await req.json();
+    const { seriesId, category, forceRefresh, timeSpan = 12 } = await req.json();
     
-    console.log(`Request received for ${category || 'category'} ${seriesId || 'all series'} with forceRefresh=${forceRefresh || false}`);
+    console.log(`Request received for ${category || 'category'} ${seriesId || 'all series'} with timeSpan=${timeSpan} months, forceRefresh=${forceRefresh || false}`);
     
     // If a specific series is requested
     if (seriesId) {
@@ -332,15 +372,15 @@ serve(async (req) => {
       
       // Determine the processing function based on series ID or category
       if (SERIES_GROUPS.INFLATION.some(s => s.id === seriesId)) {
-        result = await processInflationData(seriesId);
+        result = await processInflationData(seriesId, timeSpan);
       } else if (SERIES_GROUPS.INTEREST_RATES.some(s => s.id === seriesId)) {
-        result = await processInterestRateData(seriesId);
+        result = await processInterestRateData(seriesId, timeSpan);
       } else if (SERIES_GROUPS.ECONOMIC_GROWTH.some(s => s.id === seriesId)) {
-        result = await processGrowthData(seriesId);
+        result = await processGrowthData(seriesId, timeSpan);
       } else if (SERIES_GROUPS.EMPLOYMENT.some(s => s.id === seriesId)) {
-        result = await processEmploymentData(seriesId);
+        result = await processEmploymentData(seriesId, timeSpan);
       } else if (SERIES_GROUPS.MARKETS.some(s => s.id === seriesId)) {
-        result = await processMarketData(seriesId);
+        result = await processMarketData(seriesId, timeSpan);
       } else {
         throw new Error(`Unknown series ID: ${seriesId}`);
       }
@@ -383,7 +423,7 @@ serve(async (req) => {
       const results = await Promise.all(
         seriesGroup.map(async (series) => {
           try {
-            const data = await processingFunction(series.id);
+            const data = await processingFunction(series.id, timeSpan);
             return {
               ...data,
               name: series.name,

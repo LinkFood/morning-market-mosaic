@@ -68,6 +68,7 @@ export async function testFredConnection(): Promise<boolean> {
     console.log("Testing FRED API connection...");
     const response = await invokeFredFunction({ 
       seriesId: "FEDFUNDS", 
+      timeSpan: 1,
       forceRefresh: true 
     });
     return !!response;

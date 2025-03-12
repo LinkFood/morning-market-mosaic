@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Percent } from "lucide-react";
 import fedApiService from "@/services/fred";
 import { ECONOMIC_CATEGORIES } from "@/services/fred/constants";
+import { TimeSpan } from "@/services/fred/types";
 import { toast } from "sonner";
 import InflationCard from "./inflation/InflationCard";
 import { InflationData } from "./inflation/types";
@@ -18,10 +18,15 @@ const FredInflation = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const data = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.INFLATION);
+        const data = await fedApiService.getEconomicCategory(
+          ECONOMIC_CATEGORIES.INFLATION,
+          TimeSpan.FIVE_YEARS
+        );
         setInflationData(data);
         
-        const timestamp = fedApiService.getFredCacheTimestamp(`fred_${ECONOMIC_CATEGORIES.INFLATION.toLowerCase()}`);
+        const timestamp = fedApiService.getFredCacheTimestamp(
+          `fred_${ECONOMIC_CATEGORIES.INFLATION.toLowerCase()}_${TimeSpan.FIVE_YEARS}`
+        );
         setLastUpdated(timestamp);
       } catch (error) {
         console.error("Failed to load inflation data:", error);

@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Database } from "lucide-react";
 import fedApiService from "@/services/fred";
 import { ECONOMIC_CATEGORIES } from "@/services/fred/constants";
+import { TimeSpan } from "@/services/fred/types";
 import { toast } from "sonner";
 import EconomicIndicatorCard, { EconomicIndicator } from "./economic/EconomicIndicatorCard";
 
@@ -22,8 +22,14 @@ const FredEconomicIndicators = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const growthData = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.ECONOMIC_GROWTH);
-        const employmentData = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.EMPLOYMENT);
+        const growthData = await fedApiService.getEconomicCategory(
+          ECONOMIC_CATEGORIES.ECONOMIC_GROWTH,
+          TimeSpan.FIVE_YEARS
+        );
+        const employmentData = await fedApiService.getEconomicCategory(
+          ECONOMIC_CATEGORIES.EMPLOYMENT,
+          TimeSpan.FIVE_YEARS
+        );
         
         const allIndicators = [...growthData, ...employmentData];
         
@@ -37,7 +43,9 @@ const FredEconomicIndicators = () => {
         let mostRecentTimestamp: Date | null = null;
         
         categories.forEach(category => {
-          const timestamp = fedApiService.getFredCacheTimestamp(`fred_${category}`);
+          const timestamp = fedApiService.getFredCacheTimestamp(
+            `fred_${category}_${TimeSpan.FIVE_YEARS}`
+          );
           if (timestamp && (!mostRecentTimestamp || timestamp > mostRecentTimestamp)) {
             mostRecentTimestamp = timestamp;
           }

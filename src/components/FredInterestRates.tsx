@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp } from "lucide-react";
 import fedApiService from "@/services/fred";
 import { ECONOMIC_CATEGORIES } from "@/services/fred/constants";
+import { TimeSpan } from "@/services/fred/types";
 import { toast } from "sonner";
 import InterestRateCard from "./interest-rates/InterestRateCard";
 
@@ -30,10 +30,15 @@ const FredInterestRates = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const data = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.INTEREST_RATES);
+        const data = await fedApiService.getEconomicCategory(
+          ECONOMIC_CATEGORIES.INTEREST_RATES,
+          TimeSpan.FIVE_YEARS
+        );
         setRatesData(data);
         
-        const timestamp = fedApiService.getFredCacheTimestamp(`fred_${ECONOMIC_CATEGORIES.INTEREST_RATES.toLowerCase()}`);
+        const timestamp = fedApiService.getFredCacheTimestamp(
+          `fred_${ECONOMIC_CATEGORIES.INTEREST_RATES.toLowerCase()}_${TimeSpan.FIVE_YEARS}`
+        );
         setLastUpdated(timestamp);
       } catch (error) {
         console.error("Failed to load interest rates data:", error);
