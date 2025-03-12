@@ -14,6 +14,8 @@ interface InflationData {
   previous: string;
   change: string;
   date: string;
+  lastUpdated?: string;
+  formattedDate?: string;
   trend: { date: string; value: number }[];
   unit: string;
 }
@@ -56,14 +58,6 @@ const FredInflation = () => {
     if (change < 0) return <ArrowDown className="h-4 w-4" />;
     return <Minus className="h-4 w-4" />;
   };
-  
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   if (isLoading) {
     return (
@@ -105,9 +99,16 @@ const FredInflation = () => {
             <div key={indicator.id} className="p-4 rounded-lg bg-secondary/50">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">{indicator.name}</h3>
-                <span className="text-sm text-muted-foreground">
-                  {formatDate(indicator.date)}
-                </span>
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground block">
+                    {indicator.formattedDate || new Date(indicator.date).toLocaleDateString()}
+                  </span>
+                  {indicator.lastUpdated && indicator.lastUpdated !== indicator.date && (
+                    <span className="text-xs text-muted-foreground block">
+                      Updated: {new Date(indicator.lastUpdated).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-end justify-between">

@@ -11,10 +11,11 @@ import { toast } from "sonner";
 const FedDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Function to refresh all Fed data
+  // Function to refresh all Fed data with force flag
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
+      // Clear cache and force refresh
       fedApiService.clearFredCacheData();
       // Force page reload to refresh all components
       window.location.reload();
@@ -45,7 +46,7 @@ const FedDashboard = () => {
               disabled={isRefreshing}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh Data
+              Force Data Refresh
             </Button>
           </div>
           <p className="text-muted-foreground">

@@ -72,9 +72,21 @@ async function fetchWithRetry(url: string, options = {}, retries = 3, backoff = 
   }
 }
 
-// Fetch series observations
+// Fetch series observations with improved parameters to ensure latest data
 async function fetchSeriesObservations(seriesId: string, limit = 12, sortOrder = "desc") {
-  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=${sortOrder}&limit=${limit}`;
+  // Add frequency and observation_end=9999-12-31 to ensure we get the most recent data
+  // The observation_end date in the future ensures we get all data up to the present
+  const todayDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  
+  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=${sortOrder}&limit=${limit}&observation_end=${todayDate}`;
+  
+  console.log(`Fetching FRED data for ${seriesId} with end date ${todayDate}`);
+  return fetchWithRetry(url);
+}
+
+// Get release dates for a series to check if new data is available
+async function getSeriesReleaseInfo(seriesId: string) {
+  const url = `${FRED_BASE_URL}/series/release?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json`;
   return fetchWithRetry(url);
 }
 
@@ -84,6 +96,16 @@ function calculatePercentChange(newer: number, older: number): number {
   return ((newer - older) / older) * 100;
 }
 
+// Format date to display as friendly string
+function formatReleaseDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+}
+
 // Process inflation data
 async function processInflationData(seriesId: string) {
   const data = await fetchSeriesObservations(seriesId, 13);
@@ -91,6 +113,10 @@ async function processInflationData(seriesId: string) {
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
   }
+  
+  // Get release info to show when the data was last updated
+  const releaseInfo = await getSeriesReleaseInfo(seriesId);
+  const realTimeStart = releaseInfo?.releases?.[0]?.realtime_start || null;
   
   const latestObs = data.observations[0];
   const previousObs = data.observations[1];
@@ -113,6 +139,8 @@ async function processInflationData(seriesId: string) {
     previous: isInflationIndex ? (calculatePercentChange(previousValue, data.observations[yearAgoIndex-1]?.value || 0)).toFixed(1) : previousValue.toFixed(2),
     change: isInflationIndex ? (annualChange - calculatePercentChange(previousValue, data.observations[yearAgoIndex-1]?.value || 0)).toFixed(1) : (latestValue - previousValue).toFixed(2),
     date: latestObs.date,
+    lastUpdated: realTimeStart || latestObs.date, // Use release date if available
+    formattedDate: formatReleaseDate(latestObs.date),
     trend: data.observations.slice(0, 12).reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
@@ -127,6 +155,10 @@ async function processInterestRateData(seriesId: string) {
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
   }
+  
+  // Get release info to show when the data was last updated
+  const releaseInfo = await getSeriesReleaseInfo(seriesId);
+  const realTimeStart = releaseInfo?.releases?.[0]?.realtime_start || null;
   
   const latestObs = data.observations[0];
   const previousObs = data.observations[1];
@@ -147,6 +179,8 @@ async function processInterestRateData(seriesId: string) {
     change: dailyChange.toFixed(2),
     weeklyChange: weeklyChange.toFixed(2),
     date: latestObs.date,
+    lastUpdated: realTimeStart || latestObs.date, // Use release date if available
+    formattedDate: formatReleaseDate(latestObs.date),
     trend: data.observations.slice(0, 30).reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
@@ -162,6 +196,10 @@ async function processGrowthData(seriesId: string) {
     throw new Error(`Insufficient data for series ${seriesId}`);
   }
   
+  // Get release info to show when the data was last updated
+  const releaseInfo = await getSeriesReleaseInfo(seriesId);
+  const realTimeStart = releaseInfo?.releases?.[0]?.realtime_start || null;
+  
   const latestObs = data.observations[0];
   const previousObs = data.observations[1];
   
@@ -176,6 +214,8 @@ async function processGrowthData(seriesId: string) {
     previous: previousValue.toFixed(1),
     change: quarterlyChange.toFixed(1),
     date: latestObs.date,
+    lastUpdated: realTimeStart || latestObs.date, // Use release date if available
+    formattedDate: formatReleaseDate(latestObs.date),
     trend: data.observations.slice(0, 8).reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
@@ -192,6 +232,10 @@ async function processEmploymentData(seriesId: string) {
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
   }
+  
+  // Get release info to show when the data was last updated
+  const releaseInfo = await getSeriesReleaseInfo(seriesId);
+  const realTimeStart = releaseInfo?.releases?.[0]?.realtime_start || null;
   
   const latestObs = data.observations[0];
   const previousObs = data.observations[1];
@@ -219,6 +263,8 @@ async function processEmploymentData(seriesId: string) {
     change: seriesId === "ICSA" ? Math.round((latestValue - previousValue) / 1000) : (latestValue - previousValue).toFixed(1),
     fourWeekAvg: fourWeekAvg,
     date: latestObs.date,
+    lastUpdated: realTimeStart || latestObs.date, // Use release date if available
+    formattedDate: formatReleaseDate(latestObs.date),
     trend: data.observations.slice(0, Math.min(52, data.observations.length)).reverse().map(obs => ({
       date: obs.date,
       value: seriesId === "ICSA" ? Math.round(parseFloat(obs.value) / 1000) : parseFloat(obs.value)
@@ -233,6 +279,10 @@ async function processMarketData(seriesId: string) {
   if (!data.observations || data.observations.length < 2) {
     throw new Error(`Insufficient data for series ${seriesId}`);
   }
+  
+  // Get release info to show when the data was last updated
+  const releaseInfo = await getSeriesReleaseInfo(seriesId);
+  const realTimeStart = releaseInfo?.releases?.[0]?.realtime_start || null;
   
   const latestObs = data.observations[0];
   const previousObs = data.observations[1];
@@ -255,6 +305,8 @@ async function processMarketData(seriesId: string) {
     changePercent: dailyPctChange.toFixed(2),
     weeklyChange: weeklyChange.toFixed(2),
     date: latestObs.date,
+    lastUpdated: realTimeStart || latestObs.date, // Use release date if available
+    formattedDate: formatReleaseDate(latestObs.date),
     trend: data.observations.slice(0, 30).reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
@@ -270,9 +322,9 @@ serve(async (req) => {
   }
   
   try {
-    const { seriesId, category } = await req.json();
+    const { seriesId, category, forceRefresh } = await req.json();
     
-    console.log(`Request received for ${category || 'category'} ${seriesId || 'all series'}`);
+    console.log(`Request received for ${category || 'category'} ${seriesId || 'all series'} with forceRefresh=${forceRefresh || false}`);
     
     // If a specific series is requested
     if (seriesId) {

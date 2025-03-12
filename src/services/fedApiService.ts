@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,13 +31,14 @@ interface CacheItem<T> {
 async function fetchWithCache<T>(
   cacheKey: string,
   fetcher: () => Promise<T>,
-  ttl: number = CACHE_TTL.DAILY
+  ttl: number = CACHE_TTL.DAILY,
+  forceRefresh: boolean = false
 ): Promise<T> {
   try {
-    // Check if data exists in cache and is still valid
+    // Check if data exists in cache and is still valid, unless forceRefresh is true
     const cachedItem = localStorage.getItem(cacheKey);
     
-    if (cachedItem) {
+    if (cachedItem && !forceRefresh) {
       const parsedItem: CacheItem<T> = JSON.parse(cachedItem);
       const now = Date.now();
       
@@ -47,7 +49,7 @@ async function fetchWithCache<T>(
       }
     }
     
-    // If no valid cache exists, fetch new data
+    // If no valid cache exists or forceRefresh is true, fetch new data
     console.log(`Fetching fresh FRED data for ${cacheKey}`);
     const data = await fetcher();
     
@@ -92,20 +94,22 @@ async function invokeFredFunction(params: any) {
 }
 
 // Get data for a specific economic category
-export async function getEconomicCategory(category: string) {
+export async function getEconomicCategory(category: string, forceRefresh: boolean = false) {
   return fetchWithCache(
     `fred_${category.toLowerCase()}`,
-    async () => invokeFredFunction({ category }),
-    getCategoryTTL(category)
+    async () => invokeFredFunction({ category, forceRefresh }),
+    getCategoryTTL(category),
+    forceRefresh
   );
 }
 
 // Get data for a specific series
-export async function getEconomicSeries(seriesId: string) {
+export async function getEconomicSeries(seriesId: string, forceRefresh: boolean = false) {
   return fetchWithCache(
     `fred_series_${seriesId}`,
-    async () => invokeFredFunction({ seriesId }),
-    getSeriesTTL(seriesId)
+    async () => invokeFredFunction({ seriesId, forceRefresh }),
+    getSeriesTTL(seriesId),
+    forceRefresh
   );
 }
 

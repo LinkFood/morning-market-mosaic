@@ -15,6 +15,8 @@ interface InterestRateData {
   change: string;
   weeklyChange: string;
   date: string;
+  lastUpdated?: string;
+  formattedDate?: string;
   trend: { date: string; value: number }[];
   unit: string;
 }
@@ -57,14 +59,6 @@ const FredInterestRates = () => {
     if (change < 0) return <ArrowDown className="h-4 w-4" />;
     return <Minus className="h-4 w-4" />;
   };
-  
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   if (isLoading) {
     return (
@@ -106,9 +100,16 @@ const FredInterestRates = () => {
             <div key={rate.id} className="p-4 rounded-lg bg-secondary/50">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">{rate.name}</h3>
-                <span className="text-sm text-muted-foreground">
-                  {formatDate(rate.date)}
-                </span>
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground block">
+                    {rate.formattedDate || new Date(rate.date).toLocaleDateString()}
+                  </span>
+                  {rate.lastUpdated && rate.lastUpdated !== rate.date && (
+                    <span className="text-xs text-muted-foreground block">
+                      Updated: {new Date(rate.lastUpdated).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-end justify-between">
