@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +25,6 @@ const FredInterestRates = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Load interest rates data
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -34,7 +32,6 @@ const FredInterestRates = () => {
         const data = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.INTEREST_RATES);
         setRatesData(data);
         
-        // Get the timestamp from cache
         const timestamp = fedApiService.getFredCacheTimestamp(`fred_${ECONOMIC_CATEGORIES.INTEREST_RATES.toLowerCase()}`);
         setLastUpdated(timestamp);
       } catch (error) {
@@ -138,6 +135,7 @@ const FredInterestRates = () => {
                 {rate.trend && (
                   <SparklineChart 
                     data={rate.trend.map(t => t.value)} 
+                    dates={rate.trend.map(t => t.date)}
                     positive={parseFloat(rate.change) >= 0}
                     showAxis={true}
                     showLabels={true}

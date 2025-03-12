@@ -194,6 +194,7 @@ const FredEconomicIndicators = () => {
                 <div className="h-20 mt-4">
                   <SparklineChart 
                     data={indicator.trend.map(t => t.value)} 
+                    dates={indicator.trend.map(t => t.date)}
                     positive={indicator.id === "UNRATE" ? parseFloat(indicator.change) < 0 : parseFloat(indicator.change) >= 0}
                     showAxis={true}
                     showLabels={true}

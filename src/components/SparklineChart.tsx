@@ -1,6 +1,15 @@
 
+import React from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 interface SparklineChartProps {
   data: number[];
+  dates?: string[];
   positive: boolean;
   height?: number;
   width?: number;
@@ -11,6 +20,7 @@ interface SparklineChartProps {
 
 const SparklineChart = ({
   data,
+  dates,
   positive,
   height = 40,
   width = 100,
@@ -63,13 +73,17 @@ const SparklineChart = ({
     points.push({
       x: getX(0),
       y: getY(data[0]),
-      value: data[0]
+      value: data[0],
+      date: dates ? dates[0] : undefined,
+      index: 0
     });
     
     points.push({
       x: getX(data.length - 1),
       y: getY(data[data.length - 1]),
-      value: data[data.length - 1]
+      value: data[data.length - 1],
+      date: dates ? dates[data.length - 1] : undefined,
+      index: data.length - 1
     });
     
     // Show additional points based on labelCount
@@ -82,7 +96,9 @@ const SparklineChart = ({
           points.push({
             x: getX(i),
             y: getY(data[i]),
-            value: data[i]
+            value: data[i],
+            date: dates ? dates[i] : undefined,
+            index: i
           });
         }
       }
@@ -98,7 +114,9 @@ const SparklineChart = ({
           points.push({
             x: getX(minIndex),
             y: getY(min),
-            value: min
+            value: min,
+            date: dates ? dates[minIndex] : undefined,
+            index: minIndex
           });
         }
       }
@@ -109,7 +127,9 @@ const SparklineChart = ({
           points.push({
             x: getX(maxIndex),
             y: getY(max),
-            value: max
+            value: max,
+            date: dates ? dates[maxIndex] : undefined,
+            index: maxIndex
           });
         }
       }
@@ -132,88 +152,109 @@ const SparklineChart = ({
     }
   };
   
-  const points = showLabels ? generatePoints() : [];
+  const points = generatePoints();
   
   return (
-    <svg
-      width="100%"
-      height="100%"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-      className="overflow-visible"
-    >
-      {/* Background gradient */}
-      <defs>
-        <linearGradient id={`sparkline-gradient-${positive ? 'up' : 'down'}`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={positive ? "rgba(74, 222, 128, 0.3)" : "rgba(248, 113, 113, 0.3)"} />
-          <stop offset="100%" stopColor="rgba(0, 0, 0, 0)" />
-        </linearGradient>
-      </defs>
-      
-      {/* Area under the line */}
-      <path
-        d={`${generatePath()} L ${width} ${height} L 0 ${height} Z`}
-        fill={`url(#sparkline-gradient-${positive ? 'up' : 'down'})`}
-        opacity="0.5"
-      />
-      
-      {/* X and Y axes */}
-      {showAxis && (
-        <>
-          <line 
-            x1="0" 
-            y1={height} 
-            x2={width} 
-            y2={height} 
-            stroke="currentColor" 
-            strokeOpacity="0.2" 
-            strokeWidth="0.5" 
-          />
-          <line 
-            x1="0" 
-            y1="0" 
-            x2="0" 
-            y2={height} 
-            stroke="currentColor" 
-            strokeOpacity="0.2" 
-            strokeWidth="0.5" 
-          />
-        </>
-      )}
-      
-      {/* Main line */}
-      <path
-        d={generatePath()}
-        fill="none"
-        strokeWidth="1.5"
-        stroke={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"}
-        className="sparkline"
-      />
-      
-      {/* Data points */}
-      {showLabels && points.map((point, i) => (
-        <g key={i}>
-          <circle 
-            cx={point.x} 
-            cy={point.y} 
-            r="2" 
-            fill={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"} 
-            stroke="white"
-            strokeWidth="0.5"
-          />
-          <text 
-            x={point.x} 
-            y={point.y - 5} 
-            fontSize="6" 
-            textAnchor="middle" 
-            fill="currentColor"
-            fontWeight="medium"
-          >
-            {formatNumber(point.value)}
-          </text>
-        </g>
-      ))}
-    </svg>
+    <TooltipProvider>
+      <svg
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        className="overflow-visible"
+      >
+        {/* Background gradient */}
+        <defs>
+          <linearGradient id={`sparkline-gradient-${positive ? 'up' : 'down'}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={positive ? "rgba(74, 222, 128, 0.3)" : "rgba(248, 113, 113, 0.3)"} />
+            <stop offset="100%" stopColor="rgba(0, 0, 0, 0)" />
+          </linearGradient>
+        </defs>
+        
+        {/* Area under the line */}
+        <path
+          d={`${generatePath()} L ${width} ${height} L 0 ${height} Z`}
+          fill={`url(#sparkline-gradient-${positive ? 'up' : 'down'})`}
+          opacity="0.5"
+        />
+        
+        {/* X and Y axes */}
+        {showAxis && (
+          <>
+            <line 
+              x1="0" 
+              y1={height} 
+              x2={width} 
+              y2={height} 
+              stroke="currentColor" 
+              strokeOpacity="0.2" 
+              strokeWidth="0.5" 
+            />
+            <line 
+              x1="0" 
+              y1="0" 
+              x2="0" 
+              y2={height} 
+              stroke="currentColor" 
+              strokeOpacity="0.2" 
+              strokeWidth="0.5" 
+            />
+          </>
+        )}
+        
+        {/* Main line */}
+        <path
+          d={generatePath()}
+          fill="none"
+          strokeWidth="1.5"
+          stroke={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"}
+          className="sparkline"
+        />
+        
+        {/* Data points with tooltips */}
+        {points.map((point, i) => (
+          <g key={i}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <circle 
+                  cx={point.x} 
+                  cy={point.y} 
+                  r="2.5" 
+                  fill={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"} 
+                  stroke="white"
+                  strokeWidth="0.5"
+                  className="cursor-pointer hover:r-3 transition-all duration-200"
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs font-medium">
+                <div>
+                  <span className="font-semibold">Value:</span> {formatNumber(point.value)}
+                  {point.date && (
+                    <div>
+                      <span className="font-semibold">Date:</span> {point.date}
+                    </div>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+            
+            {/* Value labels (when showLabels is true) */}
+            {showLabels && (
+              <text 
+                x={point.x} 
+                y={point.y - 5} 
+                fontSize="6" 
+                textAnchor="middle" 
+                fill="currentColor"
+                fontWeight="medium"
+              >
+                {formatNumber(point.value)}
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
+    </TooltipProvider>
   );
 };
 

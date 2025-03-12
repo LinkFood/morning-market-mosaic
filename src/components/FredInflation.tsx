@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +24,6 @@ const FredInflation = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Load inflation data
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -33,7 +31,6 @@ const FredInflation = () => {
         const data = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.INFLATION);
         setInflationData(data);
         
-        // Get the timestamp from cache
         const timestamp = fedApiService.getFredCacheTimestamp(`fred_${ECONOMIC_CATEGORIES.INFLATION.toLowerCase()}`);
         setLastUpdated(timestamp);
       } catch (error) {
@@ -137,6 +134,7 @@ const FredInflation = () => {
                 {indicator.trend && (
                   <SparklineChart 
                     data={indicator.trend.map(t => t.value)} 
+                    dates={indicator.trend.map(t => t.date)}
                     positive={parseFloat(indicator.change) < 0}
                     showAxis={true}
                     showLabels={true}
