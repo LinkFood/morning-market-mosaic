@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowDown, ArrowUp, Minus, Database } from "lucide-react";
-import SparklineChart from "@/components/SparklineChart";
+import SparklineChart from "@/components/chart/SparklineChart";
 import fedApiService, { ECONOMIC_CATEGORIES } from "@/services/fedApiService";
 import { toast } from "sonner";
 

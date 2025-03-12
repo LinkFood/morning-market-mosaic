@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StockData } from "@/types/marketTypes";
-import SparklineChart from "./SparklineChart";
+import SparklineChart from "./chart/SparklineChart";
 import { useState, useEffect } from "react";
 import apiService from "@/services/apiService";
 
