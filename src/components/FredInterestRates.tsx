@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowDown, ArrowUp, Minus, TrendingUp } from "lucide-react";
-import SparklineChart from "@/components/chart/SparklineChart";
+import EnhancedChart from "@/components/chart/EnhancedChart";
 import fedApiService from "@/services/fred";
 import { ECONOMIC_CATEGORIES } from "@/services/fred/constants";
 import { toast } from "sonner";
@@ -133,15 +132,14 @@ const FredInterestRates = () => {
                 </div>
               </div>
               
-              <div className="h-20 mt-4">
+              <div className="h-48 mt-4">
                 {rate.trend && (
-                  <SparklineChart 
-                    data={rate.trend.map(t => t.value)} 
-                    dates={rate.trend.map(t => t.date)}
-                    positive={parseFloat(rate.change) >= 0}
-                    showAxis={true}
-                    showLabels={true}
-                    labelCount={6}
+                  <EnhancedChart
+                    data={rate.trend.map(t => ({ date: t.date, value: t.value }))}
+                    dataKeys={["value"]}
+                    xAxisKey="date"
+                    height={180}
+                    title={`${rate.name} Trend`}
                   />
                 )}
               </div>
