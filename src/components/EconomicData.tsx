@@ -91,7 +91,7 @@ const EconomicData = ({ indicators, isLoading = false }: EconomicDataProps) => {
           {indicators.map((indicator) => (
             <div key={indicator.id} className="p-4 rounded-lg bg-secondary/50">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium">{indicator.name}</h3>
+                <h3 className="font-medium text-primary">{indicator.name}</h3>
                 <span className="text-sm text-muted-foreground">
                   {indicator.date ? formatDate(indicator.date) : "Latest"}
                 </span>
@@ -99,9 +99,14 @@ const EconomicData = ({ indicators, isLoading = false }: EconomicDataProps) => {
               
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-2xl font-semibold">
-                    {indicator.value.toLocaleString()}{indicator.unit}
-                  </p>
+                  <div className="flex items-baseline">
+                    <p className="text-2xl font-semibold">
+                      {indicator.value.toLocaleString()}{indicator.unit}
+                    </p>
+                    <p className="text-xs ml-2 font-medium text-muted-foreground">
+                      {getIndicatorDescription(indicator.id)}
+                    </p>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Previous: {indicator.previous.toLocaleString()}{indicator.unit}
                   </p>
@@ -123,5 +128,31 @@ const EconomicData = ({ indicators, isLoading = false }: EconomicDataProps) => {
     </Card>
   );
 };
+
+// Helper function to get descriptions for economic indicators
+function getIndicatorDescription(id: string): string {
+  switch (id) {
+    case "GDPC1":
+      return "Real GDP";
+    case "A191RL1Q225SBEA":
+      return "GDP Growth Rate";
+    case "UNRATE":
+      return "Unemployment Rate";
+    case "PAYEMS":
+      return "Nonfarm Payrolls";
+    case "CPIAUCSL":
+      return "Consumer Price Index";
+    case "PCEPI":
+      return "Personal Consumption Expenditures";
+    case "FEDFUNDS":
+      return "Fed Funds Rate";
+    case "DGS10":
+      return "10-Year Treasury";
+    case "T10Y2Y":
+      return "10Y-2Y Spread";
+    default:
+      return "";
+  }
+}
 
 export default EconomicData;

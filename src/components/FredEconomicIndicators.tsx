@@ -73,14 +73,15 @@ const FredEconomicIndicators = () => {
     loadData();
   }, []);
 
-  const getChangeColor = (change: number) => {
+  const getChangeColor = (change: number, indicatorId: string) => {
     // For unemployment, decreasing is positive
-    if (change < 0 && indicators.find(i => i.id === "UNRATE")?.id === "UNRATE") {
+    if (change < 0 && indicatorId === "UNRATE") {
       return "ticker-up";
     }
     // For other indicators
-    if (change > 0) return "ticker-up";
-    if (change < 0) return "ticker-down";
+    if (change > 0 && indicatorId !== "UNRATE") return "ticker-up";
+    if (change < 0 && indicatorId !== "UNRATE") return "ticker-down";
+    if (change > 0 && indicatorId === "UNRATE") return "ticker-down";
     return "ticker-neutral";
   };
   
@@ -94,6 +95,22 @@ const FredEconomicIndicators = () => {
       if (change < 0) return <ArrowDown className="h-4 w-4" />;
     }
     return <Minus className="h-4 w-4" />;
+  };
+
+  // Helper function to get descriptions for economic indicators
+  const getIndicatorDescription = (id: string): string => {
+    switch (id) {
+      case "GDPC1":
+        return "Real Gross Domestic Product";
+      case "A191RL1Q225SBEA":
+        return "GDP Growth Rate (Quarterly)";
+      case "UNRATE":
+        return "Unemployment Rate";
+      case "PAYEMS":
+        return "Total Nonfarm Payrolls";
+      default:
+        return "";
+    }
   };
 
   if (isLoading) {
@@ -157,11 +174,14 @@ const FredEconomicIndicators = () => {
                     {indicator.value}{indicator.unit}
                   </p>
                   <p className="text-sm text-muted-foreground">
+                    {getIndicatorDescription(indicator.id)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
                     Previous: {indicator.previous}{indicator.unit}
                   </p>
                 </div>
                 
-                <div className={getChangeColor(parseFloat(indicator.change))}>
+                <div className={getChangeColor(parseFloat(indicator.change), indicator.id)}>
                   {getChangeSymbol(parseFloat(indicator.change), indicator.id)}
                   <span className="ml-1">
                     {parseFloat(indicator.change) >= 0 ? "+" : ""}
@@ -171,10 +191,12 @@ const FredEconomicIndicators = () => {
               </div>
               
               {indicator.trend && (
-                <div className="h-12 mt-2">
+                <div className="h-20 mt-4">
                   <SparklineChart 
                     data={indicator.trend.map(t => t.value)} 
                     positive={indicator.id === "UNRATE" ? parseFloat(indicator.change) < 0 : parseFloat(indicator.change) >= 0}
+                    showAxis={true}
+                    showLabels={true}
                   />
                 </div>
               )}

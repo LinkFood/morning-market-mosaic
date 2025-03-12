@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Database } from "lucide-react";
+import { ArrowLeft, RefreshCw, Database, LineChart } from "lucide-react";
 import FredInterestRates from "@/components/FredInterestRates";
 import FredInflation from "@/components/FredInflation";
 import FredEconomicIndicators from "@/components/FredEconomicIndicators";
@@ -63,7 +63,10 @@ const FedDashboard = () => {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-3xl font-bold">Federal Reserve Data Dashboard</h1>
+              <h1 className="text-3xl font-bold flex items-center">
+                <LineChart className="h-7 w-7 mr-2 text-primary" />
+                Federal Reserve Data Dashboard
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               {lastUpdated && (
