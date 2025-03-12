@@ -20,15 +20,17 @@ export async function fetchAndProcessBaseData(seriesId: string, timeSpan = 12) {
   const releaseInfo = await getSeriesReleaseInfo(seriesId);
   const realTimeStart = releaseInfo?.releases?.[0]?.realtime_start || null;
   
-  const latestObs = data.observations[0];
-  const previousObs = data.observations[1];
+  // Since data is now in ascending order, get latest observations from the end
+  const observations = data.observations;
+  const latestObs = observations[observations.length - 1];
+  const previousObs = observations[observations.length - 2];
   
   return {
     data,
     latestObs,
     previousObs,
     realTimeStart,
-    trend: [...data.observations].reverse().map(obs => ({
+    trend: observations.map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))

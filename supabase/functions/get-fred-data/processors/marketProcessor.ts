@@ -11,12 +11,14 @@ export async function processMarketData(seriesId: string, timeSpan = 12) {
     trend 
   } = await fetchAndProcessBaseData(seriesId, timeSpan);
   
-  const weekAgoIndex = Math.min(5, data.observations.length - 1);
-  const weekAgoObs = data.observations[weekAgoIndex];
+  // Since data is now in ascending order, find the week-ago observation from the end
+  const observations = data.observations;
+  const weekAgoIndex = Math.max(0, observations.length - 6); // 5 days back from latest
+  const weekAgoObs = observations[weekAgoIndex];
   
   const latestValue = parseFloat(latestObs.value);
   const previousValue = parseFloat(previousObs.value);
-  const weekAgoValue = parseFloat(weekAgoObs.value);
+  const weekAgoValue = parseFloat(weekAgoObs?.value || '0');
   
   const dailyChange = latestValue - previousValue;
   const weeklyChange = latestValue - weekAgoValue;

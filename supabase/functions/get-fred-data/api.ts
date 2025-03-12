@@ -50,7 +50,7 @@ export function calculateObservationLimit(timeSpan: number, frequency: string): 
 }
 
 // Fetch series observations with improved parameters to ensure latest data
-export async function fetchSeriesObservations(seriesId: string, timeSpan = 12, sortOrder = "desc") {
+export async function fetchSeriesObservations(seriesId: string, timeSpan = 12, sortOrder = "asc") {
   // Find the series to determine its frequency
   let frequency = "MONTHLY"; // default
   
@@ -79,7 +79,8 @@ export async function fetchSeriesObservations(seriesId: string, timeSpan = 12, s
   const formattedStartDate = startDate.toISOString().split('T')[0];
   
   // Use observation_start and observation_end for more precise date ranges
-  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=${sortOrder}&limit=${limit}&observation_start=${formattedStartDate}&observation_end=${todayDate}`;
+  // Changed sort_order from ${sortOrder} to 'asc' to ensure chronological order
+  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&limit=${limit}&observation_start=${formattedStartDate}&observation_end=${todayDate}`;
   
   console.log(`Fetching FRED data for ${seriesId} with end date ${todayDate} and limit ${limit}`);
   return fetchWithRetry(url);

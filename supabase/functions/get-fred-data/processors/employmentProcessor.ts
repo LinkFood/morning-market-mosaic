@@ -22,8 +22,10 @@ export async function processEmploymentData(seriesId: string, timeSpan = 12) {
   
   // For initial claims, we also want to show a 4-week average
   let fourWeekAvg = null;
+  // Since data is now in ascending order, take the most recent 4 weeks from the end
   if (seriesId === "ICSA" && data.observations.length >= 4) {
-    fourWeekAvg = data.observations.slice(0, 4).reduce((sum, obs) => sum + parseFloat(obs.value), 0) / 4;
+    const observations = data.observations;
+    fourWeekAvg = observations.slice(-4).reduce((sum, obs) => sum + parseFloat(obs.value), 0) / 4;
     fourWeekAvg = Math.round(fourWeekAvg / 1000); // Convert to thousands
   }
   
