@@ -5,15 +5,50 @@ import { CacheItem } from "./types";
 
 /**
  * Saves data to local storage with a timestamp
+ * Handles storage quota errors by removing oldest items
  */
 export function cacheData<T>(cacheKey: string, data: T): void {
-  localStorage.setItem(
-    cacheKey,
-    JSON.stringify({
+  try {
+    const serializedData = JSON.stringify({
       data,
       timestamp: Date.now(),
-    })
-  );
+    });
+    
+    localStorage.setItem(cacheKey, serializedData);
+    console.log(`Cached ${cacheKey} with ${serializedData.length} bytes of data`);
+  } catch (error) {
+    console.error(`Failed to cache ${cacheKey}:`, error);
+    
+    // Handle quota exceeded errors by clearing older caches
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      // Find all FRED cache keys
+      const fredKeys = Object.keys(localStorage).filter(key => key.startsWith('fred_'));
+      if (fredKeys.length > 0) {
+        // Remove the oldest cached item
+        const oldestKey = fredKeys.reduce((oldest, key) => {
+          try {
+            const item = JSON.parse(localStorage.getItem(key) || '{}');
+            const oldestItem = JSON.parse(localStorage.getItem(oldest) || '{"timestamp": Infinity}');
+            return (item.timestamp || 0) < (oldestItem.timestamp || 0) ? key : oldest;
+          } catch (e) {
+            return oldest; // If parse fails, keep the current oldest
+          }
+        }, fredKeys[0]);
+        
+        console.log(`Removing oldest cache item ${oldestKey} to make space`);
+        localStorage.removeItem(oldestKey);
+        
+        // Try caching again
+        try {
+          localStorage.setItem(cacheKey, serializedData);
+          console.log(`Successfully cached ${cacheKey} after removing oldest item`);
+        } catch (retryError) {
+          console.error('Still failed to cache after clearing space:', retryError);
+          toast.error("Failed to store data in cache");
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -27,10 +62,13 @@ export function getCachedData<T>(cacheKey: string, ttl: number): CacheItem<T> | 
     try {
       const parsedItem: CacheItem<T> = JSON.parse(cachedItem);
       const now = Date.now();
+      const age = now - parsedItem.timestamp;
       
-      if (now - parsedItem.timestamp < ttl) {
-        console.log(`Using cached FRED data for ${cacheKey}`);
+      if (age < ttl) {
+        console.log(`Using cached FRED data for ${cacheKey} (age: ${Math.round(age/1000)}s, ttl: ${Math.round(ttl/1000)}s)`);
         return parsedItem;
+      } else {
+        console.log(`Cache expired for ${cacheKey} (age: ${Math.round(age/1000)}s, ttl: ${Math.round(ttl/1000)}s)`);
       }
     } catch (error) {
       console.error(`Error parsing cached data for ${cacheKey}:`, error);
@@ -71,6 +109,45 @@ export function clearFredCacheData(): number {
   console.log(`Cleared ${count} FRED data cache items`);
   toast.success("FRED data cache cleared, refreshing data");
   return count;
+}
+
+/**
+ * Get cache stats (usage, count, etc)
+ */
+export function getFredCacheStats() {
+  let totalBytes = 0;
+  let count = 0;
+  const itemStats = [];
+  
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith("fred_")) {
+      const item = localStorage.getItem(key);
+      const bytes = item ? new Blob([item]).size : 0;
+      totalBytes += bytes;
+      count++;
+      
+      try {
+        const parsed = JSON.parse(item || '{}');
+        const timestamp = parsed.timestamp ? new Date(parsed.timestamp) : null;
+        
+        itemStats.push({
+          key,
+          bytes,
+          timestamp,
+          age: timestamp ? Math.round((Date.now() - timestamp.getTime()) / 1000) : null
+        });
+      } catch (e) {
+        itemStats.push({ key, bytes, error: 'Invalid JSON' });
+      }
+    }
+  });
+  
+  return {
+    totalItems: count,
+    totalBytes,
+    averageBytes: count > 0 ? Math.round(totalBytes / count) : 0,
+    items: itemStats
+  };
 }
 
 /**
