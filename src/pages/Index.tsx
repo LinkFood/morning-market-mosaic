@@ -8,7 +8,7 @@ import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
 import apiService, { getCacheTimestamp } from "@/services/apiService";
-import fedApiService from "@/services/fedApiService";
+import fedApiService from "@/services/fred";
 import { MarketIndex, SectorPerformance as SectorType, StockData, EconomicIndicator, MarketEvent, UserSettings } from "@/types/marketTypes";
 import { toast } from "sonner";
 import { useTheme } from "@/components/theme-provider";
