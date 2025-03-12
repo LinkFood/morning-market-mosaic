@@ -1,9 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTheme } from "@/components/theme-provider";
+import EnhancedChart from "@/components/chart/EnhancedChart";
 
 // Mock futures data (would be replaced with real API data)
 const generateMockFuturesData = () => {
@@ -18,9 +17,9 @@ const generateMockFuturesData = () => {
     
     const value = baseValue + (trend * i * (Math.random() * 5));
     data.push({
-      time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      value: value.toFixed(2),
-      fullTime: time
+      date: time.toISOString(), // Using ISO string for date format
+      value: parseFloat(value.toFixed(2)),
+      displayTime: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   }
   
@@ -30,7 +29,6 @@ const generateMockFuturesData = () => {
 const ES1FuturesChart = () => {
   const [futuresData, setFuturesData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { theme } = useTheme();
   
   useEffect(() => {
     // Simulating API call to get futures data
@@ -41,14 +39,14 @@ const ES1FuturesChart = () => {
     }, 800);
   }, []);
   
-  const currentValue = futuresData.length > 0 ? parseFloat(futuresData[futuresData.length - 1].value) : 0;
-  const previousValue = futuresData.length > 0 ? parseFloat(futuresData[0].value) : 0;
+  // Calculate current value, change and percentage change
+  const currentValue = futuresData.length > 0 ? futuresData[futuresData.length - 1].value : 0;
+  const previousValue = futuresData.length > 0 ? futuresData[0].value : 0;
   const change = currentValue - previousValue;
   const changePercent = ((change / previousValue) * 100).toFixed(2);
   
   const isPositive = change >= 0;
-  const tickerClass = isPositive ? 'ticker-up' : 'ticker-down';
-  const chartColor = isPositive ? '#16a34a' : '#dc2626';
+  const tickerClass = isPositive ? 'text-positive' : 'text-negative';
   
   return (
     <Card className="shadow-md transition-all duration-300 hover:shadow-lg">
@@ -67,7 +65,7 @@ const ES1FuturesChart = () => {
           ) : (
             <div className="flex flex-col items-end">
               <span className="text-2xl font-bold">
-                {parseFloat(futuresData[futuresData.length - 1]?.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <span className={`text-sm font-medium ${tickerClass}`}>
                 {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent}%)
@@ -82,41 +80,13 @@ const ES1FuturesChart = () => {
           <Skeleton className="h-[300px] w-full rounded-md" />
         ) : (
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={futuresData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis 
-                  dataKey="time" 
-                  tick={{ fontSize: 12 }} 
-                  tickCount={6} 
-                  stroke={theme === 'dark' ? '#888888' : '#666666'}
-                />
-                <YAxis 
-                  domain={['auto', 'auto']} 
-                  tick={{ fontSize: 12 }} 
-                  tickCount={8} 
-                  width={60} 
-                  stroke={theme === 'dark' ? '#888888' : '#666666'}
-                />
-                <Tooltip 
-                  formatter={(value: any) => [`${parseFloat(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Price']}
-                  labelFormatter={(time) => `Time: ${time}`}
-                  contentStyle={{ 
-                    backgroundColor: theme === 'dark' ? '#333333' : '#ffffff',
-                    borderColor: theme === 'dark' ? '#555555' : '#e2e8f0',
-                    color: theme === 'dark' ? '#ffffff' : '#000000',
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke={chartColor} 
-                  strokeWidth={2} 
-                  dot={false} 
-                  activeDot={{ r: 6, stroke: chartColor, strokeWidth: 2, fill: theme === 'dark' ? '#333333' : '#ffffff' }} 
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <EnhancedChart
+              data={futuresData}
+              height={300}
+              dataKeys={["value"]}
+              xAxisKey="date"
+              title="S&P 500 E-mini Futures (Real-time)"
+            />
           </div>
         )}
       </CardContent>
