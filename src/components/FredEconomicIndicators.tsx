@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowDown, ArrowUp, Minus, Database } from "lucide-react";
-import SparklineChart from "@/components/chart/SparklineChart";
+import EnhancedChart from "@/components/chart/EnhancedChart";
 import fedApiService from "@/services/fred";
 import { ECONOMIC_CATEGORIES } from "@/services/fred/constants";
 import { toast } from "sonner";
@@ -26,32 +25,26 @@ const FredEconomicIndicators = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Types of economic indicators to fetch
   const economiCategories = [
     ECONOMIC_CATEGORIES.ECONOMIC_GROWTH,
     ECONOMIC_CATEGORIES.EMPLOYMENT
   ];
 
-  // Load economic data
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Fetch different categories of economic data
         const growthData = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.ECONOMIC_GROWTH);
         const employmentData = await fedApiService.getEconomicCategory(ECONOMIC_CATEGORIES.EMPLOYMENT);
         
-        // Combine and filter primary indicators
         const allIndicators = [...growthData, ...employmentData];
         
-        // Pick important indicators for the dashboard
         const primaryIndicators = allIndicators.filter(indicator => 
           ["GDPC1", "A191RL1Q225SBEA", "UNRATE", "PAYEMS"].includes(indicator.id)
         );
         
         setIndicators(primaryIndicators);
         
-        // Get the most recent timestamp from cache
         const categories = economiCategories.map(cat => cat.toLowerCase());
         let mostRecentTimestamp: Date | null = null;
         
@@ -75,11 +68,9 @@ const FredEconomicIndicators = () => {
   }, []);
 
   const getChangeColor = (change: number, indicatorId: string) => {
-    // For unemployment, decreasing is positive
     if (change < 0 && indicatorId === "UNRATE") {
       return "ticker-up";
     }
-    // For other indicators
     if (change > 0 && indicatorId !== "UNRATE") return "ticker-up";
     if (change < 0 && indicatorId !== "UNRATE") return "ticker-down";
     if (change > 0 && indicatorId === "UNRATE") return "ticker-down";
@@ -87,7 +78,6 @@ const FredEconomicIndicators = () => {
   };
   
   const getChangeSymbol = (change: number, indicatorId: string) => {
-    // For unemployment, down arrow is positive
     if (indicatorId === "UNRATE") {
       if (change < 0) return <ArrowDown className="h-4 w-4" />;
       if (change > 0) return <ArrowUp className="h-4 w-4" />;
@@ -98,7 +88,6 @@ const FredEconomicIndicators = () => {
     return <Minus className="h-4 w-4" />;
   };
 
-  // Helper function to get descriptions for economic indicators
   const getIndicatorDescription = (id: string): string => {
     switch (id) {
       case "GDPC1":
@@ -192,13 +181,13 @@ const FredEconomicIndicators = () => {
               </div>
               
               {indicator.trend && (
-                <div className="h-20 mt-4">
-                  <SparklineChart 
-                    data={indicator.trend.map(t => t.value)} 
-                    dates={indicator.trend.map(t => t.date)}
-                    positive={indicator.id === "UNRATE" ? parseFloat(indicator.change) < 0 : parseFloat(indicator.change) >= 0}
-                    showAxis={true}
-                    showLabels={true}
+                <div className="h-48 mt-4">
+                  <EnhancedChart
+                    data={indicator.trend.map(t => ({ date: t.date, value: t.value }))}
+                    dataKeys={["value"]}
+                    xAxisKey="date"
+                    height={180}
+                    title={`${indicator.name} Trend`}
                   />
                 </div>
               )}
