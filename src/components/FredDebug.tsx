@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import fedApiService from "@/services/fred";
+import { TimeSpan } from "@/services/fred/types";
 import { toast } from "sonner";
 
 interface TestResult {
@@ -28,7 +29,7 @@ const FredDebug = () => {
   const testEdgeFunction = async () => {
     setIsLoading(true);
     try {
-      const response = await fedApiService.getEconomicSeries("FEDFUNDS", true);
+      const response = await fedApiService.getEconomicSeries("FEDFUNDS", TimeSpan.ONE_MONTH, true);
       addResult({
         name: "Edge Function Test",
         status: "success",
