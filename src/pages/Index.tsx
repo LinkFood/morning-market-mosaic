@@ -8,6 +8,7 @@ import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
 import apiService, { getCacheTimestamp } from "@/services/apiService";
+import fedApiService from "@/services/fedApiService";
 import { MarketIndex, SectorPerformance as SectorType, StockData, EconomicIndicator, MarketEvent, UserSettings } from "@/types/marketTypes";
 import { toast } from "sonner";
 import { useTheme } from "@/components/theme-provider";
@@ -29,6 +30,7 @@ const Dashboard = () => {
   
   // State for UI
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingEcon, setIsLoadingEcon] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   
@@ -50,6 +52,37 @@ const Dashboard = () => {
     localStorage.setItem("market_dashboard_settings", JSON.stringify(newSettings));
     toast.success("Settings updated");
     loadData(); // Reload data with new settings
+  };
+  
+  // Function to load economic indicators from FRED
+  const loadEconomicIndicators = async () => {
+    setIsLoadingEcon(true);
+    try {
+      // Get key economic indicators from FRED 
+      // GDP, GDP Growth, Unemployment, Inflation (CPI)
+      const keySeriesIds = ["GDPC1", "A191RL1Q225SBEA", "UNRATE", "CPIAUCSL"];
+      const promises = keySeriesIds.map(seriesId => fedApiService.getEconomicSeries(seriesId));
+      
+      const results = await Promise.all(promises);
+      
+      // Convert to EconomicIndicator type
+      const fedIndicators: EconomicIndicator[] = results.map(item => ({
+        id: item.id,
+        name: item.name,
+        value: parseFloat(item.value),
+        previous: parseFloat(item.previous),
+        change: parseFloat(item.change),
+        unit: item.unit,
+        date: item.date
+      }));
+      
+      setIndicators(fedIndicators);
+    } catch (error) {
+      console.error("Error loading economic indicators:", error);
+      toast.error("Failed to load economic indicators");
+    } finally {
+      setIsLoadingEcon(false);
+    }
   };
   
   // Function to load all market data
@@ -75,13 +108,12 @@ const Dashboard = () => {
       const stocksData = await apiService.getMajorStocks(settings.watchlist);
       setStocks(stocksData);
       
-      // Load economic indicators
-      const indicatorsData = await apiService.getEconomicIndicators();
-      setIndicators(indicatorsData);
-      
       // Load market events
       const eventsData = await apiService.getMarketEvents();
       setEvents(eventsData);
+      
+      // Load economic indicators separately
+      loadEconomicIndicators();
       
     } catch (error) {
       console.error("Error loading market data:", error);
@@ -114,7 +146,7 @@ const Dashboard = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <MarketOverview indices={indices} />
-          <EconomicData indicators={indicators} />
+          <EconomicData indicators={indicators} isLoading={isLoadingEcon} />
           
           <div className="md:col-span-2">
             <MajorStocks stocks={stocks} />

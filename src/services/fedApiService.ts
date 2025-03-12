@@ -81,11 +81,17 @@ async function fetchWithCache<T>(
 // Invoke the Supabase Edge Function to get FRED data
 async function invokeFredFunction(params: any) {
   try {
+    console.log("Invoking FRED function with params:", params);
     const { data, error } = await supabase.functions.invoke(SUPABASE_FRED_FUNCTION, {
       body: params
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error("FRED function error:", error);
+      throw error;
+    }
+    
+    console.log("FRED function response:", data);
     return data;
   } catch (error) {
     console.error("Error calling FRED API function:", error);
@@ -95,6 +101,7 @@ async function invokeFredFunction(params: any) {
 
 // Get data for a specific economic category
 export async function getEconomicCategory(category: string, forceRefresh: boolean = false) {
+  console.log(`Getting data for category: ${category}, forceRefresh: ${forceRefresh}`);
   return fetchWithCache(
     `fred_${category.toLowerCase()}`,
     async () => invokeFredFunction({ category, forceRefresh }),
@@ -105,6 +112,7 @@ export async function getEconomicCategory(category: string, forceRefresh: boolea
 
 // Get data for a specific series
 export async function getEconomicSeries(seriesId: string, forceRefresh: boolean = false) {
+  console.log(`Getting data for series: ${seriesId}, forceRefresh: ${forceRefresh}`);
   return fetchWithCache(
     `fred_series_${seriesId}`,
     async () => invokeFredFunction({ seriesId, forceRefresh }),
@@ -144,11 +152,14 @@ function getSeriesTTL(seriesId: string): number {
 
 // Clear all FRED cache data
 export function clearFredCacheData() {
+  let count = 0;
   Object.keys(localStorage).forEach((key) => {
     if (key.startsWith("fred_")) {
       localStorage.removeItem(key);
+      count++;
     }
   });
+  console.log(`Cleared ${count} FRED data cache items`);
   toast.success("FRED data cache cleared, refreshing data");
 }
 
@@ -156,8 +167,13 @@ export function clearFredCacheData() {
 export function getFredCacheTimestamp(cacheKey: string): Date | null {
   const cachedItem = localStorage.getItem(cacheKey);
   if (cachedItem) {
-    const parsedItem = JSON.parse(cachedItem);
-    return new Date(parsedItem.timestamp);
+    try {
+      const parsedItem = JSON.parse(cachedItem);
+      return new Date(parsedItem.timestamp);
+    } catch (error) {
+      console.error(`Error parsing cache timestamp for ${cacheKey}:`, error);
+      return null;
+    }
   }
   return null;
 }

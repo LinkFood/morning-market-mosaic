@@ -2,14 +2,16 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, Database } from "lucide-react";
 import FredInterestRates from "@/components/FredInterestRates";
 import FredInflation from "@/components/FredInflation";
+import FredEconomicIndicators from "@/components/FredEconomicIndicators";
 import fedApiService from "@/services/fedApiService";
 import { toast } from "sonner";
 
 const FedDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Function to refresh all Fed data with force flag
   const refreshData = async () => {
@@ -26,6 +28,30 @@ const FedDashboard = () => {
     }
   };
 
+  // Check for last update time
+  useEffect(() => {
+    // Use the most recent cache timestamp across all economic categories
+    const categories = [
+      "interest_rates",
+      "inflation",
+      "economic_growth",
+      "employment"
+    ];
+    
+    let mostRecentUpdate: Date | null = null;
+    
+    categories.forEach(category => {
+      const timestamp = fedApiService.getFredCacheTimestamp(`fred_${category}`);
+      if (timestamp) {
+        if (!mostRecentUpdate || timestamp > mostRecentUpdate) {
+          mostRecentUpdate = timestamp;
+        }
+      }
+    });
+    
+    setLastUpdated(mostRecentUpdate);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
       <div className="container mx-auto py-6 px-4">
@@ -39,15 +65,22 @@ const FedDashboard = () => {
               </Link>
               <h1 className="text-3xl font-bold">Federal Reserve Data Dashboard</h1>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={refreshData}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Force Data Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              {lastUpdated && (
+                <span className="text-sm text-muted-foreground mr-2">
+                  Last updated: {lastUpdated.toLocaleString()}
+                </span>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refreshData}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Force Data Refresh
+              </Button>
+            </div>
           </div>
           <p className="text-muted-foreground">
             Real-time economic indicators and Federal Reserve data
@@ -55,6 +88,9 @@ const FedDashboard = () => {
         </header>
 
         <div className="grid grid-cols-1 gap-6">
+          {/* Economic Indicators Section */}
+          <FredEconomicIndicators />
+          
           {/* Interest Rates Section */}
           <FredInterestRates />
           

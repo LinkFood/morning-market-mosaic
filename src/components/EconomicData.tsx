@@ -1,22 +1,40 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EconomicIndicator } from "@/types/marketTypes";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Database } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface EconomicDataProps {
   indicators: EconomicIndicator[];
+  isLoading?: boolean;
 }
 
-const EconomicData = ({ indicators }: EconomicDataProps) => {
-  const getChangeColor = (change: number) => {
+const EconomicData = ({ indicators, isLoading = false }: EconomicDataProps) => {
+  const getChangeColor = (change: number, indicatorId?: string) => {
+    // For unemployment, decreasing is positive
+    if (change < 0 && indicatorId === "UNRATE") {
+      return "ticker-up";
+    }
+    // For inflation (CPI), decreasing is positive
+    if (change < 0 && indicatorId === "CPIAUCSL") {
+      return "ticker-up";
+    }
+    // For other indicators
     if (change > 0) return "ticker-up";
     if (change < 0) return "ticker-down";
     return "ticker-neutral";
   };
   
-  const getChangeSymbol = (change: number) => {
-    if (change > 0) return <ArrowUp className="h-4 w-4" />;
-    if (change < 0) return <ArrowDown className="h-4 w-4" />;
+  const getChangeSymbol = (change: number, indicatorId?: string) => {
+    // For unemployment and inflation, down arrow is positive
+    if (indicatorId === "UNRATE" || indicatorId === "CPIAUCSL") {
+      if (change < 0) return <ArrowDown className="h-4 w-4" />;
+      if (change > 0) return <ArrowUp className="h-4 w-4" />;
+    } else {
+      if (change > 0) return <ArrowUp className="h-4 w-4" />;
+      if (change < 0) return <ArrowDown className="h-4 w-4" />;
+    }
     return <Minus className="h-4 w-4" />;
   };
   
@@ -27,11 +45,46 @@ const EconomicData = ({ indicators }: EconomicDataProps) => {
       day: "numeric",
     });
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Database className="h-5 w-5 mr-2" />
+            <span>Economic Indicators</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-4 rounded-lg bg-secondary/50">
+                <Skeleton className="h-6 w-1/2 mb-2" />
+                <Skeleton className="h-8 w-1/3 mb-1" />
+                <Skeleton className="h-4 w-1/4 mb-2" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card className="animate-fade-in">
       <CardHeader>
-        <CardTitle>Economic Indicators</CardTitle>
+        <CardTitle className="flex justify-between items-center">
+          <div className="flex items-center">
+            <Database className="h-5 w-5 mr-2" />
+            <span>Economic Indicators</span>
+          </div>
+          <Link 
+            to="/fed-dashboard" 
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            View Full Dashboard →
+          </Link>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -40,7 +93,7 @@ const EconomicData = ({ indicators }: EconomicDataProps) => {
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">{indicator.name}</h3>
                 <span className="text-sm text-muted-foreground">
-                  {formatDate(indicator.date)}
+                  {indicator.date ? formatDate(indicator.date) : "Latest"}
                 </span>
               </div>
               
@@ -54,8 +107,8 @@ const EconomicData = ({ indicators }: EconomicDataProps) => {
                   </p>
                 </div>
                 
-                <div className={`flex items-center ${getChangeColor(indicator.change)}`}>
-                  {getChangeSymbol(indicator.change)}
+                <div className={`flex items-center ${getChangeColor(indicator.change, indicator.id)}`}>
+                  {getChangeSymbol(indicator.change, indicator.id)}
                   <span className="ml-1">
                     {indicator.change >= 0 ? "+" : ""}
                     {indicator.change.toFixed(1)}
