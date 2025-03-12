@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, TrendingUp } from "lucide-react";
 import SparklineChart from "@/components/SparklineChart";
 import fedApiService, { ECONOMIC_CATEGORIES } from "@/services/fedApiService";
 import { toast } from "sonner";
@@ -86,7 +86,10 @@ const FredInterestRates = () => {
     <Card className="animate-fade-in">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Interest Rates</span>
+          <div className="flex items-center">
+            <TrendingUp className="h-5 w-5 mr-2 text-primary" />
+            <span>Interest Rates</span>
+          </div>
           {lastUpdated && (
             <span className="text-sm font-normal text-muted-foreground">
               Updated: {lastUpdated.toLocaleString()}
@@ -131,11 +134,14 @@ const FredInterestRates = () => {
                 </div>
               </div>
               
-              <div className="h-12 mt-2">
+              <div className="h-20 mt-4">
                 {rate.trend && (
                   <SparklineChart 
                     data={rate.trend.map(t => t.value)} 
                     positive={parseFloat(rate.change) >= 0}
+                    showAxis={true}
+                    showLabels={true}
+                    labelCount={6}
                   />
                 )}
               </div>

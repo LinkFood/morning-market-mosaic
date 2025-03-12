@@ -6,6 +6,7 @@ interface SparklineChartProps {
   width?: number;
   showAxis?: boolean;
   showLabels?: boolean;
+  labelCount?: number;
 }
 
 const SparklineChart = ({
@@ -14,7 +15,8 @@ const SparklineChart = ({
   height = 40,
   width = 100,
   showAxis = false,
-  showLabels = false
+  showLabels = false,
+  labelCount = 6
 }: SparklineChartProps) => {
   if (!data || data.length === 0) {
     return <div className="h-full w-full bg-muted/30 rounded animate-pulse-light"></div>;
@@ -53,46 +55,68 @@ const SparklineChart = ({
       .join(" ");
   };
 
-  // Generate points for important data markers
+  // Generate points for data markers
   const generatePoints = () => {
-    // Only show first, last, min and max points
     const points = [];
     
-    // First point
+    // Always show first and last points
     points.push({
       x: getX(0),
       y: getY(data[0]),
       value: data[0]
     });
     
-    // Last point
     points.push({
       x: getX(data.length - 1),
       y: getY(data[data.length - 1]),
       value: data[data.length - 1]
     });
     
-    // Min point (if not first or last)
-    const minIndex = data.indexOf(min);
-    if (minIndex !== 0 && minIndex !== data.length - 1) {
-      points.push({
-        x: getX(minIndex),
-        y: getY(min),
-        value: min
-      });
+    // Show additional points based on labelCount
+    if (data.length > 2 && labelCount > 2) {
+      const step = Math.max(1, Math.floor(data.length / (labelCount - 1)));
+      
+      // Add intermediate points at regular intervals
+      for (let i = step; i < data.length - 1; i += step) {
+        if (points.length < labelCount - 1) { // Ensure we don't add too many points
+          points.push({
+            x: getX(i),
+            y: getY(data[i]),
+            value: data[i]
+          });
+        }
+      }
+      
+      // Always add min and max points if they're not already included
+      const minIndex = data.indexOf(min);
+      const maxIndex = data.indexOf(max);
+      
+      // Only add min/max if they're not the first or last point
+      if (minIndex !== 0 && minIndex !== data.length - 1) {
+        // Check if this point or a nearby point is already included
+        if (!points.some(p => Math.abs(p.x - getX(minIndex)) < width / (labelCount * 2))) {
+          points.push({
+            x: getX(minIndex),
+            y: getY(min),
+            value: min
+          });
+        }
+      }
+      
+      if (maxIndex !== 0 && maxIndex !== data.length - 1) {
+        // Check if this point or a nearby point is already included
+        if (!points.some(p => Math.abs(p.x - getX(maxIndex)) < width / (labelCount * 2))) {
+          points.push({
+            x: getX(maxIndex),
+            y: getY(max),
+            value: max
+          });
+        }
+      }
     }
     
-    // Max point (if not first or last)
-    const maxIndex = data.indexOf(max);
-    if (maxIndex !== 0 && maxIndex !== data.length - 1) {
-      points.push({
-        x: getX(maxIndex),
-        y: getY(max),
-        value: max
-      });
-    }
-    
-    return points;
+    // Sort points by x-coordinate for consistent rendering
+    return points.sort((a, b) => a.x - b.x);
   };
   
   // Format number for display
@@ -101,8 +125,10 @@ const SparklineChart = ({
       return (num / 1000000).toFixed(1) + 'M';
     } else if (Math.abs(num) >= 1000) {
       return (num / 1000).toFixed(1) + 'K';
-    } else {
+    } else if (Math.abs(num) >= 10) {
       return num.toFixed(1);
+    } else {
+      return num.toFixed(2);
     }
   };
   
@@ -164,7 +190,7 @@ const SparklineChart = ({
         className="sparkline"
       />
       
-      {/* Data points for key values */}
+      {/* Data points */}
       {showLabels && points.map((point, i) => (
         <g key={i}>
           <circle 
@@ -172,6 +198,8 @@ const SparklineChart = ({
             cy={point.y} 
             r="2" 
             fill={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"} 
+            stroke="white"
+            strokeWidth="0.5"
           />
           <text 
             x={point.x} 
@@ -179,6 +207,7 @@ const SparklineChart = ({
             fontSize="6" 
             textAnchor="middle" 
             fill="currentColor"
+            fontWeight="medium"
           >
             {formatNumber(point.value)}
           </text>

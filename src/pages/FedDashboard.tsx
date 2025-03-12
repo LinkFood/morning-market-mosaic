@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Database, LineChart } from "lucide-react";
+import { ArrowLeft, RefreshCw, LineChart } from "lucide-react";
 import FredInterestRates from "@/components/FredInterestRates";
 import FredInflation from "@/components/FredInflation";
 import FredEconomicIndicators from "@/components/FredEconomicIndicators";
