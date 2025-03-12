@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from "react";
 import { Line, Bar, Area, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
@@ -79,6 +80,17 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
     }
   }, [data, filteredData, title, xAxisKey, timeFrame]);
   
+  // Format values based on the data type
+  const formatValue = (value: number, dataKey: string) => {
+    if (dataKey === 'value') {
+      // Format based on the chart title or other context
+      if (title?.includes('GDP')) return `$${value.toFixed(1)}B`;
+      if (title?.includes('Rate') || title?.includes('Inflation')) return `${value.toFixed(2)}%`;
+      return value.toFixed(2);
+    }
+    return value.toString();
+  };
+  
   // CSS variables for chart colors
   const chartColors = [
     '#1f77b4', // blue
@@ -144,7 +156,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
             stroke={axisColor}
           />
           <Tooltip 
-            formatter={tooltipFormatter || ((value: number) => value.toFixed(2))}
+            formatter={(value, name) => formatValue(value as number, name as string)}
             labelFormatter={(label) => new Date(label).toLocaleDateString()}
             contentStyle={tooltipStyle}
           />
