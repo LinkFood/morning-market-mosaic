@@ -1,9 +1,16 @@
 
-import { RefreshCcw, Settings } from "lucide-react";
+import { RefreshCcw, Settings, Sun, Moon, Laptop } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { clearAllCacheData } from "@/services/apiService";
 import SettingsModal from "./SettingsModal";
+import { useTheme } from "./theme-provider";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 interface DashboardHeaderProps {
   lastUpdated: Date | null;
@@ -21,6 +28,7 @@ const DashboardHeader = ({
   updateUserSettings
 }: DashboardHeaderProps) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
   
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString(undefined, {
@@ -36,7 +44,7 @@ const DashboardHeader = ({
   };
   
   return (
-    <header className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 py-4 mb-4 bg-white rounded-lg shadow-sm">
+    <header className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 py-4 mb-4 bg-card rounded-lg shadow-sm transition-colors duration-300">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">Morning Market Mosaic</h1>
         <p className="text-sm text-muted-foreground">
@@ -47,6 +55,31 @@ const DashboardHeader = ({
       </div>
       
       <div className="flex space-x-2 mt-3 md:mt-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              {theme === "light" && <Sun className="h-4 w-4 mr-2" />}
+              {theme === "dark" && <Moon className="h-4 w-4 mr-2" />}
+              {theme === "system" && <Laptop className="h-4 w-4 mr-2" />}
+              Theme
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setTheme("light")}>
+              <Sun className="h-4 w-4 mr-2" />
+              Light
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme("dark")}>
+              <Moon className="h-4 w-4 mr-2" />
+              Dark
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme("system")}>
+              <Laptop className="h-4 w-4 mr-2" />
+              System
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
         <Button 
           variant="outline" 
           size="sm" 

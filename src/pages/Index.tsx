@@ -6,15 +6,20 @@ import EconomicData from "@/components/EconomicData";
 import MajorStocks from "@/components/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
+import ES1FuturesChart from "@/components/ES1FuturesChart";
 import apiService, { getCacheTimestamp } from "@/services/apiService";
 import { MarketIndex, SectorPerformance as SectorType, StockData, EconomicIndicator, MarketEvent, UserSettings } from "@/types/marketTypes";
 import { toast } from "sonner";
+import { useTheme } from "@/components/theme-provider";
 
 const defaultSettings: UserSettings = {
   watchlist: ["AAPL", "MSFT", "AMZN", "GOOGL", "META"]
 };
 
 const Dashboard = () => {
+  // Theme state
+  const { theme } = useTheme();
+  
   // State for market data
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [sectors, setSectors] = useState<SectorType[]>([]);
@@ -92,7 +97,7 @@ const Dashboard = () => {
   }, [settings.watchlist.join(",")]); // Reload when watchlist changes
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       <div className="container mx-auto py-6 px-4">
         <DashboardHeader 
           lastUpdated={lastUpdated}
@@ -101,6 +106,11 @@ const Dashboard = () => {
           userSettings={settings}
           updateUserSettings={updateSettings}
         />
+        
+        {/* ES1 Futures Chart - Featured prominently at the top */}
+        <div className="w-full mb-6 animate-fade-in">
+          <ES1FuturesChart />
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <MarketOverview indices={indices} />
