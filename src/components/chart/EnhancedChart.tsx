@@ -1,5 +1,4 @@
-
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Line, Bar, Area, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "@/components/theme-provider";
@@ -67,6 +66,18 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
       return itemDate >= cutoffDate;
     });
   }, [data, timeFrame, xAxisKey]);
+  
+  // Add debug logging to trace data flow issues
+  useEffect(() => {
+    if (data && data.length > 0) {
+      console.log(`EnhancedChart data for ${title || 'chart'}:`, {
+        dataPoints: data.length,
+        timeFrame,
+        dateRange: data.length > 0 ? `${data[0][xAxisKey]} to ${data[data.length-1][xAxisKey]}` : 'none',
+        filteredCount: filteredData.length
+      });
+    }
+  }, [data, filteredData, title, xAxisKey, timeFrame]);
   
   // CSS variables for chart colors
   const chartColors = [
