@@ -29,7 +29,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   const { theme } = useTheme();
   const [timeFrame, setTimeFrame] = useState("1Y"); // 1M, 3M, 6M, 1Y, 5Y, MAX
   
-  // Filter data based on the selected time frame
+  // Filter data based on the selected time frame with improved date validation
   const filteredData = useMemo(() => {
     if (!data || data.length === 0) return [];
     
@@ -57,7 +57,15 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         return data;
     }
     
-    return data.filter(item => new Date(item[xAxisKey]) >= cutoffDate);
+    return data.filter(item => {
+      // Ensure proper date parsing with validation
+      const itemDate = new Date(item[xAxisKey]);
+      if (isNaN(itemDate.getTime())) {
+        console.warn(`Invalid date in chart data: ${item[xAxisKey]}`);
+        return false;
+      }
+      return itemDate >= cutoffDate;
+    });
   }, [data, timeFrame, xAxisKey]);
   
   // CSS variables for chart colors
