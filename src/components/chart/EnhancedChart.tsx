@@ -80,6 +80,15 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
     }
   }, [data, filteredData, title, xAxisKey, timeFrame]);
   
+  // Handle empty filtered data by falling back to all data
+  useEffect(() => {
+    // If filtered data is empty but we have original data, show a message and fall back to all data
+    if (filteredData.length === 0 && data && data.length > 0) {
+      console.warn(`No data available for ${title || 'chart'} in timeframe ${timeFrame}, showing all data instead`);
+      setTimeFrame('MAX'); // Fall back to showing all data
+    }
+  }, [filteredData.length, data, timeFrame, title]);
+  
   // Format values based on the data type
   const formatValue = (value: number, dataKey: string) => {
     if (dataKey === 'value') {
@@ -121,7 +130,11 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         <CardContent className="p-4">
           {title && <h3 className="text-sm font-medium mb-2">{title}</h3>}
           <div className="h-[300px] flex items-center justify-center bg-secondary/20 rounded-md">
-            <p className="text-muted-foreground">No data available</p>
+            <p className="text-muted-foreground text-center">
+              {data && data.length > 0 ? 
+                "No data available for selected time period" : 
+                "No data available"}
+            </p>
           </div>
         </CardContent>
       </Card>
