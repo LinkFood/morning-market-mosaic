@@ -40,11 +40,11 @@ export interface EconomicIndicator {
 }
 
 export interface MarketEvent {
-  type: "earnings" | "economic";
+  type: string; // Changed from "earnings" | "economic" to accept any string
   title: string;
   date: string;
   time: string;
-  importance: "low" | "medium" | "high";
+  importance: string; // Changed from "low" | "medium" | "high" to accept any string
 }
 
 export interface UserSettings {
