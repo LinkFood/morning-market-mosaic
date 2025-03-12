@@ -98,7 +98,7 @@ const DashboardHeader = ({
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)}
         settings={userSettings}
-        onSave={updateUserSettings}
+        updateSettings={updateUserSettings}
       />
     </header>
   );
