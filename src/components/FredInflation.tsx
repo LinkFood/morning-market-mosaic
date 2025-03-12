@@ -1,24 +1,13 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDown, ArrowUp, Minus, Percent } from "lucide-react";
-import EnhancedChart from "@/components/chart/EnhancedChart";
+import { Percent } from "lucide-react";
 import fedApiService from "@/services/fred";
 import { ECONOMIC_CATEGORIES } from "@/services/fred/constants";
 import { toast } from "sonner";
-
-interface InflationData {
-  id: string;
-  name: string;
-  value: string;
-  previous: string;
-  change: string;
-  date: string;
-  lastUpdated?: string;
-  formattedDate?: string;
-  trend: { date: string; value: number }[];
-  unit: string;
-}
+import InflationCard from "./inflation/InflationCard";
+import { InflationData } from "./inflation/types";
 
 const FredInflation = () => {
   const [inflationData, setInflationData] = useState<InflationData[]>([]);
@@ -44,18 +33,6 @@ const FredInflation = () => {
     
     loadData();
   }, []);
-
-  const getChangeColor = (change: number) => {
-    if (change > 0) return "ticker-up";
-    if (change < 0) return "ticker-down";
-    return "ticker-neutral";
-  };
-  
-  const getChangeSymbol = (change: number) => {
-    if (change > 0) return <ArrowUp className="h-4 w-4" />;
-    if (change < 0) return <ArrowDown className="h-4 w-4" />;
-    return <Minus className="h-4 w-4" />;
-  };
 
   if (isLoading) {
     return (
@@ -97,52 +74,7 @@ const FredInflation = () => {
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {inflationData.map((indicator) => (
-            <div key={indicator.id} className="p-4 rounded-lg bg-secondary/50">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium">{indicator.name}</h3>
-                <div className="text-right">
-                  <span className="text-sm text-muted-foreground block">
-                    {indicator.formattedDate || new Date(indicator.date).toLocaleDateString()}
-                  </span>
-                  {indicator.lastUpdated && indicator.lastUpdated !== indicator.date && (
-                    <span className="text-xs text-muted-foreground block">
-                      Updated: {new Date(indicator.lastUpdated).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-2xl font-semibold">
-                    {indicator.value}{indicator.unit}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Previous: {indicator.previous}{indicator.unit}
-                  </p>
-                </div>
-                
-                <div className={getChangeColor(parseFloat(indicator.change))}>
-                  {getChangeSymbol(parseFloat(indicator.change))}
-                  <span className="ml-1">
-                    {parseFloat(indicator.change) >= 0 ? "+" : ""}
-                    {indicator.change}{indicator.unit}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="h-48 mt-4">
-                {indicator.trend && (
-                  <EnhancedChart
-                    data={indicator.trend.map(t => ({ date: t.date, value: t.value }))}
-                    dataKeys={["value"]}
-                    xAxisKey="date"
-                    height={180}
-                    title={`${indicator.name} Trend`}
-                  />
-                )}
-              </div>
-            </div>
+            <InflationCard key={indicator.id} indicator={indicator} />
           ))}
         </div>
       </CardContent>
