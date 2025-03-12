@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -42,6 +43,13 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Chart colors */
+    --chart-color-1: #1f77b4;
+    --chart-color-2: #ff7f0e;
+    --chart-color-3: #2ca02c;
+    --chart-color-4: #d62728;
+    --chart-color-5: #9467bd;
   }
 
   .dark {
@@ -80,6 +88,13 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Chart colors - slightly different for dark mode */
+    --chart-color-1: #4ba3e3;
+    --chart-color-2: #ffb35d;
+    --chart-color-3: #68d368;
+    --chart-color-4: #ff5d5d;
+    --chart-color-5: #c495fd;
   }
 }
 

@@ -17,3 +17,15 @@ export interface ChartPoint {
   date?: string;
   index: number;
 }
+
+export interface EnhancedChartProps {
+  data: any[];
+  height?: number;
+  width?: number;
+  dataKeys: string[];
+  xAxisKey: string;
+  stacked?: boolean;
+  comparisonPeriod?: string; // 'yoy', 'mom', 'qoq'
+  title?: string;
+  tooltipFormatter?: (value: number) => string;
+}
