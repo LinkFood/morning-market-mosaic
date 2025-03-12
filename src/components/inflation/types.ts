@@ -1,16 +1,7 @@
 
-export interface InflationData {
-  id: string;
-  name: string;
-  value: string;
-  previous: string;
-  change: string;
-  date: string;
-  lastUpdated?: string;
-  formattedDate?: string;
-  trend: { date: string; value: number }[];
-  unit: string;
-}
+import { IndicatorData } from "@/components/common/EconomicIndicatorCard";
+
+export type InflationData = IndicatorData;
 
 export interface InflationCardProps {
   indicator: InflationData;
