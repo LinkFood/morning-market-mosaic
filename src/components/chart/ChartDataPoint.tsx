@@ -18,29 +18,31 @@ interface ChartDataPointProps {
 const ChartDataPoint: React.FC<ChartDataPointProps> = ({ point, positive, showLabels = false }) => {
   return (
     <g>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <circle 
-            cx={point.x} 
-            cy={point.y} 
-            r="2.5" 
-            fill={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"} 
-            stroke="white"
-            strokeWidth="0.5"
-            className="cursor-pointer hover:r-3 transition-all duration-200"
-          />
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs font-medium">
-          <div>
-            <span className="font-semibold">Value:</span> {formatNumber(point.value)}
-            {point.date && (
-              <div>
-                <span className="font-semibold">Date:</span> {point.date}
-              </div>
-            )}
-          </div>
-        </TooltipContent>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <circle 
+              cx={point.x} 
+              cy={point.y} 
+              r="2.5" 
+              fill={positive ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"} 
+              stroke="white"
+              strokeWidth="0.5"
+              className="cursor-pointer hover:r-3 transition-all duration-200"
+            />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs font-medium">
+            <div>
+              <span className="font-semibold">Value:</span> {formatNumber(point.value)}
+              {point.date && (
+                <div>
+                  <span className="font-semibold">Date:</span> {point.date}
+                </div>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       
       {/* Value labels (when showLabels is true) */}
       {showLabels && (
