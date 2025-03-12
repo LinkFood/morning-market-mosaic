@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { CACHE_TTL, ECONOMIC_CATEGORIES } from "./constants";
 import { CacheItem } from "./types";
@@ -40,7 +39,11 @@ export function cacheData<T>(cacheKey: string, data: T): void {
         
         // Try caching again
         try {
-          localStorage.setItem(cacheKey, serializedData);
+          const retrySerializedData = JSON.stringify({
+            data,
+            timestamp: Date.now(),
+          });
+          localStorage.setItem(cacheKey, retrySerializedData);
           console.log(`Successfully cached ${cacheKey} after removing oldest item`);
         } catch (retryError) {
           console.error('Still failed to cache after clearing space:', retryError);
