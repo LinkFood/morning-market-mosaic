@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import {
 import FredInterestRates from "@/components/FredInterestRates";
 import FredInflation from "@/components/FredInflation";
 import FredEconomicIndicators from "@/components/FredEconomicIndicators";
-import fedApiService from "@/services/fedApiService";
+import fedApiService from "@/services/fred";
 import { toast } from "sonner";
 
 const FedDashboard = () => {

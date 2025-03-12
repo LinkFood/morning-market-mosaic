@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
-import fedApiService from "@/services/fedApiService";
+import fedApiService from "@/services/fred";
 import { toast } from "sonner";
 
 interface TestResult {
