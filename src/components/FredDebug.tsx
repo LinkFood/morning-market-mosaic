@@ -29,7 +29,7 @@ const FredDebug = () => {
   const testEdgeFunction = async () => {
     setIsLoading(true);
     try {
-      const response = await fedApiService.getEconomicSeries("FEDFUNDS", TimeSpan.ONE_MONTH, 1);
+      const response = await fedApiService.getEconomicSeries("FEDFUNDS", TimeSpan.ONE_MONTH, true);
       addResult({
         name: "Edge Function Test",
         status: "success",
