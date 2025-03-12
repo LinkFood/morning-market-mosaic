@@ -43,7 +43,7 @@ export async function processInflationData(seriesId: string, timeSpan = 12) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.reverse().map(obs => ({
+    trend: [...data.observations].reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -83,7 +83,7 @@ export async function processInterestRateData(seriesId: string, timeSpan = 12) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.reverse().map(obs => ({
+    trend: [...data.observations].reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -118,7 +118,7 @@ export async function processGrowthData(seriesId: string, timeSpan = 12) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.reverse().map(obs => ({
+    trend: [...data.observations].reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
@@ -166,7 +166,7 @@ export async function processEmploymentData(seriesId: string, timeSpan = 12) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.reverse().map(obs => ({
+    trend: [...data.observations].reverse().map(obs => ({
       date: obs.date,
       value: seriesId === "ICSA" ? Math.round(parseFloat(obs.value) / 1000) : parseFloat(obs.value)
     }))
@@ -208,7 +208,7 @@ export async function processMarketData(seriesId: string, timeSpan = 12) {
     date: latestObs.date,
     lastUpdated: realTimeStart || latestObs.date, // Use release date if available
     formattedDate: formatReleaseDate(latestObs.date),
-    trend: data.observations.reverse().map(obs => ({
+    trend: [...data.observations].reverse().map(obs => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }))
