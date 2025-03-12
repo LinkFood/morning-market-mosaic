@@ -1,8 +1,20 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, LineChart } from "lucide-react";
+import { 
+  ArrowLeft, 
+  RefreshCw, 
+  LineChart, 
+  HelpCircle 
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import FredInterestRates from "@/components/FredInterestRates";
 import FredInflation from "@/components/FredInflation";
 import FredEconomicIndicators from "@/components/FredEconomicIndicators";
@@ -13,13 +25,10 @@ const FedDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Function to refresh all Fed data with force flag
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
-      // Clear cache and force refresh
       fedApiService.clearFredCacheData();
-      // Force page reload to refresh all components
       window.location.reload();
     } catch (error) {
       console.error("Error refreshing data:", error);
@@ -28,9 +37,7 @@ const FedDashboard = () => {
     }
   };
 
-  // Check for last update time
   useEffect(() => {
-    // Use the most recent cache timestamp across all economic categories
     const categories = [
       "interest_rates",
       "inflation",
@@ -74,6 +81,28 @@ const FedDashboard = () => {
                   Last updated: {lastUpdated.toLocaleString()}
                 </span>
               )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <HelpCircle className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Having trouble with the data?</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-4">
+                      <p>
+                        If the economic data isn't loading properly, try these steps:
+                      </p>
+                      <ol className="list-decimal pl-4 space-y-2">
+                        <li>Click the "Force Data Refresh" button to clear the cache and fetch fresh data</li>
+                        <li>Check your internet connection</li>
+                        <li>If issues persist, visit our <Link to="/fred-debug" className="text-primary hover:underline">debug page</Link> to test the API connection</li>
+                      </ol>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -91,16 +120,9 @@ const FedDashboard = () => {
         </header>
 
         <div className="grid grid-cols-1 gap-6">
-          {/* Economic Indicators Section */}
           <FredEconomicIndicators />
-          
-          {/* Interest Rates Section */}
           <FredInterestRates />
-          
-          {/* Inflation Section */}
           <FredInflation />
-          
-          {/* More sections will be added here */}
           <div className="text-center py-8">
             <p className="text-muted-foreground">
               More economic indicators will be added soon (Employment, GDP, Markets)

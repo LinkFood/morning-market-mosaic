@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,31 +26,50 @@ interface CacheItem<T> {
   timestamp: number;
 }
 
-// Fetch with caching utility
+// Fetch with caching utility that includes timeout
 async function fetchWithCache<T>(
   cacheKey: string,
   fetcher: () => Promise<T>,
   ttl: number = CACHE_TTL.DAILY,
   forceRefresh: boolean = false
 ): Promise<T> {
+  const FETCH_TIMEOUT = 30000; // 30 seconds timeout
+  
   try {
-    // Check if data exists in cache and is still valid, unless forceRefresh is true
+    // Check cache first unless forceRefresh is true
     const cachedItem = localStorage.getItem(cacheKey);
     
     if (cachedItem && !forceRefresh) {
       const parsedItem: CacheItem<T> = JSON.parse(cachedItem);
       const now = Date.now();
       
-      // If cache is still valid, return the cached data
       if (now - parsedItem.timestamp < ttl) {
         console.log(`Using cached FRED data for ${cacheKey}`);
         return parsedItem.data;
       }
     }
     
-    // If no valid cache exists or forceRefresh is true, fetch new data
+    // If no valid cache exists or forceRefresh is true, fetch new data with timeout
     console.log(`Fetching fresh FRED data for ${cacheKey}`);
-    const data = await fetcher();
+    
+    const fetchWithTimeout = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+      
+      try {
+        const data = await fetcher();
+        clearTimeout(timeoutId);
+        return data;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error(`Request timeout after ${FETCH_TIMEOUT/1000} seconds`);
+        }
+        throw error;
+      }
+    };
+    
+    const data = await fetchWithTimeout();
     
     // Store in cache
     localStorage.setItem(
@@ -66,15 +84,31 @@ async function fetchWithCache<T>(
   } catch (error) {
     console.error(`Error fetching ${cacheKey}:`, error);
     
+    // Enhanced error handling with specific messages
+    let errorMessage = "Failed to fetch FRED data";
+    if (error instanceof Error) {
+      if (error.message.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (error.message.includes("network")) {
+        errorMessage = "Network error. Please check your connection.";
+      } else if (error.message.includes("401")) {
+        errorMessage = "API authentication failed. Please check API key.";
+      } else if (error.message.includes("429")) {
+        errorMessage = "Too many requests. Please wait and try again.";
+      }
+    }
+    
+    toast.error(errorMessage);
+    
     // If error occurs but we have cached data, return that even if expired
     const cachedItem = localStorage.getItem(cacheKey);
     if (cachedItem) {
-      toast.error("Using cached data due to API error");
+      console.log(`Using expired cache for ${cacheKey} due to error`);
+      toast.warning("Using cached data due to API error");
       return JSON.parse(cachedItem).data;
     }
     
-    // Otherwise, throw the error to be handled by the caller
-    throw error;
+    throw new Error(errorMessage);
   }
 }
 
@@ -178,10 +212,23 @@ export function getFredCacheTimestamp(cacheKey: string): Date | null {
   return null;
 }
 
+// Test FRED API connection
+export async function testFredConnection(): Promise<boolean> {
+  try {
+    console.log("Testing FRED API connection...");
+    const response = await getEconomicSeries("FEDFUNDS", true);
+    return !!response;
+  } catch (error) {
+    console.error("FRED API connection test failed:", error);
+    return false;
+  }
+}
+
 export default {
   getEconomicCategory,
   getEconomicSeries,
   clearFredCacheData,
   getFredCacheTimestamp,
+  testFredConnection,
   ECONOMIC_CATEGORIES
 };
