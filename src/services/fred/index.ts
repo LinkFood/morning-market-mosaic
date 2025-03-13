@@ -2,7 +2,6 @@
 import { ECONOMIC_CATEGORIES } from "./constants";
 import { getEconomicCategory, getEconomicSeries } from "./dataService";
 import { clearFredCacheData, getFredCacheTimestamp, getFredCacheStats } from "./cacheUtils";
-import { testFredConnection } from "./apiClient";
 
 /**
  * Test FRED API connection 
