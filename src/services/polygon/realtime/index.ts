@@ -1,6 +1,7 @@
 
 import RealtimeService from './RealtimeService';
-export { DataUpdateType, UpdateEventCallback } from './DataSubscriptionManager';
+// Fix type exports by adding the 'type' keyword
+export type { DataUpdateType, UpdateEventCallback } from './DataSubscriptionManager';
 
 // Create and initialize realtime service
 const realtimeService = new RealtimeService();
