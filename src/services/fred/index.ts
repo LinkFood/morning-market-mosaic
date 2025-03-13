@@ -19,6 +19,16 @@ export async function testFredConnection(): Promise<boolean> {
 }
 
 // Export a unified API for the FRED service
+export {
+  getEconomicCategory,
+  getEconomicSeries,
+  clearFredCacheData,
+  getFredCacheTimestamp,
+  getFredCacheStats,
+  ECONOMIC_CATEGORIES
+};
+
+// Default export with all methods
 export default {
   getEconomicCategory,
   getEconomicSeries,

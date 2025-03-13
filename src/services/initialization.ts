@@ -30,9 +30,15 @@ export async function initializeServices(): Promise<boolean> {
   
   try {
     // Initialize API key
-    const { initializeApiKey } = await import('./market/config');
-    const apiKey = await initializeApiKey();
-    console.log("API key initialized:", apiKey ? "Success" : "Failed");
+    let apiKey = null;
+    try {
+      const { initializeApiKey } = await import('./market/config');
+      apiKey = await initializeApiKey();
+      console.log("API key initialized:", apiKey ? "Success" : "Failed");
+    } catch (e) {
+      console.error("Failed to initialize API key:", e);
+      serviceStatus.error = "API key initialization failed";
+    }
     
     // Test Polygon API connection
     try {
@@ -49,7 +55,7 @@ export async function initializeServices(): Promise<boolean> {
     // Test FRED API if you're using it
     try {
       const fredApi = await import('./fred');
-      const fedData = await fredApi.default.testFredConnection();
+      const fedData = await fredApi.testFredConnection();
       serviceStatus.fredApi = !!fedData;
       console.log("FRED API connection test:", fedData ? "Success" : "Failed");
     } catch (e) {
@@ -58,7 +64,7 @@ export async function initializeServices(): Promise<boolean> {
       // Don't fail initialization for this one as it's secondary
     }
     
-    // Set overall initialization status
+    // Consider initialization successful if at least one API is working
     serviceStatus.initialized = serviceStatus.polygonApi || serviceStatus.fredApi;
     
     // Show toast if partial initialization
@@ -66,6 +72,9 @@ export async function initializeServices(): Promise<boolean> {
       toast.warning("Some services failed to initialize. Some features may be limited.");
     } else if (serviceStatus.initialized) {
       toast.success("Application services initialized successfully");
+    } else {
+      // If no services initialized, set a generic error
+      serviceStatus.error = serviceStatus.error || "Failed to initialize application services";
     }
     
     return serviceStatus.initialized;
