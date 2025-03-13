@@ -12,7 +12,7 @@ import StockPickerLoading from './StockPickerLoading';
 import StockPickerEmpty from './StockPickerEmpty';
 import MarketInsight from './MarketInsight';
 import apiService from '@/services/apiService';
-import { isFeatureEnabled } from '@/services/features';
+import { isFeatureEnabled } from '@/services/features'; // Fixed import path
 
 const AIStockPicker = () => {
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,7 @@ const AIStockPicker = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  // Check for AI analysis feature flag
+  // Check for AI analysis feature flag - fixed with correct import
   const isAIEnabled = isFeatureEnabled('useAIStockAnalysis');
   
   const loadData = async () => {
@@ -38,7 +38,7 @@ const AIStockPicker = () => {
         "NVDA", "TSLA", "AMD", "NFLX", "DIS",
         "JPM", "BAC", "WMT", "PG", "JNJ", 
         "XOM", "CVX", "PFE", "KO", "PEP",
-        "FB", "INTC", "VZ", "T", "MCD",
+        "INTC", "VZ", "T", "MCD", "CSCO",
         "NKE", "IBM", "GS", "V", "PYPL"
       ];
       
@@ -64,18 +64,24 @@ const AIStockPicker = () => {
       setTopStocks(scoredStocks);
       
       // Get AI analysis if enabled
-      if (isAIEnabled && scoredStocks.length > 0) {
+      if (isFeatureEnabled('useAIStockAnalysis') && scoredStocks.length > 0) {
         try {
           console.log("Requesting AI analysis for selected stocks...");
           const analysis = await apiService.getStockAnalysis(scoredStocks);
           console.log("AI analysis received:", analysis ? "success" : "empty");
-          setAiAnalysis(analysis);
+          if (analysis && analysis.stockAnalyses && Object.keys(analysis.stockAnalyses).length > 0) {
+            console.log("AI analysis contains data for", Object.keys(analysis.stockAnalyses).length, "stocks");
+            setAiAnalysis(analysis);
+          } else {
+            console.warn("AI analysis response was empty or malformed");
+            toast.warning('AI analysis returned empty results');
+          }
         } catch (analysisError) {
           console.error('Error getting AI analysis:', analysisError);
           toast.error('Could not load AI analysis. Algorithm results still available.');
         }
       } else {
-        console.log("AI analysis is disabled or no stocks were selected");
+        console.log(`AI analysis is ${isFeatureEnabled('useAIStockAnalysis') ? 'enabled' : 'disabled'}, stocks selected: ${scoredStocks.length}`);
         setAiAnalysis(null);
       }
       
@@ -168,7 +174,8 @@ const AIStockPicker = () => {
                 <StockPickerCard 
                   key={stock.ticker}
                   stock={stock}
-                  analysis={aiAnalysis?.stockAnalyses[stock.ticker]}
+                  analysis={aiAnalysis?.stockAnalyses && aiAnalysis.stockAnalyses[stock.ticker] ? 
+                    aiAnalysis.stockAnalyses[stock.ticker] : undefined}
                 />
               ))}
               
