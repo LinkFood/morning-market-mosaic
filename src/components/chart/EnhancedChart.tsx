@@ -7,11 +7,22 @@ import React, { useState, useEffect } from "react";
 import TimeFrameSelector, { TimeFrame } from "./TimeFrameSelector";
 import ChartComponent from "./ChartComponent";
 import ChartEmptyState from "./ChartEmptyState";
-import { EnhancedChartProps } from "./types";
 import { ChartConfigProvider, useChartConfig } from "./context/ChartConfigContext";
 import { useChartData } from "./hooks/useChartData";
 import { useChartAxes } from "./hooks/useChartAxes";
 import { useTooltipFormatter } from "./hooks/useTooltipFormatter";
+
+export interface EnhancedChartProps {
+  data: any[];
+  height?: number;
+  dataKeys: string[];
+  xAxisKey: string;
+  stacked?: boolean;
+  title?: string;
+  referenceLines?: any[];
+  timeFrame?: TimeFrame;
+  setTimeFrame?: (timeFrame: TimeFrame) => void;
+}
 
 /**
  * A responsive, configurable chart component that adapts to different data frequencies
