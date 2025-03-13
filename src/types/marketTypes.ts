@@ -28,17 +28,17 @@ export interface SectorPerformance {
 
 export interface StockData {
   ticker: string;
-  name?: string; // Added name property as optional
+  name?: string;
   close: number;
   open: number;
   high: number;
   low: number;
   change: number;
   changePercent: number;
-  volume?: number; // Added volume property as optional
-  lastUpdated?: Date; // Added lastUpdated property for realtime tracking
-  previousClose?: number; // Added for day-over-day comparison
-  avgVolume?: number; // Added for volume comparison analysis
+  volume?: number;
+  avgVolume?: number;
+  lastUpdated?: Date;
+  previousClose?: number;
 }
 
 export interface EconomicIndicator {
@@ -52,11 +52,11 @@ export interface EconomicIndicator {
 }
 
 export interface MarketEvent {
-  type: string; // Changed from "earnings" | "economic" to accept any string
+  type: string;
   title: string;
   date: string;
   time: string;
-  importance: string; // Changed from "low" | "medium" | "high" to accept any string
+  importance: string;
 }
 
 export interface UserSettings {
@@ -64,16 +64,15 @@ export interface UserSettings {
   visibleComponents: string[];
   componentOrder?: string[];
   refreshInterval: {
-    marketHours: number; // seconds
-    afterHours: number; // seconds
-    closed: number; // seconds
+    marketHours: number;
+    afterHours: number;
+    closed: number;
   };
   realtimeUpdates?: {
     enabled: boolean;
     method: 'auto' | 'polling' | 'websocket';
     priorityData: 'watchlist' | 'visible' | 'all';
   };
-  // Mobile-specific settings
   compactMode?: boolean;
   batteryOptimization?: boolean;
   touchGestures?: boolean;
