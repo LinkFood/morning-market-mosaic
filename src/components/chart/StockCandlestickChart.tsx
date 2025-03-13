@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   ResponsiveContainer,
@@ -156,11 +155,11 @@ const StockCandlestickChart: React.FC<StockCandlestickChartProps> = ({
   
   // Format X axis ticks based on timeframe
   const formatXAxis = (timestamp: number) => {
-    if (timeFrame === '1D') {
+    if (timeFrame === "1D") {
       // For 1D, show time only (hour:minute)
       const date = new Date(timestamp);
       return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-    } else if (timeFrame === '1W' || timeFrame === '1M') {
+    } else if (timeFrame === "1W" || timeFrame === "1M") {
       // For 1W and 1M, show day and month
       return formatDailyDate(new Date(timestamp).toISOString()).split(',')[0];
     } else {
@@ -236,13 +235,6 @@ const StockCandlestickChart: React.FC<StockCandlestickChartProps> = ({
             shape={<CandlestickBar />}
             name="Price"
             unit="$"
-            data={data.map(item => ({
-              ...item,
-              open: item.open,
-              close: item.close,
-              high: item.high,
-              low: item.low
-            }))}
           />
           
           {/* Moving Averages */}

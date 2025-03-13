@@ -1,7 +1,7 @@
 
 import React from "react";
 
-export type TimeFrame = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
+export type TimeFrame = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
 
 interface TimeFrameSelectorProps {
   timeFrame: TimeFrame;
@@ -12,7 +12,7 @@ const TimeFrameSelector: React.FC<TimeFrameSelectorProps> = ({
   timeFrame,
   setTimeFrame
 }) => {
-  const timeFrameOptions: TimeFrame[] = ["1M", "3M", "6M", "1Y", "5Y", "MAX"];
+  const timeFrameOptions: TimeFrame[] = ["1D", "1W", "1M", "3M", "6M", "1Y", "5Y", "MAX"];
   
   return (
     <div className="flex justify-end mb-2 space-x-1">
