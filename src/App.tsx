@@ -10,6 +10,7 @@ import Index from './pages/Index';
 import NotFound from './pages/NotFound';
 import FedDashboard from './pages/FedDashboard';
 import ApiDiagnostics from './pages/ApiDiagnostics';
+import Dashboard from './pages/Dashboard';
 import { initializeServices } from './services/initialization';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/fed-dashboard" element={<FedDashboard />} />
           <Route path="/api-diagnostics" element={<ApiDiagnostics />} />
           <Route path="*" element={<NotFound />} />
