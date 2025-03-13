@@ -48,9 +48,10 @@ const DashboardHeader = ({
   
   // Toggle component visibility in settings
   const toggleComponentVisibility = (componentId: string) => {
-    const updatedVisibleComponents = userSettings.visibleComponents.includes(componentId)
-      ? userSettings.visibleComponents.filter(id => id !== componentId)
-      : [...userSettings.visibleComponents, componentId];
+    const visibleComponents = userSettings.visibleComponents || [];
+    const updatedVisibleComponents = visibleComponents.includes(componentId)
+      ? visibleComponents.filter(id => id !== componentId)
+      : [...visibleComponents, componentId];
     
     updateUserSettings({
       ...userSettings,
@@ -107,7 +108,7 @@ const DashboardHeader = ({
                   key={component.id}
                   onClick={() => toggleComponentVisibility(component.id)}
                 >
-                  {userSettings.visibleComponents.includes(component.id) ? (
+                  {(userSettings.visibleComponents || []).includes(component.id) ? (
                     <Check className="h-4 w-4 mr-2 text-green-500" />
                   ) : (
                     <X className="h-4 w-4 mr-2 text-muted-foreground" />

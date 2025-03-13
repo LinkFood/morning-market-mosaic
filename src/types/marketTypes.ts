@@ -59,7 +59,7 @@ export interface MarketEvent {
 
 export interface UserSettings {
   watchlist: string[];
-  visibleComponents?: string[];
+  visibleComponents: string[];
   componentOrder?: string[];
   refreshInterval?: {
     marketHours: number; // seconds
