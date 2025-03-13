@@ -6,10 +6,20 @@ import EconomicData from "@/components/EconomicData";
 import MajorStocks from "@/components/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
+import MarketMovers from "@/components/MarketMovers";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
-import marketService, { marketIndices, sectorPerformance, stocks, events, economicIndicators, cacheUtils } from "@/services/market";
+import apiService from "@/services/apiService";
 import fedApiService from "@/services/fred";
-import { MarketIndex, SectorPerformance as SectorType, StockData, EconomicIndicator, MarketEvent, UserSettings } from "@/types/marketTypes";
+import { 
+  MarketIndex, 
+  SectorPerformance as SectorType, 
+  StockData, 
+  EconomicIndicator, 
+  MarketEvent, 
+  UserSettings, 
+  MarketStatus,
+  MarketMovers as MarketMoversType
+} from "@/types/marketTypes";
 import { toast } from "sonner";
 import { useTheme } from "@/components/theme-provider";
 
@@ -27,12 +37,19 @@ const Dashboard = () => {
   const [stocks, setStocks] = useState<StockData[]>([]);
   const [indicators, setIndicators] = useState<EconomicIndicator[]>([]);
   const [events, setEvents] = useState<MarketEvent[]>([]);
+  const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
+  const [marketMovers, setMarketMovers] = useState<MarketMoversType>({
+    gainers: [],
+    losers: []
+  });
   
   // State for UI
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEcon, setIsLoadingEcon] = useState(true);
+  const [isLoadingMovers, setIsLoadingMovers] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [moversError, setMoversError] = useState<Error | null>(null);
   
   // Effect to load settings from localStorage
   useEffect(() => {
@@ -85,32 +102,56 @@ const Dashboard = () => {
     }
   };
   
+  // Function to load market movers
+  const loadMarketMovers = async () => {
+    setIsLoadingMovers(true);
+    setMoversError(null);
+    
+    try {
+      // Load market status to check if market is open
+      const status = await apiService.getMarketStatus();
+      setMarketStatus(status);
+      
+      // Load market movers
+      const moversData = await apiService.getMarketMovers(5);
+      setMarketMovers(moversData);
+    } catch (error) {
+      console.error("Error loading market movers:", error);
+      setMoversError(error as Error);
+    } finally {
+      setIsLoadingMovers(false);
+    }
+  };
+  
   // Function to load all market data
   const loadData = async () => {
     setIsLoading(true);
     
     try {
       // Load market indices
-      const indicesData = await marketIndices.getMarketIndices();
+      const indicesData = await apiService.getMarketIndices();
       setIndices(indicesData);
       
       // Use the timestamp from the indices cache as the last updated time
-      const timestamp = cacheUtils.getCacheTimestamp("market_indices");
+      const timestamp = apiService.getCacheTimestamp("market_indices");
       if (timestamp) {
         setLastUpdated(timestamp);
       }
       
       // Load sectors
-      const sectorsData = await sectorPerformance.getSectorPerformance();
+      const sectorsData = await apiService.getSectorPerformance();
       setSectors(sectorsData);
       
-      // Load stocks based on user's watchlist - FIX: Use the imported stocks service object
-      const stocksData = await marketService.getMajorStocks(settings.watchlist);
+      // Load stocks based on user's watchlist
+      const stocksData = await apiService.getMajorStocks(settings.watchlist);
       setStocks(stocksData);
       
-      // Load market events - FIX: Use the imported events service object
-      const eventsData = await marketService.getMarketEvents();
+      // Load market events
+      const eventsData = await apiService.getMarketEvents();
       setEvents(eventsData);
+      
+      // Load market movers in parallel
+      loadMarketMovers();
       
       // Load economic indicators separately
       loadEconomicIndicators();
@@ -154,6 +195,18 @@ const Dashboard = () => {
           
           <SectorPerformance sectors={sectors} />
           <MarketEvents events={events} />
+          
+          {/* New Market Movers component */}
+          <div className="md:col-span-2">
+            <MarketMovers 
+              gainers={marketMovers.gainers} 
+              losers={marketMovers.losers}
+              isLoading={isLoadingMovers}
+              error={moversError}
+              marketStatus={marketStatus || undefined}
+              refreshData={loadMarketMovers}
+            />
+          </div>
         </div>
       </div>
     </div>
