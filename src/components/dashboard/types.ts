@@ -11,6 +11,7 @@ import {
 } from "@/types/marketTypes";
 import { ScoredStock } from "@/services/stockPicker/algorithm";
 import { StockAnalysis } from "@/services/stockPicker/aiAnalysis";
+import { getFeatureFlags } from "@/services/featureFlags";
 
 // Dashboard context type
 export type DashboardContextType = {
@@ -34,7 +35,7 @@ export type DashboardContextType = {
   refreshing: boolean;
   expandedComponent: string | null;
   collapsedComponents: {[key: string]: boolean};
-  featureFlags: ReturnType<typeof import("@/services/featureFlags").getFeatureFlags>;
+  featureFlags: ReturnType<typeof getFeatureFlags>;
   loadData: () => Promise<void>;
   loadEconomicIndicators: () => Promise<void>;
   loadMarketMovers: () => Promise<void>;

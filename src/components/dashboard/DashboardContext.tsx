@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect } from "react";
 import { getFeatureFlags, FeatureFlags } from "@/services/features"; // Fixed import path
 import { DashboardContextType, defaultSettings } from "./types";
@@ -49,7 +50,8 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { scheduleNextRefresh } = useRefreshScheduler(marketStatusData, settings, loadData);
   
   // Initialize feature flags state
-  const [featureFlags, setFeatureFlags] = React.useState<FeatureFlags>(getFeatureFlags());
+  // Changed from FeatureFlags to ReturnType<typeof getFeatureFlags> to match the correct return type
+  const [featureFlags, setFeatureFlags] = React.useState(getFeatureFlags());
   
   // Effect to load settings from localStorage
   useEffect(() => {

@@ -12,3 +12,32 @@ export interface EnhancedChartProps {
   timeFrame?: TimeFrame;
   setTimeFrame?: (timeFrame: TimeFrame) => void;
 }
+
+// Add ChartPoint interface for ChartDataPoint component
+export interface ChartPoint {
+  x: number;
+  y: number;
+  value: number;
+  date?: string;
+  index: number;
+}
+
+// Add SparklineChartProps interface for SparklineChart component
+export interface SparklineChartProps {
+  data: number[];
+  dates?: string[];
+  positive: boolean;
+  height?: number;
+  width?: number;
+  showAxis?: boolean;
+  showLabels?: boolean;
+  labelCount?: number;
+}
+
+// Add ReferenceLine interface for ChartConfigContext
+export interface ReferenceLine {
+  y: number;
+  label?: string;
+  color?: string;
+  strokeDasharray?: string;
+}
