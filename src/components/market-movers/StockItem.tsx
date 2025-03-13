@@ -1,9 +1,9 @@
+
 import React from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { StockData } from "@/types/marketTypes";
 import SparklineChart from "../chart/SparklineChart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 import { useStockDetail } from "../StockDetail";
 
 interface StockItemProps {

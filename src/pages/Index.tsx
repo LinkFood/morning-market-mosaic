@@ -1,14 +1,14 @@
+
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/DashboardHeader";
 import MarketOverview from "@/components/MarketOverview";
 import EconomicData from "@/components/EconomicData";
-import MajorStocks from "@/components/MajorStocks";
+import MajorStocks from "@/components/major-stocks/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
 import apiService from "@/services/apiService";
-import fedApiService from "@/services/fred";
 import { 
   MarketIndex, 
   SectorPerformance as SectorType, 
