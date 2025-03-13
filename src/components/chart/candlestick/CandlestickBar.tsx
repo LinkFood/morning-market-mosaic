@@ -1,59 +1,54 @@
 
 import React from 'react';
 
-interface CandlestickBarProps {
+// Add proper typing for props
+export interface CandlestickBarProps {
   x: number;
   y: number;
   width: number;
   height: number;
   open: number;
   close: number;
-  low: number;
   high: number;
+  low: number;
+  payload: {
+    open: number;
+    close: number;
+    high: number;
+    low: number;
+    date: string;
+    timestamp: number;
+    volume: number;
+  };
 }
 
 const CandlestickBar: React.FC<CandlestickBarProps> = (props) => {
-  const { x, y, width, height, open, close, low, high } = props;
+  const { x, y, width, high, low, open, close } = props;
   
-  // Determine if the candle is up or down
-  const isUp = close > open;
-  const color = isUp ? '#10b981' : '#ef4444';
+  // Determine if the candle is rising or falling
+  const isRising = close >= open;
   
-  // Calculate positions for the candle body
-  const bodyY = isUp ? y + (high - close) / (high - low) * height : y + (high - open) / (high - low) * height;
-  const bodyHeight = isUp ? (close - open) / (high - low) * height : (open - close) / (high - low) * height;
+  // Calculate proper wick and body positions
+  const bodyY = isRising ? y + (high - close) : y + (high - open);
+  const bodyHeight = isRising ? (close - open) : (open - close);
+  const wickY = y;
+  const wickHeight = high - low;
   
-  // Ensure minimum visible height for the body
-  const minBodyHeight = 1;
-  const adjustedBodyHeight = Math.max(bodyHeight, minBodyHeight);
+  // Fill color based on price direction
+  const color = isRising ? "#16a34a" : "#dc2626";
   
-  // Calculate positions for the wicks
-  const wickX = x + width / 2;
-  const topWickY = y;
-  const topWickHeight = isUp ? (high - close) / (high - low) * height : (high - open) / (high - low) * height;
-  const bottomWickY = isUp ? y + (high - open) / (high - low) * height : y + (high - close) / (high - low) * height;
-  const bottomWickHeight = isUp ? (open - low) / (high - low) * height : (close - low) / (high - low) * height;
+  const wickWidth = Math.max(1, width / 6);
+  const wickX = x + (width / 2) - (wickWidth / 2);
   
   return (
     <g>
-      {/* Upper wick */}
-      <line
-        x1={wickX}
-        y1={topWickY}
-        x2={wickX}
-        y2={topWickY + topWickHeight}
-        stroke={color}
-        strokeWidth={1}
-      />
-      
-      {/* Lower wick */}
-      <line
-        x1={wickX}
-        y1={bottomWickY}
-        x2={wickX}
-        y2={bottomWickY + bottomWickHeight}
-        stroke={color}
-        strokeWidth={1}
+      {/* Candle wick */}
+      <rect
+        x={wickX}
+        y={wickY}
+        width={wickWidth}
+        height={wickHeight}
+        fill={color}
       />
       
       {/* Candle body */}
@@ -61,9 +56,10 @@ const CandlestickBar: React.FC<CandlestickBarProps> = (props) => {
         x={x}
         y={bodyY}
         width={width}
-        height={adjustedBodyHeight}
+        height={Math.max(1, bodyHeight)}
         fill={color}
         stroke={color}
+        strokeWidth={1}
       />
     </g>
   );
