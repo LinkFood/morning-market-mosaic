@@ -1,4 +1,3 @@
-
 // Common types used across the market dashboard
 
 export interface MarketIndex {
@@ -59,6 +58,13 @@ export interface MarketEvent {
 
 export interface UserSettings {
   watchlist: string[];
+  visibleComponents?: string[];
+  componentOrder?: string[];
+  refreshInterval?: {
+    marketHours: number; // seconds
+    afterHours: number; // seconds
+    closed: number; // seconds
+  };
 }
 
 // New interfaces for Polygon API data
