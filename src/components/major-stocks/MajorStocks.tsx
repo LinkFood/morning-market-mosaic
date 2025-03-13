@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StockData } from "@/types/marketTypes";
-import { useMajorStocks } from "./useMajorStocks";
+import { useMajorStocks, FilterTab } from "./useMajorStocks";
 import StockFilters from "./StockFilters";
 import MajorStocksTable from "./MajorStocksTable";
 import { useMediaQuery } from "@/hooks/use-mobile";

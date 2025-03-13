@@ -1,149 +1,122 @@
-
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { StockData } from "@/types/marketTypes";
-import { stocks } from "@/services/market";
-import { toast } from "sonner";
 
-type SortKey = 'ticker' | 'close' | 'change' | 'changePercent' | 'volume';
-type SortDirection = 'asc' | 'desc';
-type FilterTab = 'all' | 'gainers' | 'losers' | 'active';
+export type SortKey = "ticker" | "name" | "price" | "change" | "volume";
+export type SortDirection = "asc" | "desc";
+export type FilterTab = "all" | "watchlist" | "gainers" | "losers" | "tech";
 
-export const useMajorStocks = (stocksData: StockData[]) => {
-  const [sparklines, setSparklines] = useState<{[key: string]: number[]}>({});
-  const [expandedRows, setExpandedRows] = useState<{[key: string]: boolean}>({});
-  const [stockDetails, setStockDetails] = useState<{[key: string]: any}>({});
+export function useMajorStocks(stocksData: StockData[]) {
+  const [sparklines, setSparklines] = useState<{ [key: string]: number[] }>({});
+  const [expandedRows, setExpandedRows] = useState<{ [key: string]: boolean }>({});
+  const [stockDetails, setStockDetails] = useState<{ [key: string]: any }>({});
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>(() => {
-    const savedSort = localStorage.getItem('major_stocks_sort');
-    return savedSort ? JSON.parse(savedSort) : { key: 'changePercent', direction: 'desc' };
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
+    key: "price",
+    direction: "desc"
   });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  const [loadingDetails, setLoadingDetails] = useState<{[key: string]: boolean}>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
-  useEffect(() => {
-    const savedWatchlist = localStorage.getItem('stock_watchlist');
-    if (savedWatchlist) {
-      setWatchlist(JSON.parse(savedWatchlist));
+  const filteredAndSortedStocks = useCallback(() => {
+    let filteredStocks = stocksData;
+
+    if (activeFilter === "watchlist") {
+      filteredStocks = stocksData.filter((stock) => watchlist.includes(stock.ticker));
+    } else if (activeFilter === "gainers") {
+      filteredStocks = [...stocksData].sort((a, b) => (b.change_percent - a.change_percent));
+    } else if (activeFilter === "losers") {
+      filteredStocks = [...stocksData].sort((a, b) => (a.change_percent - b.change_percent));
+    } else if (activeFilter === "tech") {
+       filteredStocks = stocksData.filter(stock => ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'].includes(stock.ticker));
     }
-  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('stock_watchlist', JSON.stringify(watchlist));
-  }, [watchlist]);
+    if (searchQuery) {
+      const lowerCaseQuery = searchQuery.toLowerCase();
+      filteredStocks = filteredStocks.filter((stock) =>
+        stock.ticker.toLowerCase().includes(lowerCaseQuery) ||
+        stock.name.toLowerCase().includes(lowerCaseQuery)
+      );
+    }
 
-  useEffect(() => {
-    localStorage.setItem('major_stocks_sort', JSON.stringify(sortConfig));
-  }, [sortConfig]);
-
-  useEffect(() => {
-    const fetchSparklines = async () => {
-      const sparklineData: {[key: string]: number[]} = {};
-      
-      for (const stock of stocksData) {
-        try {
-          if (!sparklines[stock.ticker]) {
-            const data = await stocks.getStockSparkline(stock.ticker);
-            sparklineData[stock.ticker] = data;
-          }
-        } catch (error) {
-          console.error(`Failed to fetch sparkline for ${stock.ticker}:`, error);
-          sparklineData[stock.ticker] = [100, 101, 102, 101, 102, 103, 104];
+    if (sortConfig) {
+      filteredStocks = [...filteredStocks].sort((a, b) => {
+        let sortValue = 0;
+        if (sortConfig.key === "ticker") {
+          sortValue = a.ticker.localeCompare(b.ticker);
+        } else if (sortConfig.key === "name") {
+          sortValue = a.name.localeCompare(b.name);
+        } else if (sortConfig.key === "price") {
+          sortValue = a.price - b.price;
+        } else if (sortConfig.key === "change") {
+          sortValue = a.change - b.change;
+        } else if (sortConfig.key === "volume") {
+          sortValue = a.volume - b.volume;
         }
-      }
-      
-      setSparklines(prevSparklines => ({
-        ...prevSparklines,
-        ...sparklineData
-      }));
-    };
-    
-    if (stocksData.length > 0) {
-      fetchSparklines();
+
+        return sortConfig.direction === "asc" ? sortValue : -sortValue;
+      });
     }
-  }, [stocksData]);
 
-  const toggleRowExpansion = async (ticker: string) => {
-    setExpandedRows(prev => {
-      const isExpanding = !prev[ticker];
-      
-      if (isExpanding && !stockDetails[ticker] && !loadingDetails[ticker]) {
-        loadStockDetails(ticker);
-      }
-      
-      return {
-        ...prev,
-        [ticker]: isExpanding
-      };
-    });
-  };
+    return filteredStocks;
+  }, [stocksData, activeFilter, searchQuery, sortConfig, watchlist]);
 
-  const loadStockDetails = async (ticker: string) => {
-    setLoadingDetails(prev => ({ ...prev, [ticker]: true }));
-    
-    try {
-      const details = await stocks.getStockDetails(ticker);
-      setStockDetails(prev => ({ ...prev, [ticker]: details }));
-    } catch (error) {
-      console.error(`Failed to fetch details for ${ticker}:`, error);
-      toast.error(`Could not load details for ${ticker}`);
-    } finally {
-      setLoadingDetails(prev => ({ ...prev, [ticker]: false }));
+  const toggleRowExpansion = (ticker: string) => {
+    setExpandedRows(prev => ({ ...prev, [ticker]: !prev[ticker] }));
+    if (!stockDetails[ticker]) {
+      loadStockDetails(ticker);
     }
   };
 
   const toggleWatchlist = (ticker: string) => {
     setWatchlist(prev => {
       if (prev.includes(ticker)) {
-        toast.success(`Removed ${ticker} from watchlist`);
         return prev.filter(t => t !== ticker);
       } else {
-        toast.success(`Added ${ticker} to watchlist`);
         return [...prev, ticker];
       }
     });
   };
 
   const requestSort = (key: SortKey) => {
-    setSortConfig(prevConfig => {
-      const direction: SortDirection = 
-        prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc';
-      return { key, direction };
-    });
+    let direction: SortDirection = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
   };
 
-  const filteredAndSortedStocks = useMemo(() => {
-    let filtered = [...stocksData];
-    
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(stock => 
-        stock.ticker.toLowerCase().includes(query) || 
-        (stock.name && stock.name.toLowerCase().includes(query))
-      );
+  const loadStockDetails = async (ticker: string) => {
+    setLoadingDetails(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setStockDetails(prev => ({
+        ...prev,
+        [ticker]: {
+          description: `Details for ${ticker}`,
+          marketCap: 1000000,
+          peRatio: 20
+        }
+      }));
+    } catch (error) {
+      console.error("Failed to load stock details:", error);
+    } finally {
+      setLoadingDetails(false);
     }
-    
-    if (activeFilter === 'gainers') {
-      filtered = filtered.filter(stock => stock.changePercent > 0);
-    } else if (activeFilter === 'losers') {
-      filtered = filtered.filter(stock => stock.changePercent < 0);
-    } else if (activeFilter === 'active') {
-      return [...filtered]
-        .sort((a, b) => (b.volume || 0) - (a.volume || 0))
-        .slice(0, 5);
-    }
-    
-    return [...filtered].sort((a, b) => {
-      const aValue = a[sortConfig.key] || 0;
-      const bValue = b[sortConfig.key] || 0;
-      
-      if (sortConfig.direction === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
+  };
+
+  const handleSetActiveFilter = (filter: string) => {
+    setActiveFilter(filter as FilterTab);
+  };
+
+  useEffect(() => {
+    const newSparklines: { [key: string]: number[] } = {};
+    stocksData.forEach(stock => {
+      newSparklines[stock.ticker] = Array.from({ length: 20 }, () => Math.random() * 50);
     });
-  }, [stocksData, sortConfig, searchQuery, activeFilter]);
+    setSparklines(newSparklines);
+  }, [stocksData]);
 
   return {
     sparklines,
@@ -154,11 +127,11 @@ export const useMajorStocks = (stocksData: StockData[]) => {
     searchQuery,
     activeFilter,
     loadingDetails,
-    filteredAndSortedStocks,
+    filteredAndSortedStocks: filteredAndSortedStocks(),
     toggleRowExpansion,
     toggleWatchlist,
     requestSort,
     setSearchQuery,
-    setActiveFilter,
+    setActiveFilter: handleSetActiveFilter,
   };
-};
+}

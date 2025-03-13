@@ -2,7 +2,7 @@
 import React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ReloadIcon } from "@radix-ui/react-icons";
+import { RefreshCw } from "lucide-react"; // Replace ReloadIcon with RefreshCw from lucide-react
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,7 +56,7 @@ const StockList: React.FC<StockListProps> = ({
           </AlertDescription>
         </Alert>
         <Button onClick={refreshData} className="w-full">
-          <ReloadIcon className="mr-2 h-4 w-4" /> Try Again
+          <RefreshCw className="mr-2 h-4 w-4" /> Try Again
         </Button>
       </div>
     );

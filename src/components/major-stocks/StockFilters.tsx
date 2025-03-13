@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -20,6 +19,7 @@ const StockFilters: React.FC<StockFiltersProps> = ({
   setSearchQuery,
   compactMode = false
 }) => {
+  
   const FILTERS = [
     { id: "all", label: "All" },
     { id: "watchlist", label: "Watchlist" },
@@ -33,6 +33,7 @@ const StockFilters: React.FC<StockFiltersProps> = ({
   };
 
   return (
+    
     <div className={`space-y-3 mb-4 ${compactMode ? 'mb-2' : ''}`}>
       <div className={`flex flex-wrap gap-2 ${compactMode ? 'gap-1' : ''}`}>
         {FILTERS.map((filter) => (

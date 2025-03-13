@@ -1,4 +1,3 @@
-
 import React from "react";
 import { SortAsc, SortDesc, TrendingUp, TrendingDown, ChevronDown, ChevronRight, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,17 +11,18 @@ import { useStockDetail } from "../StockDetail";
 type SortKey = 'ticker' | 'close' | 'change' | 'changePercent' | 'volume';
 type SortDirection = 'asc' | 'desc';
 
-interface MajorStocksTableProps {
+export interface MajorStocksTableProps {
   stocks: StockData[];
-  sparklines: {[key: string]: number[]};
-  expandedRows: {[key: string]: boolean};
-  stockDetails: {[key: string]: any};
+  sparklines: { [key: string]: number[] };
+  expandedRows: { [key: string]: boolean };
+  stockDetails: { [key: string]: any };
   watchlist: string[];
   sortConfig: { key: SortKey; direction: SortDirection };
-  loadingDetails: {[key: string]: boolean};
+  loadingDetails: boolean;
   toggleRowExpansion: (ticker: string) => void;
   toggleWatchlist: (ticker: string) => void;
   requestSort: (key: SortKey) => void;
+  compactMode?: boolean;
 }
 
 const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
@@ -36,6 +36,7 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
   toggleRowExpansion,
   toggleWatchlist,
   requestSort,
+  compactMode = false
 }) => {
   const { openStockDetail } = useStockDetail();
 
