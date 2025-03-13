@@ -16,19 +16,22 @@ async function getMarketStatus(): Promise<MarketStatus> {
       // Get API key from config
       const status = await polygonService.getMarketStatus();
       
+      // Add type assertion to help TypeScript understand the structure
+      const statusData = status as any;
+      
       // Transform to our MarketStatus type
       const marketStatus: MarketStatus = {
-        market: status.market || "closed",
-        serverTime: status.serverTime || new Date().toISOString(),
-        exchanges: status.exchanges || {},
-        isOpen: status.isOpen || false,
-        nextOpeningTime: status.nextOpeningTime || null
+        market: statusData.market || "closed",
+        serverTime: statusData.serverTime || new Date().toISOString(),
+        exchanges: statusData.exchanges || {},
+        isOpen: statusData.isOpen || false,
+        nextOpeningTime: statusData.nextOpeningTime || null
       };
       
       return marketStatus;
     } catch (error) {
       console.error("Error fetching market status:", error);
-      return mockData.MOCK_MARKET_STATUS;
+      return mockData.MOCK_MARKET_STATUS as MarketStatus;
     }
   });
 }

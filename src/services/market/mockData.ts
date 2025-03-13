@@ -1,5 +1,4 @@
-
-import { MarketIndex, SectorPerformance, StockData, EconomicIndicator, MarketEvent } from "@/types/marketTypes";
+import { MarketIndex, SectorPerformance, StockData, EconomicIndicator, MarketEvent, MarketStatus } from "@/types/marketTypes";
 
 // Mock data for DEMO mode
 
@@ -96,6 +95,19 @@ const MOCK_EVENTS_DATA: MarketEvent[] = [
   }
 ];
 
+// Mock market status data
+const MOCK_MARKET_STATUS: MarketStatus = {
+  market: "closed",
+  serverTime: new Date().toISOString(),
+  exchanges: {
+    nasdaq: "closed",
+    nyse: "closed",
+    otc: "closed"
+  },
+  isOpen: false,
+  nextOpeningTime: "09:30 ET"
+};
+
 // Helper function to generate mock sparkline data
 function generateMockSparkline(uptrend: boolean): number[] {
   const points = 7; // 7 days
@@ -119,5 +131,6 @@ export default {
   MOCK_STOCKS_DATA,
   MOCK_ECONOMIC_DATA,
   MOCK_EVENTS_DATA,
+  MOCK_MARKET_STATUS,
   generateMockSparkline
 };
