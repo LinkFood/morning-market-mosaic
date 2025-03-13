@@ -197,7 +197,8 @@ async function getMarketStatus(): Promise<MarketStatus> {
       }
       
       // Get actual market status from polygon
-      return await polygonService.getMarketStatus();
+      const status = await polygonService.getMarketStatus();
+      return status;
     } catch (error) {
       console.error("Error fetching market status:", error);
       // Fallback mock status
@@ -248,23 +249,23 @@ async function getMarketMovers(limit: number = 5): Promise<MarketMovers> {
         return { gainers: mockGainers, losers: mockLosers };
       }
       
-      // Get top gainers from polygon snapshot endpoint
-      const gainersData = await polygonService.getBatchStockSnapshots([], limit, "gainers");
-      const gainers = gainersData.map(stock => ({
-        ...stock,
-        volume: stock.volume || Math.floor(Math.random() * 10000000), // Ensure volume exists
-        name: stock.name || stock.ticker + " Inc" // Ensure name exists
-      }));
+      // Get top gainers and losers from polygon
+      // For production, you would call specific endpoints
+      const gainers = await polygonService.getBatchStockSnapshots([], limit, "gainers");
+      const losers = await polygonService.getBatchStockSnapshots([], limit, "losers");
       
-      // Get top losers from polygon snapshot endpoint
-      const losersData = await polygonService.getBatchStockSnapshots([], limit, "losers");
-      const losers = losersData.map(stock => ({
-        ...stock,
-        volume: stock.volume || Math.floor(Math.random() * 10000000), // Ensure volume exists
-        name: stock.name || stock.ticker + " Inc" // Ensure name exists
-      }));
-      
-      return { gainers, losers };
+      return { 
+        gainers: gainers.map(stock => ({
+          ...stock,
+          volume: stock.volume || Math.floor(Math.random() * 10000000),
+          name: stock.name || `${stock.ticker} Inc.`
+        })),
+        losers: losers.map(stock => ({
+          ...stock,
+          volume: stock.volume || Math.floor(Math.random() * 10000000),
+          name: stock.name || `${stock.ticker} Inc.`
+        }))
+      };
     } catch (error) {
       console.error("Error fetching market movers:", error);
       // Fallback mock data
@@ -325,8 +326,9 @@ async function getStockDetails(ticker: string): Promise<TickerDetails> {
         };
       }
       
-      // Get ticker details
-      return await polygonService.getTickerDetails(ticker);
+      // Get ticker details from Polygon
+      const details = await polygonService.getTickerDetails(ticker);
+      return details;
     } catch (error) {
       console.error(`Error fetching details for ${ticker}:`, error);
       // Return basic mock data as fallback
