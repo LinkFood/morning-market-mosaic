@@ -1,130 +1,115 @@
 
 /**
- * Polygon.io Market Indices Data
- * Provides historical and current data for market indices
+ * Polygon.io Historical Index Data
+ * Provides data for market indices
  */
 import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { MarketIndex } from '@/types/marketTypes';
 
 /**
- * Get data for market indices using ETF proxies
- * @param ticker Index ticker (can be "SPY" for S&P 500, "DIA" for Dow Jones, "QQQ" for Nasdaq)
- * @param days Number of days of historical data (default: 30)
+ * Get historical data for a market index
+ * @param indexTicker Index ticker symbol
  * @returns Promise with index data
  */
-export async function getIndexData(ticker: string, days: number = 30): Promise<any> {
-  const cacheKey = `index_${ticker}_${days}`;
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.INDEX_DATA);
+export async function getIndexData(indexTicker: string): Promise<MarketIndex> {
+  const cacheKey = `index_${indexTicker}`;
+  const cachedData = getCachedData<MarketIndex>(cacheKey, CACHE_TTL.INDEX_DATA);
   
   if (cachedData) {
     return cachedData;
   }
   
   try {
-    // Calculate date range
-    const to = new Date().toISOString().split('T')[0];
-    const from = new Date();
-    from.setDate(from.getDate() - days);
-    const fromDate = from.toISOString().split('T')[0];
+    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/indices/tickers/${indexTicker}`);
     
-    // Get historical data for the index
-    const response = await polygonRequest(
-      `/v2/aggs/ticker/${ticker}/range/1/day/${fromDate}/${to}`
-    );
-    
-    // Get current day's data
-    const currentData = await polygonRequest(
-      `/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`
-    );
-    
-    // Map index tickers to names
-    const indexNames: Record<string, string> = {
-      'SPY': 'S&P 500',
-      'DIA': 'Dow Jones',
-      'QQQ': 'Nasdaq',
-      'IWM': 'Russell 2000',
-      'EFA': 'MSCI EAFE',
-      'EEM': 'MSCI Emerging Markets'
-    };
-    
-    // Format index data
+    // Format the response
     const indexData: MarketIndex = {
-      ticker,
-      name: indexNames[ticker] || ticker,
-      close: currentData.ticker.day.c,
-      open: currentData.ticker.day.o,
-      change: currentData.ticker.todaysChange,
-      changePercent: currentData.ticker.todaysChangePerc
-    };
-    
-    // Format historical data
-    const historicalData = response.results.map((item: any) => ({
-      date: new Date(item.t).toISOString().split('T')[0],
-      close: item.c
-    }));
-    
-    const result = {
-      indexData,
-      historicalData
+      ticker: response.ticker.ticker,
+      name: response.ticker.name || response.ticker.ticker,
+      close: response.ticker.day.c,
+      open: response.ticker.day.o,
+      high: response.ticker.day.h,
+      low: response.ticker.day.l,
+      change: response.ticker.todaysChange,
+      changePercent: response.ticker.todaysChangePerc,
+      volume: response.ticker.day.v,
     };
     
     // Cache the result
-    cacheData(cacheKey, result);
+    cacheData(cacheKey, indexData);
     
-    return result;
+    return indexData;
   } catch (error) {
-    console.error(`Error fetching index data for ${ticker}:`, error);
+    console.error(`Error fetching index data for ${indexTicker}:`, error);
     throw error;
   }
 }
 
 /**
- * Get batch data for market indices
- * @param indices Array of index tickers
+ * Get historical data for multiple market indices
+ * @param indexTickers Array of index tickers
  * @returns Promise with array of index data
  */
-export async function getBatchIndexData(indices: string[]): Promise<MarketIndex[]> {
+export async function getBatchIndexData(indexTickers: string[]): Promise<MarketIndex[]> {
+  // Check cache first
+  const cachedResults: MarketIndex[] = [];
+  const tickersToFetch: string[] = [];
+  
+  // Check each ticker in the cache
+  indexTickers.forEach(ticker => {
+    const cacheKey = `index_${ticker}`;
+    const cachedData = getCachedData<MarketIndex>(cacheKey, CACHE_TTL.INDEX_DATA);
+    
+    if (cachedData) {
+      cachedResults.push(cachedData);
+    } else {
+      tickersToFetch.push(ticker);
+    }
+  });
+  
+  // If all tickers were in cache, return them
+  if (tickersToFetch.length === 0) {
+    return cachedResults;
+  }
+  
   try {
-    const promises = indices.map(ticker => {
-      const cacheKey = `index_${ticker}_current`;
-      const cachedData = getCachedData<MarketIndex>(cacheKey, CACHE_TTL.INDEX_DATA);
+    // Format tickers for the API request
+    const tickersParam = tickersToFetch.join(',');
+    
+    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/indices/tickers?tickers=${tickersParam}`);
+    
+    // Format the response
+    const indicesData: MarketIndex[] = response.tickers.map((item: any) => {
+      const indexData: MarketIndex = {
+        ticker: item.ticker,
+        name: item.name || item.ticker,
+        close: item.day.c,
+        open: item.day.o,
+        high: item.day.h,
+        low: item.day.l,
+        change: item.todaysChange,
+        changePercent: item.todaysChangePerc,
+        volume: item.day.v,
+      };
       
-      if (cachedData) {
-        return Promise.resolve(cachedData);
-      }
+      // Cache individual index data
+      cacheData(`index_${item.ticker}`, indexData);
       
-      return polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`)
-        .then(response => {
-          // Map index tickers to names
-          const indexNames: Record<string, string> = {
-            'SPY': 'S&P 500',
-            'DIA': 'Dow Jones',
-            'QQQ': 'Nasdaq',
-            'IWM': 'Russell 2000',
-            'EFA': 'MSCI EAFE',
-            'EEM': 'MSCI Emerging Markets'
-          };
-          
-          const indexData: MarketIndex = {
-            ticker,
-            name: indexNames[ticker] || ticker,
-            close: response.ticker.day.c,
-            open: response.ticker.day.o,
-            change: response.ticker.todaysChange,
-            changePercent: response.ticker.todaysChangePerc
-          };
-          
-          // Cache individual index data
-          cacheData(`index_${ticker}_current`, indexData);
-          
-          return indexData;
-        });
+      return indexData;
     });
     
-    return Promise.all(promises);
+    // Combine cached and fresh results
+    return [...cachedResults, ...indicesData];
   } catch (error) {
-    console.error('Error fetching batch index data:', error);
+    console.error(`Error fetching batch index data:`, error);
+    
+    // If we have some cached results, return those instead of failing
+    if (cachedResults.length > 0) {
+      console.log(`Returning ${cachedResults.length} cached results due to API error`);
+      return cachedResults;
+    }
+    
     throw error;
   }
 }

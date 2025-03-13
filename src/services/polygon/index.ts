@@ -4,36 +4,27 @@
  * Main entry point that exports all functionality
  */
 import client from './client';
-import marketData from './marketData';
-import historical from './historical';
-import referenceData from './reference';
-import { realtime } from './realtime';
-import { clearAllCache, getCacheTimestamp } from './cache';
-
-// Integrate market data functions
-const {
-  getStockSnapshot,
-  getBatchStockSnapshots,
-  getMarketStatus,
-  getMarketMovers
-} = marketData;
-
-// Integrate historical data functions
-const {
+import { 
+  getStockSnapshot, 
+  getBatchStockSnapshots, 
+  getMarketMovers 
+} from './snapshots';
+import { getMarketStatus } from './reference/marketStatus';
+import {
   getStockCandles,
   getAggregates,
   getIndexData,
   getBatchIndexData
-} = historical;
-
-// Integrate reference data functions
-const {
+} from './historical';
+import {
   getTickerDetails,
   getSectorPerformance,
   getMarketHolidays,
   getCompanyNews,
   getMarketBreadth
-} = referenceData;
+} from './reference';
+import { realtime } from './realtime';
+import { clearAllCache, getCacheTimestamp } from './cache';
 
 // Export all functions
 export default {
