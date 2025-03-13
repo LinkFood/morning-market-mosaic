@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +28,7 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useStockDetail } from "./StockDetail";
 
 interface MajorStocksProps {
   stocks: StockData[];
@@ -39,52 +39,33 @@ type SortDirection = 'asc' | 'desc';
 type FilterTab = 'all' | 'gainers' | 'losers' | 'active';
 
 const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
-  // State for sparklines data
   const [sparklines, setSparklines] = useState<{[key: string]: number[]}>({});
-  
-  // State for expanded rows
   const [expandedRows, setExpandedRows] = useState<{[key: string]: boolean}>({});
-  
-  // State for stock details
   const [stockDetails, setStockDetails] = useState<{[key: string]: any}>({});
-  
-  // State for watchlist
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  
-  // State for sorting
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>(() => {
     const savedSort = localStorage.getItem('major_stocks_sort');
     return savedSort ? JSON.parse(savedSort) : { key: 'changePercent', direction: 'desc' };
   });
-  
-  // State for search filter
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // State for filter tab
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  
-  // State for loading details
   const [loadingDetails, setLoadingDetails] = useState<{[key: string]: boolean}>({});
-  
-  // Load saved watchlist from localStorage
+
   useEffect(() => {
     const savedWatchlist = localStorage.getItem('stock_watchlist');
     if (savedWatchlist) {
       setWatchlist(JSON.parse(savedWatchlist));
     }
   }, []);
-  
-  // Save watchlist to localStorage when it changes
+
   useEffect(() => {
     localStorage.setItem('stock_watchlist', JSON.stringify(watchlist));
   }, [watchlist]);
-  
-  // Save sort configuration to localStorage when it changes
+
   useEffect(() => {
     localStorage.setItem('major_stocks_sort', JSON.stringify(sortConfig));
   }, [sortConfig]);
-  
-  // Fetch sparklines for each stock
+
   useEffect(() => {
     const fetchSparklines = async () => {
       const sparklineData: {[key: string]: number[]} = {};
@@ -97,7 +78,6 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
           }
         } catch (error) {
           console.error(`Failed to fetch sparkline for ${stock.ticker}:`, error);
-          // Provide fallback data if the API fails
           sparklineData[stock.ticker] = [100, 101, 102, 101, 102, 103, 104];
         }
       }
@@ -112,14 +92,11 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       fetchSparklines();
     }
   }, [stocksData]);
-  
-  // Function to toggle row expansion and load details
+
   const toggleRowExpansion = async (ticker: string) => {
-    // Toggle the expansion state
     setExpandedRows(prev => {
       const isExpanding = !prev[ticker];
       
-      // Load details if expanding and not already loaded
       if (isExpanding && !stockDetails[ticker] && !loadingDetails[ticker]) {
         loadStockDetails(ticker);
       }
@@ -130,10 +107,8 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       };
     });
   };
-  
-  // Function to load stock details
+
   const loadStockDetails = async (ticker: string) => {
-    // Set loading state
     setLoadingDetails(prev => ({ ...prev, [ticker]: true }));
     
     try {
@@ -146,8 +121,7 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       setLoadingDetails(prev => ({ ...prev, [ticker]: false }));
     }
   };
-  
-  // Function to toggle watchlist status
+
   const toggleWatchlist = (ticker: string) => {
     setWatchlist(prev => {
       if (prev.includes(ticker)) {
@@ -159,8 +133,7 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       }
     });
   };
-  
-  // Function to handle sort
+
   const requestSort = (key: SortKey) => {
     setSortConfig(prevConfig => {
       const direction: SortDirection = 
@@ -168,8 +141,7 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       return { key, direction };
     });
   };
-  
-  // Function to get sort indicator
+
   const getSortIndicator = (key: SortKey) => {
     if (sortConfig.key !== key) return null;
     
@@ -177,13 +149,10 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       ? <SortAsc className="h-4 w-4 inline-block ml-1" /> 
       : <SortDesc className="h-4 w-4 inline-block ml-1" />;
   };
-  
-  // Filter and sort stocks
+
   const filteredAndSortedStocks = useMemo(() => {
-    // First, filter the stocks
     let filtered = [...stocksData];
     
-    // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(stock => 
@@ -192,19 +161,16 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       );
     }
     
-    // Apply tab filter
     if (activeFilter === 'gainers') {
       filtered = filtered.filter(stock => stock.changePercent > 0);
     } else if (activeFilter === 'losers') {
       filtered = filtered.filter(stock => stock.changePercent < 0);
     } else if (activeFilter === 'active') {
-      // Sort by volume and take top 5
       return [...filtered]
         .sort((a, b) => (b.volume || 0) - (a.volume || 0))
         .slice(0, 5);
     }
     
-    // Sort the filtered data
     return [...filtered].sort((a, b) => {
       const aValue = a[sortConfig.key] || 0;
       const bValue = b[sortConfig.key] || 0;
@@ -216,7 +182,13 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
       }
     });
   }, [stocksData, sortConfig, searchQuery, activeFilter]);
-  
+
+  const { openStockDetail } = useStockDetail();
+
+  const handleStockClick = (ticker: string) => {
+    openStockDetail(ticker);
+  };
+
   return (
     <Card className="animate-fade-in">
       <CardHeader className="flex flex-row justify-between items-center pb-2">
@@ -269,6 +241,7 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
                       <tr 
                         className={`border-t border-border hover:bg-muted/30 transition-colors 
                           ${watchlist.includes(stock.ticker) ? 'bg-muted/20' : ''}`}
+                        onClick={() => handleStockClick(stock.ticker)}
                       >
                         <td className="py-3 font-medium flex items-center">
                           <Button 
@@ -329,7 +302,6 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
                         </td>
                       </tr>
                       
-                      {/* Expanded details row */}
                       {expandedRows[stock.ticker] && (
                         <tr className="bg-muted/10">
                           <td colSpan={7} className="py-3 px-4">
@@ -411,7 +383,10 @@ const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
                                   variant="outline" 
                                   size="sm" 
                                   className="gap-1"
-                                  onClick={() => toast.info(`View details for ${stock.ticker} (Future feature)`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openStockDetail(stock.ticker);
+                                  }}
                                 >
                                   View Details <ExternalLink className="h-3 w-3" />
                                 </Button>

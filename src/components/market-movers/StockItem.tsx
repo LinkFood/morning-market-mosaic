@@ -1,10 +1,10 @@
-
 import React from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { StockData } from "@/types/marketTypes";
 import SparklineChart from "../chart/SparklineChart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useStockDetail } from "../StockDetail";
 
 interface StockItemProps {
   stock: StockData;
@@ -21,7 +21,6 @@ export const formatPercentChange = (changePercent: number) => {
   return `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
 };
 
-// Format the volume as K or M
 export const formatVolume = (volume: number) => {
   if (volume >= 1000000) {
     return `${(volume / 1000000).toFixed(1)}M`;
@@ -31,7 +30,6 @@ export const formatVolume = (volume: number) => {
   return volume.toString();
 };
 
-// Calculate volume percentage for the volume indicator bar
 export const getVolumePercentage = (volume: number, maxVolume: number) => {
   return Math.min(100, Math.max(5, (volume / maxVolume) * 100));
 };
@@ -42,10 +40,12 @@ const StockItem: React.FC<StockItemProps> = ({
   loadingSparklines,
   maxVolume,
 }) => {
+  const { openStockDetail } = useStockDetail();
+  
   return (
     <div
       className="border-b border-border last:border-0 p-3 transition-colors hover:bg-accent/10 cursor-pointer"
-      onClick={() => toast.info(`Details for ${stock.ticker}`)}
+      onClick={() => openStockDetail(stock.ticker)}
     >
       <div className="flex justify-between items-start mb-1">
         <div>
@@ -76,7 +76,6 @@ const StockItem: React.FC<StockItemProps> = ({
       </div>
 
       <div className="flex items-center gap-2 mt-2">
-        {/* Volume indicator */}
         <div className="flex flex-col flex-shrink-0 w-12">
           <div className="text-xs text-muted-foreground mb-1">Vol</div>
           <div className="h-2 bg-muted rounded-full w-full overflow-hidden">
@@ -94,7 +93,6 @@ const StockItem: React.FC<StockItemProps> = ({
           </div>
         </div>
 
-        {/* Sparkline */}
         <div className="flex-1 h-14">
           {loadingSparklines ? (
             <Skeleton className="h-full w-full" />
