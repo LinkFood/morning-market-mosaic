@@ -1,3 +1,4 @@
+
 import { 
   MarketIndex, 
   SectorPerformance, 
@@ -56,7 +57,8 @@ export const defaultSettings: UserSettings = {
     "sector-performance", 
     "market-events", 
     "market-movers",
-    "stock-picks"
+    "stock-picks",
+    "ai-stock-picker"
   ],
   componentOrder: [
     "market-overview", 
@@ -66,7 +68,8 @@ export const defaultSettings: UserSettings = {
     "sector-performance", 
     "market-events", 
     "market-movers",
-    "stock-picks"
+    "stock-picks",
+    "ai-stock-picker"
   ],
   refreshInterval: {
     marketHours: 60, // seconds
