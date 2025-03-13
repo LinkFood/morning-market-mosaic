@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useEffect } from "react";
-import { getFeatureFlags } from "@/services/featureFlags";
+import { getFeatureFlags } from "@/services/features"; // Fixed import path
 import { DashboardContextType, defaultSettings } from "./types";
 import { useDashboardData } from "./useDashboardData";
 import { useRefreshScheduler } from "./useRefreshScheduler";
