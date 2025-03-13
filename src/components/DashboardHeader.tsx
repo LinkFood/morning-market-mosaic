@@ -4,7 +4,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserSettings } from "@/types/marketTypes";
 import { useMediaQuery } from "@/hooks/use-mobile";
-import SettingsModal from "@/components/SettingsModal";
+import SettingsModal from "@/components/settings/SettingsModal";
 import UpdateIndicator from "./realtime/UpdateIndicator";
 import HeaderActions from "./header/HeaderActions";
 
