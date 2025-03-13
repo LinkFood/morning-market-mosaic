@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getServiceStatus } from '@/services/initialization';
 import { getFeatureFlags } from '@/services/features';
@@ -34,7 +34,6 @@ const ApiDiagnostics = () => {
   });
   
   useEffect(() => {
-    // Get initial service status
     const status = getServiceStatus();
     setServiceStatus(status);
     setFeatureFlags(getFeatureFlags());
@@ -56,21 +55,18 @@ const ApiDiagnostics = () => {
     });
     
     try {
-      // Test Polygon API key edge function
       const { polygonKeyResult, polygonError } = await testPolygonKeyFunction();
       setTestResults(prev => ({ ...prev, polygonEdgeFunction: polygonKeyResult }));
       if (polygonError) {
         setErrorDetails(prev => ({ ...prev, polygon: polygonError }));
       }
       
-      // Test Gemini edge function
       const { geminiResult, geminiError } = await testGeminiFunction();
       setTestResults(prev => ({ ...prev, geminiEdgeFunction: geminiResult }));
       if (geminiError) {
         setErrorDetails(prev => ({ ...prev, gemini: geminiError }));
       }
       
-      // Get updated service status
       const status = getServiceStatus();
       setServiceStatus(status);
       setFeatureFlags(getFeatureFlags());
@@ -166,7 +162,6 @@ const ApiDiagnostics = () => {
     }
   };
   
-  // Render status badge
   const StatusBadge = ({ status }: { status: boolean | null }) => {
     if (status === null) return <Badge variant="outline">Unknown</Badge>;
     
@@ -177,10 +172,21 @@ const ApiDiagnostics = () => {
   
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">API Diagnostics</h1>
+      <header className="mb-6">
+        <div className="flex items-center mb-4">
+          <Link to="/">
+            <Button variant="outline" size="icon" className="mr-2">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">API Diagnostics</h1>
+        </div>
+        <p className="text-muted-foreground">
+          Check the status of API connections and troubleshoot issues
+        </p>
+      </header>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* Service Status Card */}
         <Card>
           <CardHeader>
             <CardTitle>Service Status</CardTitle>
@@ -215,7 +221,6 @@ const ApiDiagnostics = () => {
           </CardContent>
         </Card>
         
-        {/* Feature Flags Card */}
         <Card>
           <CardHeader>
             <CardTitle>Feature Flags</CardTitle>
@@ -237,7 +242,6 @@ const ApiDiagnostics = () => {
         </Card>
       </div>
       
-      {/* Connection Tests Card */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Connection Tests</CardTitle>
@@ -289,7 +293,6 @@ const ApiDiagnostics = () => {
         </CardFooter>
       </Card>
       
-      {/* Troubleshooting Steps */}
       <Card>
         <CardHeader>
           <CardTitle>Troubleshooting</CardTitle>
