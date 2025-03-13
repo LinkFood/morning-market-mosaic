@@ -33,7 +33,6 @@ export default {
   getTopPicks
 };
 
-export {
-  ScoredStock,
-  getTopPicks
-};
+// Use 'export type' for re-exporting types when isolatedModules is enabled
+export { getTopPicks };
+export type { ScoredStock };
