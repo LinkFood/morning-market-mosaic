@@ -28,6 +28,11 @@ const ApiDiagnostics = () => {
     geminiEdgeFunction: null
   });
   
+  const [errorDetails, setErrorDetails] = useState<{[key: string]: string | null}>({
+    polygon: null,
+    gemini: null
+  });
+  
   useEffect(() => {
     // Get initial service status
     const status = getServiceStatus();
@@ -45,15 +50,25 @@ const ApiDiagnostics = () => {
       polygonEdgeFunction: null,
       geminiEdgeFunction: null
     });
+    setErrorDetails({
+      polygon: null,
+      gemini: null
+    });
     
     try {
       // Test Polygon API key edge function
-      const polygonKeyResult = await testPolygonKeyFunction();
+      const { polygonKeyResult, polygonError } = await testPolygonKeyFunction();
       setTestResults(prev => ({ ...prev, polygonEdgeFunction: polygonKeyResult }));
+      if (polygonError) {
+        setErrorDetails(prev => ({ ...prev, polygon: polygonError }));
+      }
       
       // Test Gemini edge function
-      const geminiResult = await testGeminiFunction();
+      const { geminiResult, geminiError } = await testGeminiFunction();
       setTestResults(prev => ({ ...prev, geminiEdgeFunction: geminiResult }));
+      if (geminiError) {
+        setErrorDetails(prev => ({ ...prev, gemini: geminiError }));
+      }
       
       // Get updated service status
       const status = getServiceStatus();
@@ -69,24 +84,40 @@ const ApiDiagnostics = () => {
     }
   };
   
-  const testPolygonKeyFunction = async (): Promise<boolean> => {
+  const testPolygonKeyFunction = async (): Promise<{ polygonKeyResult: boolean, polygonError: string | null }> => {
     try {
+      console.log("Testing Polygon API Key function...");
       const { data, error } = await supabase.functions.invoke('get-polygon-api-key');
       
       if (error) {
         console.error("Polygon key function error:", error);
-        return false;
+        return { 
+          polygonKeyResult: false, 
+          polygonError: `Edge function error: ${error.message || error.name || 'Unknown error'}` 
+        };
       }
       
-      return !!data?.apiKey;
+      if (!data || !data.apiKey) {
+        return { 
+          polygonKeyResult: false, 
+          polygonError: "No API key returned from edge function" 
+        };
+      }
+      
+      console.log("Polygon API Key test successful");
+      return { polygonKeyResult: true, polygonError: null };
     } catch (error) {
       console.error("Error testing Polygon key function:", error);
-      return false;
+      return { 
+        polygonKeyResult: false, 
+        polygonError: error instanceof Error ? error.message : "Unknown error" 
+      };
     }
   };
   
-  const testGeminiFunction = async (): Promise<boolean> => {
+  const testGeminiFunction = async (): Promise<{ geminiResult: boolean, geminiError: string | null }> => {
     try {
+      console.log("Testing Gemini function...");
       const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
         body: { 
           stocks: [
@@ -103,13 +134,35 @@ const ApiDiagnostics = () => {
       
       if (error) {
         console.error("Gemini function error:", error);
-        return false;
+        return { 
+          geminiResult: false, 
+          geminiError: `Edge function error: ${error.message || error.name || 'Unknown error'}` 
+        };
       }
       
-      return !!data && !data.error;
+      if (!data) {
+        return { 
+          geminiResult: false, 
+          geminiError: "No data returned from edge function" 
+        };
+      }
+      
+      if (data.error) {
+        console.error("Gemini API error:", data.error);
+        return { 
+          geminiResult: false, 
+          geminiError: `API error: ${data.error}${data.details ? ` - ${data.details}` : ''}` 
+        };
+      }
+      
+      console.log("Gemini function test successful");
+      return { geminiResult: true, geminiError: null };
     } catch (error) {
       console.error("Error testing Gemini function:", error);
-      return false;
+      return { 
+        geminiResult: false, 
+        geminiError: error instanceof Error ? error.message : "Unknown error" 
+      };
     }
   };
   
@@ -196,10 +249,23 @@ const ApiDiagnostics = () => {
               <span>Polygon API Key Function:</span>
               <StatusBadge status={testResults.polygonEdgeFunction} />
             </div>
+            {errorDetails.polygon && (
+              <div className="ml-6 p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-sm rounded border border-amber-200 dark:border-amber-800">
+                <p className="font-medium">Error details:</p>
+                <p className="font-mono text-xs break-all">{errorDetails.polygon}</p>
+              </div>
+            )}
+            
             <div className="flex justify-between items-center">
               <span>Gemini Analysis Function:</span>
               <StatusBadge status={testResults.geminiEdgeFunction} />
             </div>
+            {errorDetails.gemini && (
+              <div className="ml-6 p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-sm rounded border border-amber-200 dark:border-amber-800">
+                <p className="font-medium">Error details:</p>
+                <p className="font-mono text-xs break-all">{errorDetails.gemini}</p>
+              </div>
+            )}
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">

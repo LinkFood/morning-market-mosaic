@@ -96,49 +96,58 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   console.log("Invoking gemini-stock-analysis function");
   const startTime = performance.now();
   
-  const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
-    body: payload
-  });
-  
-  const endTime = performance.now();
-  console.log(`Edge function response time: ${Math.round(endTime - startTime)}ms`);
-  
-  if (error) {
-    console.error("Supabase function invocation error:", error);
-    throw new Error(`Function invocation error: ${error.message}`);
+  try {
+    const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
+      body: payload
+    });
+    
+    const endTime = performance.now();
+    console.log(`Edge function response time: ${Math.round(endTime - startTime)}ms`);
+    
+    if (error) {
+      console.error("Supabase function invocation error:", error);
+      throw new Error(`Function invocation error: ${error.message}`);
+    }
+    
+    console.log("Edge function response received:", data ? "success" : "empty");
+    
+    // Validate response structure
+    if (!data) {
+      console.error("Empty response from function");
+      throw new Error("Empty response from analysis function");
+    }
+    
+    // Check for error in the response
+    const responseError = data as EdgeFunctionError;
+    if (responseError.error) {
+      console.error("Error in function response:", responseError);
+      throw new Error(`Analysis error: ${responseError.error}${responseError.details ? ` - ${responseError.details}` : ''}`);
+    }
+    
+    // Validate required fields
+    if (!data.stockAnalyses || !data.marketInsight) {
+      console.error("Invalid response structure:", data);
+      throw new Error("Invalid response structure from analysis function");
+    }
+    
+    // Create the analysis object
+    const analysis: StockAnalysis = {
+      stockAnalyses: data.stockAnalyses,
+      marketInsight: data.marketInsight,
+      generatedAt: data.generatedAt || new Date().toISOString()
+    };
+    
+    console.log("Successfully parsed AI analysis for", Object.keys(analysis.stockAnalyses).length, "stocks");
+    
+    return analysis;
+  } catch (error) {
+    // Improved error logging with more detail
+    console.error("Failed to get AI analysis:", error);
+    if (error instanceof Error && error.stack) {
+      console.error("Error stack:", error.stack);
+    }
+    throw error;
   }
-  
-  console.log("Edge function response received:", data ? "success" : "empty");
-  
-  // Validate response structure
-  if (!data) {
-    console.error("Empty response from function");
-    throw new Error("Empty response from analysis function");
-  }
-  
-  // Check for error in the response
-  const responseError = data as EdgeFunctionError;
-  if (responseError.error) {
-    console.error("Error in function response:", responseError);
-    throw new Error(`Analysis error: ${responseError.error}${responseError.details ? ` - ${responseError.details}` : ''}`);
-  }
-  
-  // Validate required fields
-  if (!data.stockAnalyses || !data.marketInsight) {
-    console.error("Invalid response structure:", data);
-    throw new Error("Invalid response structure from analysis function");
-  }
-  
-  // Create the analysis object
-  const analysis: StockAnalysis = {
-    stockAnalyses: data.stockAnalyses,
-    marketInsight: data.marketInsight,
-    generatedAt: data.generatedAt || new Date().toISOString()
-  };
-  
-  console.log("Successfully parsed AI analysis for", Object.keys(analysis.stockAnalyses).length, "stocks");
-  
-  return analysis;
 }
 
 /**

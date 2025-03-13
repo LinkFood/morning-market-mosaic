@@ -40,6 +40,18 @@ serve(async (req) => {
       );
     }
 
+    // Test if the API key is a valid format
+    if (GEMINI_API_KEY.trim() === "" || !GEMINI_API_KEY.trim().startsWith("AI")) {
+      console.error("GEMINI_API_KEY appears to be invalid (should start with 'AI')");
+      return new Response(
+        JSON.stringify({ 
+          error: "API key appears to be invalid",
+          details: "The GEMINI_API_KEY environment variable is set but doesn't appear to be in the correct format (should start with 'AI')"
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Parse request body
     const requestBody = await req.json();
     const { stocks } = requestBody as RequestBody;
@@ -89,12 +101,11 @@ serve(async (req) => {
     // Google Gemini API endpoint
     const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
     
-    const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    try {
+      console.log("Making API request to Google Gemini endpoint");
+      
+      // Add more detailed logging for request troubleshooting
+      const requestData = {
         contents: [
           {
             parts: [
@@ -108,82 +119,127 @@ serve(async (req) => {
           topP: 0.95,
           maxOutputTokens: 2048,
         }
-      }),
-    });
-    
-    // Check response status
-    if (!response.ok) {
-      const errorText = await response.text();
-      const status = response.status;
-      console.error(`Gemini API Error (${status}):`, errorText);
+      };
       
-      // Return a more detailed error response
-      return new Response(
-        JSON.stringify({ 
-          error: `Gemini API Error: ${response.statusText}`,
-          status: response.status,
-          details: errorText
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      const requestURL = `${endpoint}?key=${GEMINI_API_KEY}`;
+      console.log(`Request URL (without key): ${endpoint}?key=AI...`);
+      
+      const response = await fetch(requestURL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      });
+      
+      // Check response status
+      console.log(`Gemini API response status: ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        const status = response.status;
+        console.error(`Gemini API Error (${status}):`, errorText);
+        
+        // Enhanced error handling based on status code
+        let errorDetails = errorText;
+        
+        if (status === 401) {
+          errorDetails = "Authentication failed. The Gemini API key appears to be invalid.";
+        } else if (status === 403) {
+          errorDetails = "Permission denied. The API key may not have access to the Gemini API.";
+        } else if (status === 429) {
+          errorDetails = "Rate limit exceeded. The API quota may have been reached.";
+        } else if (status >= 500) {
+          errorDetails = "Gemini API server error. The service may be experiencing issues.";
         }
-      );
-    }
-    
-    // Process successful response
-    const data = await response.json();
-    
-    // Validate response structure
-    if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-      console.error("Invalid response format from Gemini API:", data);
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid API response format", 
-          details: "The Gemini API returned an unexpected response format"
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-    
-    const aiResponse = data.candidates[0].content.parts[0].text;
-    
-    // Validate AI response isn't empty
-    if (!aiResponse) {
-      console.error("Empty response from Gemini API");
-      return new Response(
-        JSON.stringify({ 
-          error: "Empty API response", 
-          details: "The Gemini API returned an empty response"
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
+        
+        // Return a more detailed error response
+        return new Response(
+          JSON.stringify({ 
+            error: `Gemini API Error: ${response.statusText}`,
+            status: response.status,
+            details: errorDetails
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
+      // Process successful response
+      const data = await response.json();
+      console.log("Successfully received response from Gemini API");
+      
+      // Enhanced logging for debugging
+      if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
+        console.log("Response contains expected structure");
+      } else {
+        console.error("Unexpected response structure:", JSON.stringify(data).substring(0, 500) + "...");
+      }
+      
+      // Validate response structure
+      if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
+        console.error("Invalid response format from Gemini API:", JSON.stringify(data).substring(0, 500) + "...");
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid API response format", 
+            details: "The Gemini API returned an unexpected response format"
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
+      const aiResponse = data.candidates[0].content.parts[0].text;
+      
+      // Validate AI response isn't empty
+      if (!aiResponse) {
+        console.error("Empty response from Gemini API");
+        return new Response(
+          JSON.stringify({ 
+            error: "Empty API response", 
+            details: "The Gemini API returned an empty response"
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
 
-    console.log("Successfully received response from Gemini API");
-
-    // Parse the AI response
-    const stockAnalyses = parseAnalysisResponse(aiResponse);
-    const marketInsight = extractMarketInsight(aiResponse);
-    
-    // Create the analysis object
-    const analysis = {
-      stockAnalyses,
-      marketInsight,
-      generatedAt: new Date().toISOString()
-    };
-    
-    return new Response(
-      JSON.stringify(analysis),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-    
+      // Parse the AI response
+      const stockAnalyses = parseAnalysisResponse(aiResponse);
+      const marketInsight = extractMarketInsight(aiResponse);
+      
+      // Create the analysis object
+      const analysis = {
+        stockAnalyses,
+        marketInsight,
+        generatedAt: new Date().toISOString()
+      };
+      
+      console.log("Successfully processed Gemini response");
+      
+      return new Response(
+        JSON.stringify(analysis),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (fetchError) {
+      console.error("Error during Gemini API fetch:", fetchError);
+      return new Response(
+        JSON.stringify({ 
+          error: "API communication error", 
+          details: fetchError instanceof Error ? fetchError.message : "Unknown fetch error"
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
   } catch (error) {
     // Log the full error
     console.error("Error in gemini-stock-analysis function:", error);
@@ -192,8 +248,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: "Failed to generate analysis", 
-        details: error.message,
-        stack: error.stack
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
       }),
       { 
         status: 500, 
