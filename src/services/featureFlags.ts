@@ -15,12 +15,10 @@ export type { FeatureFlags };
  * @returns Dictionary of feature flags and their values
  */
 export function getFeatureFlags(): ExtendedFeatureFlags {
-  // Import dynamically to avoid circular dependencies
-  const featureModule = require('./features');
-  const coreFlags = featureModule.getFeatureFlags();
-  
+  // Use dynamic import to avoid circular dependencies
   return {
-    ...coreFlags,
+    // Core feature flags from features/index.ts
+    ...window.__FEATURE_FLAGS__ || {},
     
     // UI Features
     enableDarkMode: true,
@@ -57,20 +55,29 @@ export function isFeatureEnabled(featureName: string): boolean {
  * @param featureName Name of the feature to update
  * @param enabled New value for the feature flag
  */
-export function updateFeatureFlag(featureName: string, enabled: boolean) {
-  // Dynamic import to avoid circular dependencies
-  const featureModule = require('./features');
-  
-  if (featureName in featureModule.DEFAULT_FLAGS) {
-    featureModule.setFeatureFlag(featureName as keyof FeatureFlags, enabled);
+export async function updateFeatureFlag(featureName: string, enabled: boolean) {
+  try {
+    // Use dynamic import to avoid circular dependencies
+    const featureModule = await import('./features');
+    
+    if (featureModule.DEFAULT_FLAGS && featureName in featureModule.DEFAULT_FLAGS) {
+      featureModule.setFeatureFlag(featureName as keyof FeatureFlags, enabled);
+      
+      // Update the global feature flags
+      if (window.__FEATURE_FLAGS__) {
+        window.__FEATURE_FLAGS__[featureName] = enabled;
+      }
+    }
+    
+    // In a real application, you would want to persist UI feature flag changes too
+    console.log(`Feature flag ${featureName} updated to ${enabled}`);
+    
+    // Dispatch a custom event to notify components of the change
+    const event = new CustomEvent('feature_flags_updated');
+    window.dispatchEvent(event);
+  } catch (error) {
+    console.error(`Error updating feature flag ${featureName}:`, error);
   }
-  
-  // In a real application, you would want to persist UI feature flag changes too
-  console.log(`Feature flag ${featureName} updated to ${enabled}`);
-  
-  // Dispatch a custom event to notify components of the change
-  const event = new CustomEvent('feature_flags_updated');
-  window.dispatchEvent(event);
 }
 
 export default {

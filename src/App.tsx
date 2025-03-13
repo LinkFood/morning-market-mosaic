@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/sonner";
 import { StockDetailProvider } from './components/StockDetail';
 import { initializeServices, getServiceStatus } from './services/initialization';
-import { getFeatureFlags } from './services/features';
+import { initializeFeatureFlags } from './services/features';
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import('./pages/Index'));
@@ -55,9 +55,12 @@ const ErrorFallback = ({ error, featureFlags }: { error: string, featureFlags?: 
 function App() {
   const [initializing, setInitializing] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
-  const [featureFlags, setFeatureFlags] = useState(getFeatureFlags());
+  const [featureFlags, setFeatureFlags] = useState<any>(null);
   
   useEffect(() => {
+    // Initialize feature flags first
+    initializeFeatureFlags();
+    
     // Capture any errors at the initialization level
     const init = async () => {
       try {
@@ -70,7 +73,7 @@ function App() {
         console.log("Initialization result:", success ? "Success" : "Partial failure");
         
         // Update feature flags from the latest state
-        setFeatureFlags(getFeatureFlags());
+        setFeatureFlags(window.__FEATURE_FLAGS__);
         
         if (!success) {
           const status = getServiceStatus();
@@ -81,7 +84,7 @@ function App() {
       } catch (error) {
         console.error("Unhandled error during initialization:", error);
         setInitError(error instanceof Error ? error.message : "Unexpected initialization error");
-        setFeatureFlags(getFeatureFlags());  // Make sure we have latest feature flags even during errors
+        setFeatureFlags(window.__FEATURE_FLAGS__);  // Make sure we have latest feature flags even during errors
         setInitializing(false);
       }
     };
@@ -95,7 +98,7 @@ function App() {
   }
   
   // Check if initialization completely failed with no graceful degradation possible
-  if (initError && !featureFlags.enableDataRefresh && !featureFlags.useRealTimeData && !featureFlags.useFredEconomicData) {
+  if (initError && featureFlags && !featureFlags.enableDataRefresh && !featureFlags.useRealTimeData && !featureFlags.useFredEconomicData) {
     return <ErrorFallback error={initError} />;
   }
   
@@ -110,10 +113,10 @@ function App() {
               <Suspense fallback={<LoadingFallback />}>
                 <Routes>
                   <Route path="/" element={<Index />} />
-                  {featureFlags.useFredEconomicData && (
+                  {featureFlags && featureFlags.useFredEconomicData && (
                     <Route path="/fed-dashboard" element={<FedDashboard />} />
                   )}
-                  {featureFlags.useFredEconomicData && (
+                  {featureFlags && featureFlags.useFredEconomicData && (
                     <Route path="/fred-debug" element={<FredDebug />} />
                   )}
                   <Route path="*" element={<NotFound />} />

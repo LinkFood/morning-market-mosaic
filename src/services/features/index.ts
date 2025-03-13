@@ -9,6 +9,13 @@ import { FeatureFlags, DEFAULT_FLAGS } from './types';
 // Current feature flags
 let currentFlags: FeatureFlags = { ...DEFAULT_FLAGS };
 
+// Declare global window extension
+declare global {
+  interface Window {
+    __FEATURE_FLAGS__?: FeatureFlags;
+  }
+}
+
 /**
  * Update feature flags based on service availability
  * @param polygonApiAvailable Whether Polygon API is available
@@ -36,6 +43,9 @@ export function updateFeatureFlags(
   // Store in localStorage for persistence
   localStorage.setItem('feature_flags', JSON.stringify(currentFlags));
   
+  // Set global window variable for easy access
+  window.__FEATURE_FLAGS__ = { ...currentFlags };
+  
   console.log("Feature flags updated:", currentFlags);
 }
 
@@ -49,10 +59,14 @@ export function initializeFeatureFlags(): void {
       const parsed = JSON.parse(stored);
       currentFlags = { ...DEFAULT_FLAGS, ...parsed };
     }
+    
+    // Set global window variable for easy access
+    window.__FEATURE_FLAGS__ = { ...currentFlags };
   } catch (error) {
     console.error("Error loading feature flags:", error);
     // Use defaults on error
     currentFlags = { ...DEFAULT_FLAGS };
+    window.__FEATURE_FLAGS__ = { ...currentFlags };
   }
 }
 
@@ -75,6 +89,10 @@ export function isFeatureEnabled(feature: keyof FeatureFlags): boolean {
  */
 export function setFeatureFlag(feature: keyof FeatureFlags, enabled: boolean): void {
   currentFlags[feature] = enabled;
+  
+  // Update the global flags
+  window.__FEATURE_FLAGS__ = { ...currentFlags };
+  
   localStorage.setItem('feature_flags', JSON.stringify(currentFlags));
 }
 
@@ -83,3 +101,4 @@ initializeFeatureFlags();
 
 // Export types
 export type { FeatureFlags };
+export { DEFAULT_FLAGS };
