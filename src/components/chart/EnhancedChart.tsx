@@ -25,8 +25,15 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   stacked = false,
   title,
   referenceLines = [],
+  timeFrame: externalTimeFrame,
+  setTimeFrame: externalSetTimeFrame
 }) => {
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>("1Y");
+  // Use internal or external time frame state
+  const [internalTimeFrame, setInternalTimeFrame] = useState<TimeFrame>("1Y");
+  
+  // Determine if we're using controlled or uncontrolled timeframe
+  const timeFrame = externalTimeFrame || internalTimeFrame;
+  const setTimeFrame = externalSetTimeFrame || setInternalTimeFrame;
   
   // Process chart data using our custom hook
   const { 
@@ -67,7 +74,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
       console.warn(`No data available for ${title || 'chart'} in timeframe ${timeFrame}, showing all data instead`);
       setTimeFrame('MAX'); // Fall back to showing all data
     }
-  }, [filteredData.length, data, timeFrame, title]);
+  }, [filteredData.length, data, timeFrame, title, setTimeFrame]);
   
   // If no data, show placeholder
   if (isEmpty) {
