@@ -119,14 +119,29 @@ function identifySignals(stock: StockData): string[] {
 
 /**
  * Check if a stock meets minimum criteria for consideration
+ * Filters out penny stocks and ensures adequate liquidity
  */
 function meetsMinimumCriteria(stock: ScoredStock): boolean {
-  // Relaxed volume filter - to show more stocks
-  if (stock.volume && stock.volume < 50000) return false;
+  // Filter out penny stocks (price < $5)
+  if (stock.close < 5) {
+    console.log(`${stock.ticker} filtered out: penny stock (price $${stock.close.toFixed(2)})`);
+    return false;
+  }
   
-  // Relaxed minimum composite score threshold
-  if (stock.scores.composite < 40) return false;
+  // Require sufficient volume for liquidity
+  if (!stock.volume || stock.volume < 500000) {
+    console.log(`${stock.ticker} filtered out: insufficient volume (${stock.volume?.toLocaleString() || 'unknown'})`);
+    return false;
+  }
   
+  // Minimum composite score threshold
+  if (stock.scores.composite < 40) {
+    console.log(`${stock.ticker} filtered out: low composite score (${stock.scores.composite})`);
+    return false;
+  }
+  
+  // Passed all criteria
+  console.log(`${stock.ticker} passed minimum criteria: price $${stock.close.toFixed(2)}, volume ${stock.volume.toLocaleString()}, score ${stock.scores.composite}`);
   return true;
 }
 
