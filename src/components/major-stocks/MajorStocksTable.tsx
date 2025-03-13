@@ -7,9 +7,7 @@ import PriceRangeSlider from "../chart/PriceRangeSlider";
 import VolumeIndicator from "../chart/VolumeIndicator";
 import StockRowDetails from "./StockRowDetails";
 import { useStockDetail } from "../StockDetail";
-
-type SortKey = 'ticker' | 'close' | 'change' | 'changePercent' | 'volume';
-type SortDirection = 'asc' | 'desc';
+import { SortKey, SortDirection } from "./useMajorStocks";
 
 export interface MajorStocksTableProps {
   stocks: StockData[];

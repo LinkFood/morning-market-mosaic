@@ -86,8 +86,14 @@ export function useRealtimeUpdates<T>(
     setIsPaused(status.isPaused);
     setLastUpdated(status.lastUpdated);
     
-    // Subscribe to updates
-    const unsubscribe = realtime.subscribeMultiple(symbolArray, handleUpdate as UpdateEventCallback);
+    // Use a simple subscription approach instead of subscribeMultiple
+    const unsubscribe = realtime.subscribe((data) => {
+      if (data.type === 'data' && symbolArray.includes(data.symbol)) {
+        handleUpdate(data.data, data.type);
+      } else if (data.type === 'status') {
+        handleUpdate(data.data, data.type);
+      }
+    });
     
     // Cleanup on unmount
     return () => {

@@ -7,7 +7,7 @@ import client from './client';
 import marketData from './marketData';
 import historical from './historical';
 import referenceData from './reference';
-import realtime from './realtime';
+import { realtime } from './realtime';
 import { clearAllCache, getCacheTimestamp } from './cache';
 
 // Integrate market data functions

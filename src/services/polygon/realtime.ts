@@ -1,7 +1,9 @@
-
 import { RealtimeUpdateStatus, RealtimeOptions, MarketStatus, StockData } from '@/types/marketTypes';
-import { clearCache } from './cache';
+import { clearAllCache } from './cache';
 import marketData from './marketData';
+
+export type DataUpdateType = 'status' | 'data' | 'error';
+export type UpdateEventCallback = (data: any, type: DataUpdateType) => void;
 
 /**
  * Realtime data service for Polygon.io
@@ -41,22 +43,16 @@ class RealtimeService {
     this.initBatteryMonitoring();
   }
   
-  /**
-   * Initialize battery monitoring if available in the browser
-   */
   private async initBatteryMonitoring() {
     try {
-      // Check if Battery API is available
       if ('getBattery' in navigator) {
         const battery = await (navigator as any).getBattery();
         
-        // Update initial status
         this.batteryStatus = {
           charging: battery.charging,
           level: battery.level
         };
         
-        // Listen for battery status changes
         battery.addEventListener('chargingchange', () => {
           this.batteryStatus.charging = battery.charging;
           this.adjustPollingForBattery();
@@ -72,19 +68,13 @@ class RealtimeService {
     }
   }
   
-  /**
-   * Adjust polling frequency based on battery status
-   */
   private adjustPollingForBattery() {
     if (!this.options.batteryOptimization) return;
     
-    // If on battery and battery level is low (< 20%)
     if (!this.batteryStatus.charging && this.batteryStatus.level < 0.2) {
-      // Double all intervals to reduce battery usage
       this.stopPolling();
       this.startPolling(true);
     } else {
-      // Reset to normal intervals
       if (this.status.isPolling) {
         this.stopPolling();
         this.startPolling(false);
@@ -92,26 +82,18 @@ class RealtimeService {
     }
   }
   
-  /**
-   * Initialize realtime updates
-   */
   public init() {
     this.checkMarketStatus();
     
-    // Start updates based on current market status
     this.determineUpdateMethod();
   }
   
-  /**
-   * Update configuration options
-   */
   public updateSettings(options: Partial<RealtimeOptions>) {
     this.options = {
       ...this.options,
       ...options
     };
     
-    // Restart updates with new settings
     if (this.status.isPolling) {
       this.stopPolling();
       this.startPolling();
@@ -120,14 +102,10 @@ class RealtimeService {
     this.adjustPollingForBattery();
   }
   
-  /**
-   * Get current market status
-   */
   private async checkMarketStatus() {
     const now = new Date();
     const timeSinceLastCheck = now.getTime() - this.lastMarketStatusCheck.getTime();
     
-    // Only check every 5 minutes to avoid excessive API calls
     if (timeSinceLastCheck > 5 * 60 * 1000 || !this.marketStatus) {
       try {
         const status = await marketData.getMarketStatus();
@@ -135,7 +113,6 @@ class RealtimeService {
         this.lastMarketStatusCheck = now;
       } catch (error) {
         console.error('Failed to get market status:', error);
-        // Fallback to assuming market is closed
         this.marketStatus = {
           market: 'unknown',
           serverTime: new Date().toISOString(),
@@ -149,9 +126,6 @@ class RealtimeService {
     return this.marketStatus;
   }
   
-  /**
-   * Update stored market status
-   */
   private updateMarketStatus(status: MarketStatus) {
     const marketStatusChanged = 
       !this.marketStatus || 
@@ -159,23 +133,16 @@ class RealtimeService {
     
     this.marketStatus = status;
     
-    // Adjust update method if market status changed
     if (marketStatusChanged) {
       this.determineUpdateMethod();
     }
   }
   
-  /**
-   * Determine the best update method based on market status and settings
-   */
   private determineUpdateMethod() {
-    // Don't change anything if updates are paused
     if (this.status.isPaused) return;
     
-    // First, check market status
     if (!this.marketStatus) return;
     
-    // Stop current updates
     this.stopUpdates();
     
     if (this.options.updateMethod === 'websocket') {
@@ -183,88 +150,63 @@ class RealtimeService {
     } else if (this.options.updateMethod === 'polling') {
       this.startPolling();
     } else {
-      // Auto method - choose based on market status
       if (this.marketStatus.isOpen) {
-        // During market hours, prefer WebSocket if available in your plan
         this.startPolling();
-        // In a real implementation, you would use WebSocket for real-time data
-        // this.connectWebSocket();
       } else {
-        // When market is closed, polling is sufficient
         this.startPolling();
       }
     }
   }
   
-  /**
-   * Stop all active updates
-   */
   private stopUpdates() {
     this.stopPolling();
     this.disconnectWebSocket();
   }
   
-  /**
-   * Start polling for updates
-   */
   private startPolling(lowPowerMode = false) {
     if (this.status.isPolling) return;
     
-    // Determine polling interval based on market status
     let interval = this.getPollingInterval();
     
-    // Adjust for low power mode if needed
     if (lowPowerMode) {
       interval = interval * 2;
     }
     
-    // Start different polling for different data types
     this.pollingIntervals['marketIndices'] = window.setInterval(() => {
       this.pollMarketIndices();
-    }, interval * 1000); // Convert to milliseconds
+    }, interval * 1000);
     
     this.pollingIntervals['stocks'] = window.setInterval(() => {
       this.pollStocks();
-    }, interval * 1000); // Convert to milliseconds
+    }, interval * 1000);
     
-    // Check market status occasionally
     this.pollingIntervals['marketStatus'] = window.setInterval(() => {
       this.checkMarketStatus();
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, 5 * 60 * 1000);
     
     this.status.isPolling = true;
     this.notifyStatusChanged();
   }
   
-  /**
-   * Determine polling interval based on market hours
-   */
   private getPollingInterval(): number {
     if (!this.marketStatus) {
       return this.options.intervals?.closed || 900;
     }
     
-    // Check if market is open
     if (this.marketStatus.isOpen) {
       return this.options.intervals?.marketHours || 60;
     }
     
-    // Check if it's extended hours
     const now = new Date();
     const hour = now.getHours();
     
-    // Pre-market (4:00 AM - 9:30 AM) or after-hours (4:00 PM - 8:00 PM)
     if ((hour >= 4 && hour < 9.5) || (hour >= 16 && hour < 20)) {
       return this.options.intervals?.afterHours || 300;
     }
     
-    // Market closed
     return this.options.intervals?.closed || 900;
   }
   
-  /**
-   * Stop all polling operations
-   */
   private stopPolling() {
     Object.keys(this.pollingIntervals).forEach((key) => {
       window.clearInterval(this.pollingIntervals[key]);
@@ -275,13 +217,8 @@ class RealtimeService {
     this.notifyStatusChanged();
   }
   
-  /**
-   * Poll for market indices
-   */
-  private async pollMarketIndices() {
+  private pollMarketIndices() {
     try {
-      // In a real implementation, this would get real-time market index data
-      // For this example, we're just simulating an update
       console.log('Polling market indices...');
       
       this.status.lastUpdated = new Date();
@@ -291,19 +228,13 @@ class RealtimeService {
     }
   }
   
-  /**
-   * Poll for stock data
-   */
-  private async pollStocks() {
+  private pollStocks() {
     try {
-      // Prioritize certain stocks based on settings
       const prioritySymbols = this.options.prioritySymbols || [];
       
       if (prioritySymbols.length > 0) {
-        // In a real implementation, batch request stock data
         console.log('Polling priority stocks...', prioritySymbols);
       } else {
-        // Poll a general set of stocks
         console.log('Polling general stocks...');
       }
       
@@ -314,21 +245,13 @@ class RealtimeService {
     }
   }
   
-  /**
-   * Connect to WebSocket for real-time updates
-   */
   private connectWebSocket() {
-    // In a real implementation, connect to Polygon.io WebSocket API
     console.log('WebSocket not implemented in this example');
     
-    // Simulate connected state
     this.status.isConnected = true;
     this.notifyStatusChanged();
   }
   
-  /**
-   * Disconnect WebSocket
-   */
   private disconnectWebSocket() {
     if (this.websocket) {
       this.websocket.close();
@@ -339,9 +262,6 @@ class RealtimeService {
     this.notifyStatusChanged();
   }
   
-  /**
-   * Subscribe to updates
-   */
   public subscribe(callback: (data: any) => void) {
     this.subscribers.push(callback);
     return () => {
@@ -349,9 +269,18 @@ class RealtimeService {
     };
   }
   
-  /**
-   * Notify all subscribers of status changes
-   */
+  public subscribeMultiple(symbols: string[], callback: UpdateEventCallback) {
+    const unsubscribes = symbols.map(symbol => this.subscribe((data) => {
+      if (data.symbol === symbol || data.type === 'status') {
+        callback(data.data, data.type as DataUpdateType);
+      }
+    }));
+    
+    return () => {
+      unsubscribes.forEach(unsubscribe => unsubscribe());
+    };
+  }
+  
   private notifyStatusChanged() {
     this.subscribers.forEach(callback => {
       callback({
@@ -361,23 +290,14 @@ class RealtimeService {
     });
   }
   
-  /**
-   * Get current status
-   */
   public getStatus(): RealtimeUpdateStatus {
     return { ...this.status };
   }
   
-  /**
-   * Get last updated timestamp
-   */
   public getLastUpdated(): Date | null {
     return this.status.lastUpdated;
   }
   
-  /**
-   * Pause or resume updates
-   */
   public toggleUpdates(): boolean {
     this.status.isPaused = !this.status.isPaused;
     
@@ -391,18 +311,12 @@ class RealtimeService {
     return !this.status.isPaused;
   }
   
-  /**
-   * Manually refresh all data
-   */
   public async refreshData() {
     try {
-      // Clear cache to ensure fresh data
-      clearCache();
+      clearAllCache();
       
-      // Update market status
       await this.checkMarketStatus();
       
-      // In a real implementation, this would refresh all relevant data
       console.log('Manually refreshing all data...');
       
       this.status.lastUpdated = new Date();
@@ -415,24 +329,15 @@ class RealtimeService {
     }
   }
   
-  /**
-   * Update cached data for a symbol
-   */
   public updateCachedData(symbol: string, data: any) {
     this.cachedData.set(symbol, data);
     this.notifyDataUpdated(symbol, data);
   }
   
-  /**
-   * Get cached data for a symbol
-   */
   public getCachedData(symbol: string) {
     return this.cachedData.get(symbol);
   }
   
-  /**
-   * Notify subscribers of data updates
-   */
   private notifyDataUpdated(symbol: string, data: any) {
     this.subscribers.forEach(callback => {
       callback({
@@ -444,8 +349,6 @@ class RealtimeService {
   }
 }
 
-// Export singleton instance
 export const realtime = new RealtimeService();
 
-// Initialize on import
 realtime.init();

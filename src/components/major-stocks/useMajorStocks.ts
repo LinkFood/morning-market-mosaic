@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { StockData } from "@/types/marketTypes";
 
@@ -24,9 +25,9 @@ export function useMajorStocks(stocksData: StockData[]) {
     if (activeFilter === "watchlist") {
       filteredStocks = stocksData.filter((stock) => watchlist.includes(stock.ticker));
     } else if (activeFilter === "gainers") {
-      filteredStocks = [...stocksData].sort((a, b) => (b.change_percent - a.change_percent));
+      filteredStocks = [...stocksData].sort((a, b) => (b.changePercent - a.changePercent));
     } else if (activeFilter === "losers") {
-      filteredStocks = [...stocksData].sort((a, b) => (a.change_percent - b.change_percent));
+      filteredStocks = [...stocksData].sort((a, b) => (a.changePercent - b.changePercent));
     } else if (activeFilter === "tech") {
        filteredStocks = stocksData.filter(stock => ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'].includes(stock.ticker));
     }
@@ -47,7 +48,7 @@ export function useMajorStocks(stocksData: StockData[]) {
         } else if (sortConfig.key === "name") {
           sortValue = a.name.localeCompare(b.name);
         } else if (sortConfig.key === "price") {
-          sortValue = a.price - b.price;
+          sortValue = a.close - b.close; // Changed 'price' to 'close' to match StockData
         } else if (sortConfig.key === "change") {
           sortValue = a.change - b.change;
         } else if (sortConfig.key === "volume") {
