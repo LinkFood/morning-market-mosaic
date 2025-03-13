@@ -19,13 +19,19 @@ serve(async (req) => {
     if (!apiKey) {
       console.error("POLYGON_API_KEY environment variable is not set");
       return new Response(
-        JSON.stringify({ error: "API key not configured" }),
+        JSON.stringify({ 
+          error: "API key not configured",
+          details: "The POLYGON_API_KEY environment variable is not set in Supabase Edge Function secrets"
+        }),
         { 
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
     }
+    
+    // Log successful retrieval (useful for debugging)
+    console.log("Successfully retrieved Polygon API key");
     
     // Return the API key
     return new Response(
@@ -36,9 +42,16 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error retrieving API key:", error.message);
+    // Log the full error
+    console.error("Error retrieving API key:", error);
+    
+    // Return a detailed error response
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: "Failed to retrieve API key",
+        details: error.message,
+        stack: error.stack
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }

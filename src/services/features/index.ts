@@ -4,29 +4,7 @@
  * Controls which features are enabled based on API availability
  */
 
-// Feature flag definitions
-export interface FeatureFlags {
-  useRealTimeData: boolean;    // Use real-time data instead of cached
-  showMarketMovers: boolean;   // Show market movers section
-  enableDetailedCharts: boolean; // Show enhanced charts with technical indicators
-  enableNewsSection: boolean;  // Show financial news
-  useFredEconomicData: boolean; // Use FRED API for economic data
-  enableDataRefresh: boolean;  // Allow automatic data refresh
-  useStockPickerAlgorithm: boolean; // Use algorithmic stock picking
-  useAIStockAnalysis: boolean; // Use AI for stock analysis
-}
-
-// Default feature flags (everything enabled)
-const DEFAULT_FLAGS: FeatureFlags = {
-  useRealTimeData: true,
-  showMarketMovers: true,
-  enableDetailedCharts: true,
-  enableNewsSection: true,
-  useFredEconomicData: true,
-  enableDataRefresh: true,
-  useStockPickerAlgorithm: true,
-  useAIStockAnalysis: true
-};
+import { FeatureFlags, DEFAULT_FLAGS } from './types';
 
 // Current feature flags
 let currentFlags: FeatureFlags = { ...DEFAULT_FLAGS };
@@ -102,3 +80,6 @@ export function setFeatureFlag(feature: keyof FeatureFlags, enabled: boolean): v
 
 // Initialize on module load
 initializeFeatureFlags();
+
+// Export types
+export type { FeatureFlags };

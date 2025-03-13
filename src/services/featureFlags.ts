@@ -4,8 +4,8 @@
  * Provides a centralized way to manage feature flags in the application
  */
 
-// Import the FeatureFlags interface from the features service
-import { FeatureFlags } from './features';
+// Import from the types file to avoid circular dependencies
+import { FeatureFlags, ExtendedFeatureFlags } from './features/types';
 
 // Re-export the FeatureFlags type
 export type { FeatureFlags };
@@ -14,34 +14,19 @@ export type { FeatureFlags };
  * Get all feature flags
  * @returns Dictionary of feature flags and their values
  */
-export function getFeatureFlags(): FeatureFlags & {
-  // Additional flags not in the core FeatureFlags interface
-  enableDarkMode: boolean;
-  enableAnimations: boolean;
-  showExperimentalCharts: boolean;
-  useTouchGestures: boolean;
-  useBatteryOptimization: boolean;
-  showDebugInfo: boolean;
-  allowCustomWatchlists: boolean;
-  allowThemeCustomization: boolean;
-  useAIStockAnalysis: boolean; // Add this flag for AI stock analysis
-} {
+export function getFeatureFlags(): ExtendedFeatureFlags {
+  // Import dynamically to avoid circular dependencies
+  const featureModule = require('./features');
+  const coreFlags = featureModule.getFeatureFlags();
+  
   return {
-    // Core FeatureFlags from features service
-    useRealTimeData: true,
-    showMarketMovers: true,
-    enableDetailedCharts: true,
-    enableNewsSection: true,
-    useFredEconomicData: true,
-    enableDataRefresh: true,
-    useStockPickerAlgorithm: true,
+    ...coreFlags,
     
     // UI Features
     enableDarkMode: true,
     enableAnimations: true,
     
     // Experimental Features
-    // Fixed property name from 'useRealtimeUpdates' to 'useRealTimeData'
     showExperimentalCharts: false,
     
     // Mobile Features
@@ -53,10 +38,7 @@ export function getFeatureFlags(): FeatureFlags & {
     
     // User-specific Features
     allowCustomWatchlists: true,
-    allowThemeCustomization: true,
-    
-    // AI Analysis Feature
-    useAIStockAnalysis: true
+    allowThemeCustomization: true
   };
 }
 
@@ -67,7 +49,7 @@ export function getFeatureFlags(): FeatureFlags & {
  */
 export function isFeatureEnabled(featureName: string): boolean {
   const flags = getFeatureFlags();
-  return flags[featureName as keyof ReturnType<typeof getFeatureFlags>] === true;
+  return flags[featureName as keyof ExtendedFeatureFlags] === true;
 }
 
 /**
@@ -76,7 +58,14 @@ export function isFeatureEnabled(featureName: string): boolean {
  * @param enabled New value for the feature flag
  */
 export function updateFeatureFlag(featureName: string, enabled: boolean) {
-  // In a real application, you would want to persist these changes to a database or configuration file
+  // Dynamic import to avoid circular dependencies
+  const featureModule = require('./features');
+  
+  if (featureName in featureModule.DEFAULT_FLAGS) {
+    featureModule.setFeatureFlag(featureName as keyof FeatureFlags, enabled);
+  }
+  
+  // In a real application, you would want to persist UI feature flag changes too
   console.log(`Feature flag ${featureName} updated to ${enabled}`);
   
   // Dispatch a custom event to notify components of the change
