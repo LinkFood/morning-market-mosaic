@@ -1,10 +1,9 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { MarketIndex } from "@/types/marketTypes";
 import SparklineChart from "./chart/SparklineChart";
 import { useState, useEffect } from "react";
-import apiService from "@/services/apiService";
+import { stocks } from "@/services/market";
 
 interface MarketOverviewProps {
   indices: MarketIndex[];
@@ -19,7 +18,7 @@ const MarketOverview = ({ indices }: MarketOverviewProps) => {
       
       for (const index of indices) {
         try {
-          const data = await apiService.getStockSparkline(index.ticker);
+          const data = await stocks.getStockSparkline(index.ticker);
           sparklineData[index.ticker] = data;
         } catch (error) {
           console.error(`Failed to fetch sparkline for ${index.ticker}:`, error);

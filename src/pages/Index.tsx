@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/DashboardHeader";
 import MarketOverview from "@/components/MarketOverview";
@@ -7,7 +6,7 @@ import MajorStocks from "@/components/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
-import apiService, { getCacheTimestamp } from "@/services/apiService";
+import marketService, { marketIndices, sectorPerformance, stocks, events, economicIndicators, cacheUtils } from "@/services/market";
 import fedApiService from "@/services/fred";
 import { MarketIndex, SectorPerformance as SectorType, StockData, EconomicIndicator, MarketEvent, UserSettings } from "@/types/marketTypes";
 import { toast } from "sonner";
@@ -91,25 +90,25 @@ const Dashboard = () => {
     
     try {
       // Load market indices
-      const indicesData = await apiService.getMarketIndices();
+      const indicesData = await marketIndices.getMarketIndices();
       setIndices(indicesData);
       
       // Use the timestamp from the indices cache as the last updated time
-      const timestamp = getCacheTimestamp("market_indices");
+      const timestamp = cacheUtils.getCacheTimestamp("market_indices");
       if (timestamp) {
         setLastUpdated(timestamp);
       }
       
       // Load sectors
-      const sectorsData = await apiService.getSectorPerformance();
+      const sectorsData = await sectorPerformance.getSectorPerformance();
       setSectors(sectorsData);
       
       // Load stocks based on user's watchlist
-      const stocksData = await apiService.getMajorStocks(settings.watchlist);
+      const stocksData = await stocks.getMajorStocks(settings.watchlist);
       setStocks(stocksData);
       
       // Load market events
-      const eventsData = await apiService.getMarketEvents();
+      const eventsData = await events.getMarketEvents();
       setEvents(eventsData);
       
       // Load economic indicators separately

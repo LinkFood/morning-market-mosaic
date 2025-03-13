@@ -1,24 +1,23 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StockData } from "@/types/marketTypes";
 import SparklineChart from "./chart/SparklineChart";
 import { useState, useEffect } from "react";
-import apiService from "@/services/apiService";
+import { stocks } from "@/services/market";
 
 interface MajorStocksProps {
   stocks: StockData[];
 }
 
-const MajorStocks = ({ stocks }: MajorStocksProps) => {
+const MajorStocks = ({ stocks: stocksData }: MajorStocksProps) => {
   const [sparklines, setSparklines] = useState<{[key: string]: number[]}>({});
   
   useEffect(() => {
     const fetchSparklines = async () => {
       const sparklineData: {[key: string]: number[]} = {};
       
-      for (const stock of stocks) {
+      for (const stock of stocksData) {
         try {
-          const data = await apiService.getStockSparkline(stock.ticker);
+          const data = await stocks.getStockSparkline(stock.ticker);
           sparklineData[stock.ticker] = data;
         } catch (error) {
           console.error(`Failed to fetch sparkline for ${stock.ticker}:`, error);
@@ -30,10 +29,10 @@ const MajorStocks = ({ stocks }: MajorStocksProps) => {
       setSparklines(sparklineData);
     };
     
-    if (stocks.length > 0) {
+    if (stocksData.length > 0) {
       fetchSparklines();
     }
-  }, [stocks]);
+  }, [stocksData]);
   
   return (
     <Card className="animate-fade-in">
@@ -54,7 +53,7 @@ const MajorStocks = ({ stocks }: MajorStocksProps) => {
               </tr>
             </thead>
             <tbody>
-              {stocks.map((stock) => (
+              {stocksData.map((stock) => (
                 <tr key={stock.ticker} className="border-t border-border">
                   <td className="py-3 font-medium">{stock.ticker}</td>
                   <td className="py-3">${stock.close.toFixed(2)}</td>
