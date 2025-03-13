@@ -12,7 +12,7 @@ import StockPickerLoading from './StockPickerLoading';
 import StockPickerEmpty from './StockPickerEmpty';
 import MarketInsight from './MarketInsight';
 import apiService from '@/services/apiService';
-import { isFeatureEnabled } from '@/services/features'; // Fixed import path
+import { isFeatureEnabled } from '@/services/features';
 
 const AIStockPicker = () => {
   const [loading, setLoading] = useState(true);
@@ -32,14 +32,15 @@ const AIStockPicker = () => {
     try {
       console.log("Starting AI Stock Picker data load");
       
-      // Get a mix of active stocks to analyze (more comprehensive than just major stocks)
+      // Get a broader mix of active stocks to analyze
       const stockSymbols = [
         "AAPL", "MSFT", "AMZN", "GOOGL", "META", 
         "NVDA", "TSLA", "AMD", "NFLX", "DIS",
         "JPM", "BAC", "WMT", "PG", "JNJ", 
         "XOM", "CVX", "PFE", "KO", "PEP",
         "INTC", "VZ", "T", "MCD", "CSCO",
-        "NKE", "IBM", "GS", "V", "PYPL"
+        "NKE", "IBM", "GS", "V", "PYPL",
+        "ADBE", "CRM", "QCOM", "TXN", "CMCSA"
       ];
       
       // Get stock data for the symbols
@@ -60,7 +61,7 @@ const AIStockPicker = () => {
         throw new Error("No stocks met the algorithm criteria");
       }
       
-      console.log(`Algorithm selected ${scoredStocks.length} top stocks`);
+      console.log(`Algorithm selected ${scoredStocks.length} top stocks: ${scoredStocks.map(s => s.ticker).join(', ')}`);
       setTopStocks(scoredStocks);
       
       // Get AI analysis if enabled
@@ -181,6 +182,18 @@ const AIStockPicker = () => {
               
               {aiAnalysis?.marketInsight && (
                 <MarketInsight insight={aiAnalysis.marketInsight} />
+              )}
+              
+              {/* Add debug information for troubleshooting */}
+              {!aiAnalysis?.marketInsight && isAIEnabled && (
+                <div className="text-xs text-muted-foreground mt-6 p-2 border border-dashed rounded-md">
+                  <p>AI analysis feature is enabled but no market insight was returned.</p>
+                  <p>Stocks analyzed: {topStocks.map(s => s.ticker).join(', ')}</p>
+                  {aiAnalysis && (
+                    <p>Analysis received for: {Object.keys(aiAnalysis.stockAnalyses || {}).join(', ') || 'none'}</p>
+                  )}
+                  <p>Check the console logs for more details.</p>
+                </div>
               )}
             </>
           )}
