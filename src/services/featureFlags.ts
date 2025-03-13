@@ -15,16 +15,24 @@ export type { FeatureFlags };
  * @returns Dictionary of feature flags and their values
  */
 export function getFeatureFlags(): ExtendedFeatureFlags {
-  // Use dynamic import to avoid circular dependencies
+  // Get the core feature flags from window.__FEATURE_FLAGS__
+  const coreFlags: Partial<FeatureFlags> = window.__FEATURE_FLAGS__ || {};
+  
+  // Return extended feature flags with proper defaults
   return {
-    // Core feature flags from features/index.ts
-    ...window.__FEATURE_FLAGS__ || {},
+    // Core feature flags - ensure all required properties exist
+    useRealTimeData: coreFlags.useRealTimeData ?? true,
+    showMarketMovers: coreFlags.showMarketMovers ?? true,
+    enableDetailedCharts: coreFlags.enableDetailedCharts ?? true,
+    enableNewsSection: coreFlags.enableNewsSection ?? true,
+    useFredEconomicData: coreFlags.useFredEconomicData ?? true,
+    enableDataRefresh: coreFlags.enableDataRefresh ?? true,
+    useStockPickerAlgorithm: coreFlags.useStockPickerAlgorithm ?? true,
+    useAIStockAnalysis: coreFlags.useAIStockAnalysis ?? true,
     
     // UI Features
     enableDarkMode: true,
     enableAnimations: true,
-    
-    // Experimental Features
     showExperimentalCharts: false,
     
     // Mobile Features
@@ -65,7 +73,7 @@ export async function updateFeatureFlag(featureName: string, enabled: boolean) {
       
       // Update the global feature flags
       if (window.__FEATURE_FLAGS__) {
-        window.__FEATURE_FLAGS__[featureName] = enabled;
+        window.__FEATURE_FLAGS__[featureName as keyof FeatureFlags] = enabled;
       }
     }
     
