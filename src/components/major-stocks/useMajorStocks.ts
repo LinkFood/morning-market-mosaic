@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { StockData } from "@/types/marketTypes";
 
-export type SortKey = "ticker" | "name" | "price" | "change" | "volume";
+export type SortKey = "ticker" | "name" | "price" | "close" | "change" | "volume";
 export type SortDirection = "asc" | "desc";
 export type FilterTab = "all" | "watchlist" | "gainers" | "losers" | "tech";
 
@@ -36,7 +36,7 @@ export function useMajorStocks(stocksData: StockData[]) {
       const lowerCaseQuery = searchQuery.toLowerCase();
       filteredStocks = filteredStocks.filter((stock) =>
         stock.ticker.toLowerCase().includes(lowerCaseQuery) ||
-        stock.name.toLowerCase().includes(lowerCaseQuery)
+        (stock.name && stock.name.toLowerCase().includes(lowerCaseQuery))
       );
     }
 
@@ -46,13 +46,13 @@ export function useMajorStocks(stocksData: StockData[]) {
         if (sortConfig.key === "ticker") {
           sortValue = a.ticker.localeCompare(b.ticker);
         } else if (sortConfig.key === "name") {
-          sortValue = a.name.localeCompare(b.name);
-        } else if (sortConfig.key === "price") {
-          sortValue = a.close - b.close; // Changed 'price' to 'close' to match StockData
+          sortValue = (a.name || '').localeCompare(b.name || '');
+        } else if (sortConfig.key === "price" || sortConfig.key === "close") {
+          sortValue = a.close - b.close;
         } else if (sortConfig.key === "change") {
           sortValue = a.change - b.change;
         } else if (sortConfig.key === "volume") {
-          sortValue = a.volume - b.volume;
+          sortValue = (a.volume || 0) - (b.volume || 0);
         }
 
         return sortConfig.direction === "asc" ? sortValue : -sortValue;

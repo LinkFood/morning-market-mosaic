@@ -1,3 +1,4 @@
+
 import { RealtimeUpdateStatus, RealtimeOptions, MarketStatus, StockData } from '@/types/marketTypes';
 import { clearAllCache } from './cache';
 import marketData from './marketData';
@@ -270,12 +271,14 @@ class RealtimeService {
   }
   
   public subscribeMultiple(symbols: string[], callback: UpdateEventCallback) {
+    // Create separate subscriptions for each symbol
     const unsubscribes = symbols.map(symbol => this.subscribe((data) => {
       if (data.symbol === symbol || data.type === 'status') {
         callback(data.data, data.type as DataUpdateType);
       }
     }));
     
+    // Return a function that unsubscribes all
     return () => {
       unsubscribes.forEach(unsubscribe => unsubscribe());
     };
