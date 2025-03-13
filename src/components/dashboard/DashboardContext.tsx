@@ -13,6 +13,7 @@ import {
   MarketStatus,
   MarketMovers
 } from "@/types/marketTypes";
+import { getFeatureFlags, isFeatureEnabled } from "@/services/features";
 
 // Default settings
 export const defaultSettings: UserSettings = {
@@ -59,6 +60,7 @@ type DashboardContextType = {
   refreshing: boolean;
   expandedComponent: string | null;
   collapsedComponents: {[key: string]: boolean};
+  featureFlags: ReturnType<typeof getFeatureFlags>;
   loadData: () => Promise<void>;
   loadEconomicIndicators: () => Promise<void>;
   loadMarketMovers: () => Promise<void>;
@@ -94,6 +96,7 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [refreshing, setRefreshing] = useState(false);
   const [expandedComponent, setExpandedComponent] = useState<string | null>(null);
   const [collapsedComponents, setCollapsedComponents] = useState<{[key: string]: boolean}>({});
+  const [featureFlags, setFeatureFlags] = useState(getFeatureFlags());
   
   // Refresh timer refs
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -117,6 +120,9 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error("Failed to parse saved settings:", error);
       setSettings(defaultSettings);
     }
+    
+    // Update feature flags
+    setFeatureFlags(getFeatureFlags());
   }, []);
 
   // Function to update settings
@@ -153,6 +159,13 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const loadEconomicIndicators = async () => {
     setIsLoadingEcon(true);
     try {
+      // Check if FRED data is enabled via feature flag
+      if (!isFeatureEnabled('useFredEconomicData')) {
+        console.log("FRED economic data is disabled by feature flag");
+        setIsLoadingEcon(false);
+        return;
+      }
+      
       const fedIndicators = await apiService.getEconomicIndicators();
       setIndicators(fedIndicators);
     } catch (error) {
@@ -169,6 +182,13 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMoversError(null);
     
     try {
+      // Check if market movers is enabled via feature flag
+      if (!isFeatureEnabled('showMarketMovers')) {
+        console.log("Market movers are disabled by feature flag");
+        setIsLoadingMovers(false);
+        return;
+      }
+      
       const status = await apiService.getMarketStatus();
       setMarketStatus(status);
       
@@ -187,6 +207,12 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = null;
+    }
+    
+    // Check if data refresh is enabled via feature flag
+    if (!isFeatureEnabled('enableDataRefresh')) {
+      console.log("Automatic data refresh is disabled by feature flag");
+      return;
     }
     
     if (!settings || !settings.refreshInterval) {
@@ -220,6 +246,9 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setRefreshing(true);
     
     try {
+      // Update feature flags to make sure we have the latest state
+      setFeatureFlags(getFeatureFlags());
+      
       const status = await marketStatus.getMarketStatus();
       setMarketStatus(status);
       
@@ -240,9 +269,15 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const eventsData = await apiService.getMarketEvents();
       setEvents(eventsData);
       
-      loadMarketMovers();
+      // Load market movers if the feature is enabled
+      if (isFeatureEnabled('showMarketMovers')) {
+        loadMarketMovers();
+      }
       
-      loadEconomicIndicators();
+      // Load economic indicators if the feature is enabled
+      if (isFeatureEnabled('useFredEconomicData')) {
+        loadEconomicIndicators();
+      }
       
     } catch (error) {
       console.error("Error loading market data:", error);
@@ -273,11 +308,21 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, []);
   
-  // Determine which components to render based on settings
+  // Determine which components to render based on settings and feature flags
   const isComponentVisible = (componentId: string) => {
     if (!settings || !settings.visibleComponents) {
       return false;
     }
+    
+    // Check component-specific feature flags
+    if (componentId === "market-movers" && !isFeatureEnabled('showMarketMovers')) {
+      return false;
+    }
+    
+    if (componentId === "economic-data" && !isFeatureEnabled('useFredEconomicData')) {
+      return false;
+    }
+    
     return settings.visibleComponents.includes(componentId);
   };
 
@@ -300,6 +345,7 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         refreshing,
         expandedComponent,
         collapsedComponents,
+        featureFlags,
         loadData,
         loadEconomicIndicators,
         loadMarketMovers,

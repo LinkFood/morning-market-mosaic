@@ -4,6 +4,7 @@
  * Ensures all services are properly initialized before use
  */
 import { toast } from "sonner";
+import { updateFeatureFlags, getFeatureFlags } from "./features";
 
 // Service health status
 export interface ServiceStatus {
@@ -42,13 +43,24 @@ export async function initializeServices(): Promise<boolean> {
     }
     
     // Initialize services in parallel for better performance
-    await Promise.allSettled([
+    const results = await Promise.allSettled([
       initializeMarketData(),
       initializeFredData()
     ]);
     
+    // Extract results
+    const marketResult = results[0];
+    const fredResult = results[1];
+    
+    // Update service status based on results
+    serviceStatus.polygonApi = marketResult.status === 'fulfilled' ? marketResult.value : false;
+    serviceStatus.fredApi = fredResult.status === 'fulfilled' ? fredResult.value : false;
+    
     // Set initialization status - consider success if any API initialized
     serviceStatus.initialized = serviceStatus.polygonApi || serviceStatus.fredApi;
+    
+    // Update feature flags based on service availability
+    updateFeatureFlags(serviceStatus.polygonApi, serviceStatus.fredApi);
     
     // Show appropriate toast based on status
     if (serviceStatus.initialized && serviceStatus.error) {
@@ -61,12 +73,19 @@ export async function initializeServices(): Promise<boolean> {
       toast.error(serviceStatus.error);
     }
     
+    // Log the current feature flags after initialization
+    console.log("Current feature flags after initialization:", getFeatureFlags());
+    
     return serviceStatus.initialized;
   } catch (error) {
     console.error("Unhandled error during service initialization:", error);
     serviceStatus.error = error instanceof Error ? error.message : "Unknown error";
     serviceStatus.initialized = false;
     toast.error("Failed to initialize application services");
+    
+    // Make sure feature flags are updated even in case of error
+    updateFeatureFlags(false, false);
+    
     return false;
   }
 }
@@ -79,9 +98,10 @@ async function initializeMarketData(): Promise<boolean> {
     // Test Polygon API connection
     const polygon = await import('./polygon');
     const status = await polygon.default.getMarketStatus();
-    serviceStatus.polygonApi = !!status;
-    console.log("Polygon API connection test:", status ? "Success" : "Failed");
-    return serviceStatus.polygonApi;
+    const isAvailable = !!status;
+    serviceStatus.polygonApi = isAvailable;
+    console.log("Polygon API connection test:", isAvailable ? "Success" : "Failed");
+    return isAvailable;
   } catch (e) {
     console.error("Failed to test Polygon API connection:", e);
     serviceStatus.polygonApi = false;
@@ -99,9 +119,10 @@ async function initializeFredData(): Promise<boolean> {
     const fredModule = await import('./fred');
     // Access the testFredConnection function from the imported module
     const fedData = await fredModule.testFredConnection();
-    serviceStatus.fredApi = !!fedData;
-    console.log("FRED API connection test:", fedData ? "Success" : "Failed");
-    return serviceStatus.fredApi;
+    const isAvailable = !!fedData;
+    serviceStatus.fredApi = isAvailable;
+    console.log("FRED API connection test:", isAvailable ? "Success" : "Failed");
+    return isAvailable;
   } catch (e) {
     console.error("Failed to test FRED API connection:", e);
     serviceStatus.fredApi = false;
