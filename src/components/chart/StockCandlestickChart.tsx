@@ -98,9 +98,19 @@ const StockCandlestickChart: React.FC<StockCandlestickChartProps> = ({
           {/* Candlesticks */}
           <Bar
             dataKey="close"
-            shape={<CandlestickBar />}
             name="Price"
             unit="$"
+            shape={(props) => (
+              <CandlestickBar
+                {...props}
+                candleData={dataWithMA[props.index]}
+                x={props.x}
+                y={props.y}
+                width={props.width}
+                height={props.height}
+                index={props.index}
+              />
+            )}
           />
           
           {/* Moving Averages */}
