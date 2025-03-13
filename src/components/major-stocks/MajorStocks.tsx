@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StockData } from "@/types/marketTypes";
 import { useMajorStocks, FilterTab } from "./useMajorStocks";
@@ -12,11 +12,19 @@ interface MajorStocksProps {
   compactMode?: boolean;
 }
 
+/**
+ * Major stocks component displaying a filterable, sortable table of stocks
+ * with interactive features like watchlist and details expansion.
+ * 
+ * @param stocks - Array of stock data
+ * @param compactMode - Whether to display in compact mode for mobile
+ */
 const MajorStocks: React.FC<MajorStocksProps> = ({ 
   stocks: stocksData, 
   compactMode = false 
 }) => {
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const isCompact = compactMode && isMobile;
   
   const {
     sparklines,
@@ -37,17 +45,17 @@ const MajorStocks: React.FC<MajorStocksProps> = ({
 
   return (
     <Card className="animate-fade-in">
-      <CardHeader className={`flex flex-row justify-between items-center pb-2 ${compactMode && isMobile ? 'py-3' : ''}`}>
-        <CardTitle className={compactMode && isMobile ? 'text-base' : ''}>Major Stocks</CardTitle>
+      <CardHeader className={`flex flex-row justify-between items-center pb-2 ${isCompact ? 'py-3' : ''}`}>
+        <CardTitle className={isCompact ? 'text-base' : ''}>Major Stocks</CardTitle>
       </CardHeader>
       
-      <CardContent className={compactMode && isMobile ? 'p-3' : ''}>
+      <CardContent className={isCompact ? 'p-3' : ''}>
         <StockFilters
           activeFilter={activeFilter}
           setActiveFilter={setActiveFilter}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          compactMode={compactMode && isMobile}
+          compactMode={isCompact}
         />
         
         <MajorStocksTable
@@ -61,11 +69,12 @@ const MajorStocks: React.FC<MajorStocksProps> = ({
           toggleRowExpansion={toggleRowExpansion}
           toggleWatchlist={toggleWatchlist}
           requestSort={requestSort}
-          compactMode={compactMode && isMobile}
+          compactMode={isCompact}
         />
       </CardContent>
     </Card>
   );
 };
 
-export default MajorStocks;
+// Export memoized component for better performance
+export default memo(MajorStocks);

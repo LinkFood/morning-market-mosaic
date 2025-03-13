@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { memo } from "react";
 import { ChevronRight } from "lucide-react";
 import SparklineChart from "@/components/chart/SparklineChart";
 import { StockData } from "@/types/marketTypes";
@@ -10,20 +10,47 @@ interface StockItemProps {
   sparklineData?: number[];
   isLoadingSparkline?: boolean;
   compactMode?: boolean;
+  onClick?: (ticker: string) => void;
 }
 
+/**
+ * Individual stock item for market movers list
+ * Shows price, change, and sparkline chart
+ */
 const StockItem: React.FC<StockItemProps> = ({
   stock,
   sparklineData,
   isLoadingSparkline = false,
-  compactMode = false
+  compactMode = false,
+  onClick
 }) => {
+  /**
+   * Format percent change with + or - sign
+   */
   const formatPercentChange = (change: number) => {
     return `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
   };
 
+  /**
+   * Handle click on stock item
+   */
+  const handleClick = () => {
+    if (onClick) onClick(stock.ticker);
+  };
+
   return (
-    <div className={`flex items-center justify-between p-2 ${compactMode ? 'py-2' : 'py-3'} px-4 hover:bg-secondary/40 cursor-pointer transition-colors`}>
+    <div 
+      className={`flex items-center justify-between p-2 ${compactMode ? 'py-2' : 'py-3'} px-4 hover:bg-secondary/40 cursor-pointer transition-colors`}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      aria-label={`${stock.ticker}${stock.name ? `: ${stock.name}` : ''}, Price: $${stock.close.toFixed(2)}, Change: ${formatPercentChange(stock.changePercent)}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          handleClick();
+        }
+      }}
+    >
       <div className="flex-grow">
         <div className="flex items-center">
           <p className={`font-semibold ${compactMode ? 'text-sm' : ''} mr-1`}>{stock.ticker}</p>
@@ -57,10 +84,11 @@ const StockItem: React.FC<StockItemProps> = ({
             )
           )}
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       </div>
     </div>
   );
 };
 
-export default StockItem;
+// Export memoized component for better performance 
+export default memo(StockItem);

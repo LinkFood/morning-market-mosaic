@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { memo } from "react";
 import { SortAsc, SortDesc, TrendingUp, TrendingDown, ChevronDown, ChevronRight, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockData } from "@/types/marketTypes";
@@ -16,13 +17,16 @@ export interface MajorStocksTableProps {
   stockDetails: { [key: string]: any };
   watchlist: string[];
   sortConfig: { key: SortKey; direction: SortDirection };
-  loadingDetails: boolean;
+  loadingDetails: { [key: string]: boolean };
   toggleRowExpansion: (ticker: string) => void;
   toggleWatchlist: (ticker: string) => void;
   requestSort: (key: SortKey) => void;
   compactMode?: boolean;
 }
 
+/**
+ * Renders a table of stock data with interactive features
+ */
 const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
   stocks,
   sparklines,
@@ -38,10 +42,19 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
 }) => {
   const { openStockDetail } = useStockDetail();
 
+  /**
+   * Open stock detail view when a row is clicked
+   * @param ticker - Stock ticker symbol
+   */
   const handleStockClick = (ticker: string) => {
     openStockDetail(ticker);
   };
 
+  /**
+   * Generate sort indicator icon based on current sort state
+   * @param key - Column key
+   * @returns Icon element or null
+   */
   const getSortIndicator = (key: SortKey) => {
     if (sortConfig.key !== key) return null;
     
@@ -49,6 +62,15 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
       ? <SortAsc className="h-4 w-4 inline-block ml-1" /> 
       : <SortDesc className="h-4 w-4 inline-block ml-1" />;
   };
+
+  // No data message
+  if (stocks.length === 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        No stocks available for this filter.
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -85,6 +107,7 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
                     variant="ghost" 
                     size="icon"
                     className="h-6 w-6 mr-1"
+                    aria-label={`${watchlist.includes(stock.ticker) ? 'Remove' : 'Add'} ${stock.ticker} to watchlist`}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleWatchlist(stock.ticker);
@@ -99,9 +122,9 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
                 <td className="py-3">${stock.close.toFixed(2)}</td>
                 <td className={`py-3 ${
                   stock.change > 0 
-                    ? "text-positive flex items-center gap-1" 
+                    ? "text-green-600 dark:text-green-400 flex items-center gap-1" 
                     : stock.change < 0 
-                    ? "text-negative flex items-center gap-1" 
+                    ? "text-red-600 dark:text-red-400 flex items-center gap-1" 
                     : "text-muted-foreground"
                 }`}>
                   {stock.change > 0 ? <TrendingUp className="h-3 w-3" /> : 
@@ -132,6 +155,7 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
                     variant="ghost" 
                     size="icon" 
                     className="h-6 w-6"
+                    aria-label={`${expandedRows[stock.ticker] ? 'Collapse' : 'Expand'} ${stock.ticker} details`}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleRowExpansion(stock.ticker);
@@ -159,18 +183,11 @@ const MajorStocksTable: React.FC<MajorStocksTableProps> = ({
               )}
             </React.Fragment>
           ))}
-          
-          {stocks.length === 0 && (
-            <tr>
-              <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                No stocks available
-              </td>
-            </tr>
-          )}
         </tbody>
       </table>
     </div>
   );
 };
 
-export default MajorStocksTable;
+// Export memoized component for performance
+export default memo(MajorStocksTable);
