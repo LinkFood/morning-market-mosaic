@@ -17,6 +17,7 @@ import {
   EconomicIndicator
 } from "@/types/marketTypes";
 import { ScoredStock } from "@/services/stockPicker/algorithm";
+import { StockAnalysis } from "@/services/stockPicker/aiAnalysis";
 
 // Import specialized services
 import marketService from "./market";
@@ -46,7 +47,8 @@ export const {
 
 // Re-export stock picker services
 export const {
-  getTopPicks
+  getTopPicks,
+  getStockAnalysis
 } = stockPickerService;
 
 // Get economic indicators from FRED

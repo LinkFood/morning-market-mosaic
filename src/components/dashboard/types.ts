@@ -10,6 +10,7 @@ import {
   MarketMovers
 } from "@/types/marketTypes";
 import { ScoredStock } from "@/services/stockPicker/algorithm";
+import { StockAnalysis } from "@/services/stockPicker/aiAnalysis";
 
 // Dashboard context type
 export type DashboardContextType = {
@@ -21,10 +22,12 @@ export type DashboardContextType = {
   marketStatusData: MarketStatus | null;
   marketMovers: MarketMovers;
   stockPicks: ScoredStock[];
+  stockAnalysis: StockAnalysis | null;
   isLoading: boolean;
   isLoadingEcon: boolean;
   isLoadingMovers: boolean;
   isLoadingStockPicks: boolean;
+  isLoadingAnalysis: boolean;
   lastUpdated: Date | null;
   settings: UserSettings;
   moversError: Error | null;

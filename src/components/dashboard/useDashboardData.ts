@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import apiService from "@/services/apiService";
 import { marketStatus } from "@/services/market";
-import stockPicker, { ScoredStock } from "@/services/stockPicker";
+import stockPicker, { ScoredStock, StockAnalysis } from "@/services/stockPicker";
 import { 
   MarketIndex, 
   SectorPerformance, 
@@ -28,12 +28,14 @@ export const useDashboardData = (settings: UserSettings) => {
     losers: []
   });
   const [stockPicks, setStockPicks] = useState<ScoredStock[]>([]);
+  const [stockAnalysis, setStockAnalysis] = useState<StockAnalysis | null>(null);
   
   // UI state
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEcon, setIsLoadingEcon] = useState(true);
   const [isLoadingMovers, setIsLoadingMovers] = useState(true);
   const [isLoadingStockPicks, setIsLoadingStockPicks] = useState(true);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [moversError, setMoversError] = useState<Error | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,7 +87,7 @@ export const useDashboardData = (settings: UserSettings) => {
     }
   };
   
-  // Function to load stock picks
+  // Function to load stock picks and AI analysis
   const loadStockPicks = async () => {
     setIsLoadingStockPicks(true);
     
@@ -105,8 +107,21 @@ export const useDashboardData = (settings: UserSettings) => {
       
       // Apply the stock picker algorithm
       const pickedStocks = await stockPicker.getTopPicks(stocksToAnalyze);
-      
       setStockPicks(pickedStocks);
+      
+      // Load AI analysis if enabled
+      if (isFeatureEnabled('useAIStockAnalysis') && pickedStocks.length > 0) {
+        setIsLoadingAnalysis(true);
+        try {
+          const analysis = await stockPicker.getStockAnalysis(pickedStocks);
+          setStockAnalysis(analysis);
+        } catch (error) {
+          console.error("Error loading AI stock analysis:", error);
+          toast.error("Failed to load AI analysis");
+        } finally {
+          setIsLoadingAnalysis(false);
+        }
+      }
     } catch (error) {
       console.error("Error loading stock picks:", error);
       toast.error("Failed to load stock picks");
@@ -175,12 +190,14 @@ export const useDashboardData = (settings: UserSettings) => {
     marketStatusData,
     marketMovers,
     stockPicks,
+    stockAnalysis,
     
     // Loading states
     isLoading,
     isLoadingEcon,
     isLoadingMovers,
     isLoadingStockPicks,
+    isLoadingAnalysis,
     lastUpdated,
     moversError,
     refreshing,

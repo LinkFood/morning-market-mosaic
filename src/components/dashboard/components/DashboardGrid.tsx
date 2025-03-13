@@ -22,9 +22,11 @@ const DashboardGrid: React.FC = () => {
     indices,
     marketMovers,
     stockPicks,
+    stockAnalysis,
     marketStatusData, 
     isLoadingMovers,
     isLoadingStockPicks,
+    isLoadingAnalysis,
     isLoadingEcon, 
     moversError,
     loadMarketMovers,
@@ -76,7 +78,12 @@ const DashboardGrid: React.FC = () => {
             componentId="stock-picks"
             title="Algorithmic Stock Picks"
           >
-            <StockPicks stocks={stockPicks} isLoading={isLoadingStockPicks} />
+            <StockPicks 
+              stocks={stockPicks} 
+              analysis={stockAnalysis}
+              isLoading={isLoadingStockPicks}
+              isLoadingAnalysis={isLoadingAnalysis}
+            />
           </CollapsibleComponent>
         </div>
       )}
