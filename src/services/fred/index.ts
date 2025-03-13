@@ -2,6 +2,7 @@
 import { ECONOMIC_CATEGORIES } from "./constants";
 import { getEconomicCategory, getEconomicSeries } from "./dataService";
 import { clearFredCacheData, getFredCacheTimestamp, getFredCacheStats } from "./cacheUtils";
+import { invokeFredFunction } from "./apiClient";
 
 /**
  * Test FRED API connection 
@@ -9,6 +10,7 @@ import { clearFredCacheData, getFredCacheTimestamp, getFredCacheStats } from "./
  */
 export async function testFredConnection(): Promise<boolean> {
   try {
+    console.log("Testing FRED API connection...");
     // Test with a simple query
     const data = await getEconomicCategory(ECONOMIC_CATEGORIES.INFLATION, 1);
     return !!data;

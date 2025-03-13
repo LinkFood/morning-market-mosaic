@@ -19,7 +19,15 @@ import {
 
 // Import specialized services
 import marketService from "./market";
-import * as fredApiService from "./fred";
+// Import FRED service methods directly to avoid circular imports
+import {
+  getEconomicCategory,
+  getEconomicSeries,
+  clearFredCacheData,
+  getFredCacheTimestamp,
+  testFredConnection,
+  ECONOMIC_CATEGORIES
+} from "./fred";
 
 // Re-export all services for backward compatibility
 export const {
@@ -40,7 +48,7 @@ async function getEconomicIndicators(): Promise<EconomicIndicator[]> {
     // Get key economic indicators from FRED 
     // GDP, GDP Growth, Unemployment, Inflation (CPI)
     const keySeriesIds = ["GDPC1", "A191RL1Q225SBEA", "UNRATE", "CPIAUCSL"];
-    const promises = keySeriesIds.map(seriesId => fredApiService.getEconomicSeries(seriesId));
+    const promises = keySeriesIds.map(seriesId => getEconomicSeries(seriesId));
     
     const results = await Promise.all(promises);
     
@@ -71,12 +79,12 @@ export const {
 } = marketService;
 
 // Re-export FRED APIs
-export const {
+export {
   clearFredCacheData,
   getFredCacheTimestamp,
   getEconomicCategory,
   testFredConnection
-} = fredApiService;
+};
 
 // Default export with all methods
 export default {
@@ -85,8 +93,8 @@ export default {
   
   // Economic data APIs
   getEconomicIndicators,
-  getEconomicCategory: fredApiService.getEconomicCategory,
-  clearFredCacheData: fredApiService.clearFredCacheData,
-  getFredCacheTimestamp: fredApiService.getFredCacheTimestamp,
-  testFredConnection: fredApiService.testFredConnection
+  getEconomicCategory,
+  clearFredCacheData,
+  getFredCacheTimestamp,
+  testFredConnection
 };

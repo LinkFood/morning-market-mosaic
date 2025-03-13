@@ -48,29 +48,49 @@ const ErrorFallback = ({ error }: { error: string }) => (
 
 function App() {
   const [initializing, setInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   
   useEffect(() => {
-    async function init() {
+    // Capture any errors at the initialization level
+    const init = async () => {
       try {
-        await initializeServices();
+        console.log("Starting service initialization...");
+        const success = await initializeServices();
+        console.log("Initialization result:", success ? "Success" : "Failed");
+        
+        if (!success) {
+          const status = getServiceStatus();
+          setInitError(status.error || "Unknown initialization error");
+        }
+        
         setInitializing(false);
       } catch (error) {
-        console.error("Service initialization failed:", error);
+        console.error("Unhandled error during initialization:", error);
+        setInitError(error instanceof Error ? error.message : "Unexpected initialization error");
         setInitializing(false);
       }
-    }
+    };
     
-    init();
+    // Wrap in a timeout to ensure React has time to render first
+    setTimeout(() => {
+      init();
+    }, 100);
   }, []);
   
   if (initializing) {
     return <LoadingFallback />;
   }
   
+  // Check if initialization completely failed
+  if (initError) {
+    return <ErrorFallback error={initError} />;
+  }
+  
+  // Check if any services managed to initialize
   const serviceStatus = getServiceStatus();
   
   if (!serviceStatus.initialized) {
-    return <ErrorFallback error={serviceStatus.error || "Unknown error"} />;
+    return <ErrorFallback error={serviceStatus.error || "Could not initialize services"} />;
   }
   
   return (
