@@ -3,18 +3,20 @@
  * Polygon.io API Client
  * Handles basic API communication and error handling
  */
-import { POLYGON_BASE_URL } from "../market/config";
-import { getApiKey } from "./api-key";
+import { getPolygonApiKey } from "../market/config";
 
+const BASE_URL = 'https://api.polygon.io';
 const DEBUG_MODE = true; // Set to false in production
 
 /**
- * Makes the actual API call to Polygon
+ * Makes an API call to Polygon
  */
 export async function makeApiCall(endpoint: string) {
   try {
-    const key = await getApiKey();
-    const url = `${POLYGON_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${key}`;
+    const apiKey = await getPolygonApiKey();
+    
+    // Build URL and add API key
+    const url = `${BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${apiKey}`;
     
     if (DEBUG_MODE) console.log(`📡 API Request: ${endpoint}`);
     const startTime = performance.now();
@@ -39,7 +41,7 @@ export async function makeApiCall(endpoint: string) {
     if (DEBUG_MODE) {
       console.log(`✅ API Response: ${endpoint}`, {
         status: response.status,
-        dataPreview: JSON.stringify(data).slice(0, 200) + '...'
+        dataPreview: data.results ? `${data.results.length} results` : 'No results property'
       });
     }
     

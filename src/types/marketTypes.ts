@@ -142,6 +142,9 @@ export interface CandleData {
   low: number;
   close: number;
   volume: number;
+  vwap?: number;
+  ma20?: number | null;
+  ma50?: number | null;
 }
 
 export interface MarketBreadthData {
