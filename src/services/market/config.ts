@@ -2,7 +2,7 @@
 /**
  * Market data configuration
  */
-import { getSupabaseClient } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
 // API configuration for Polygon.io
 export const POLYGON_BASE_URL = "https://api.polygon.io";
@@ -10,7 +10,6 @@ export const POLYGON_BASE_URL = "https://api.polygon.io";
 // Get API key from Supabase
 export async function getPolygonApiKey(): Promise<string> {
   try {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.functions.invoke("get-polygon-api-key");
     
     if (error) {
