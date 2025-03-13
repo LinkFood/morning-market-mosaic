@@ -4,10 +4,7 @@
  * Handles API communication, rate limiting, and error handling
  */
 import { toast } from "sonner";
-
-// Set up the Polygon.io API configuration
-const POLYGON_BASE_URL = "https://api.polygon.io";
-const API_KEY = "YOUR_API_KEY"; // Replace with your actual API key
+import { POLYGON_BASE_URL, POLYGON_API_KEY } from "../market/config";
 
 // API rate limit settings
 const RATE_LIMIT = 100; // 100 calls per minute on Stock Starter plan
@@ -66,7 +63,7 @@ function processQueue() {
  */
 async function makeApiCall(endpoint: string) {
   try {
-    const url = `${POLYGON_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${API_KEY}`;
+    const url = `${POLYGON_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${POLYGON_API_KEY}`;
     
     const response = await fetch(url);
     
