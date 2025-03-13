@@ -9,6 +9,7 @@ import Index from './pages/Index';
 import FedDashboard from './pages/FedDashboard';
 import NotFound from './pages/NotFound';
 import { StockDetailProvider } from './components/StockDetail';
+import FredDebug from './components/FredDebug';
 
 // Initialize React Query client
 const queryClient = new QueryClient({
@@ -29,6 +30,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/fed-dashboard" element={<FedDashboard />} />
+              <Route path="/fred-debug" element={<FredDebug />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>

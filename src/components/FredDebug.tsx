@@ -1,246 +1,158 @@
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle2, XCircle, Database } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, RefreshCw, Check, AlertTriangle } from "lucide-react";
 import fedApiService from "@/services/fred";
-import { TimeSpan } from "@/services/fred/types";
 import { toast } from "sonner";
-import { getFredCacheStats } from "@/services/fred/cacheUtils";
-
-interface TestResult {
-  name: string;
-  status: "success" | "error" | "loading";
-  message: string;
-  timestamp: Date;
-}
-
-interface CacheStats {
-  totalItems: number;
-  totalBytes: number;
-  averageBytes: number;
-  items: Array<{
-    key: string;
-    bytes: number;
-    timestamp?: Date | null;
-    age?: number | null;
-    error?: string;
-  }>;
-}
 
 const FredDebug = () => {
-  const [results, setResults] = useState<TestResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<null | boolean>(null);
+  const [cacheStats, setCacheStats] = useState<any>(null);
 
-  const addResult = (result: Omit<TestResult, "timestamp">) => {
-    setResults(prev => [{
-      ...result,
-      timestamp: new Date()
-    }, ...prev]);
-  };
-
-  const testEdgeFunction = async () => {
-    setIsLoading(true);
+  const testConnection = async () => {
+    setIsTestingConnection(true);
     try {
-      const response = await fedApiService.getEconomicSeries("FEDFUNDS", TimeSpan.ONE_MONTH, true);
-      addResult({
-        name: "Edge Function Test",
-        status: "success",
-        message: `Successfully connected to Edge Function. Latest Fed Funds Rate: ${response.value}%`
-      });
+      const result = await fedApiService.testFredConnection();
+      setConnectionStatus(result);
+      toast(result ? "Connection successful!" : "Connection failed");
     } catch (error) {
-      addResult({
-        name: "Edge Function Test",
-        status: "error",
-        message: `Edge Function Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+      console.error("Error testing connection:", error);
+      setConnectionStatus(false);
+      toast.error("Connection test failed with error");
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const testCaching = async () => {
-    setIsLoading(true);
-    try {
-      console.log("Testing cache mechanism...");
-      
-      // First call - should hit the API
-      const start = performance.now();
-      await fedApiService.getEconomicSeries("FEDFUNDS");
-      const firstCallTime = performance.now() - start;
-      
-      // Second call - should use cache
-      const cacheStart = performance.now();
-      await fedApiService.getEconomicSeries("FEDFUNDS");
-      const secondCallTime = performance.now() - cacheStart;
-      
-      addResult({
-        name: "Cache Test",
-        status: "success",
-        message: `Cache working: First call: ${firstCallTime.toFixed(2)}ms, Second call: ${secondCallTime.toFixed(2)}ms`
-      });
-    } catch (error) {
-      addResult({
-        name: "Cache Test",
-        status: "error",
-        message: `Cache Test Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-    } finally {
-      setIsLoading(false);
+      setIsTestingConnection(false);
     }
   };
 
   const clearCache = () => {
     try {
-      fedApiService.clearFredCacheData();
-      addResult({
-        name: "Clear Cache",
-        status: "success",
-        message: "Cache cleared successfully"
-      });
-      // Update cache stats after clearing
-      displayCacheStats();
+      const count = fedApiService.clearFredCacheData();
+      toast.success(`Cleared ${count} cached items`);
+      getCacheStats();
     } catch (error) {
-      addResult({
-        name: "Clear Cache",
-        status: "error",
-        message: `Failed to clear cache: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+      console.error("Error clearing cache:", error);
+      toast.error("Failed to clear cache");
     }
   };
 
-  const displayCacheStats = () => {
-    const stats = getFredCacheStats();
-    setCacheStats(stats);
-    addResult({
-      name: "Cache Statistics",
-      status: "success",
-      message: `Found ${stats.totalItems} cached items using ${formatBytes(stats.totalBytes)}`
-    });
-  };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatDate = (date: Date | null): string => {
-    if (!date) return 'Unknown';
-    return date.toLocaleString();
+  const getCacheStats = () => {
+    try {
+      // @ts-ignore - this function might not exist in the type definitions
+      const stats = fedApiService.getFredCacheStats?.() || { totalItems: 0, totalBytes: 0, items: [] };
+      setCacheStats(stats);
+    } catch (error) {
+      console.error("Error getting cache stats:", error);
+      setCacheStats({ error: "Failed to get cache stats" });
+    }
   };
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>FRED API Debug Panel</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-4">
-              <Button 
-                onClick={testEdgeFunction} 
-                disabled={isLoading}
-              >
-                Test Edge Function
+    <div className="min-h-screen bg-background transition-colors duration-300">
+      <div className="container mx-auto py-6 px-4">
+        <header className="mb-6">
+          <div className="flex items-center mb-4">
+            <Link to="/fed-dashboard">
+              <Button variant="outline" size="icon" className="mr-2">
+                <ArrowLeft className="h-4 w-4" />
               </Button>
-              <Button 
-                onClick={testCaching} 
-                disabled={isLoading}
-              >
-                Test Cache
-              </Button>
-              <Button
-                onClick={displayCacheStats}
-                disabled={isLoading}
-                variant="outline"
-              >
-                View Cache Stats
-              </Button>
-              <Button 
-                onClick={clearCache} 
-                disabled={isLoading}
-                variant="outline"
-              >
-                Clear Cache
-              </Button>
-            </div>
+            </Link>
+            <h1 className="text-3xl font-bold">Federal Reserve API Debug</h1>
+          </div>
+          <p className="text-muted-foreground">
+            Troubleshoot Federal Reserve data loading issues
+          </p>
+        </header>
 
-            {cacheStats && (
-              <Card className="bg-secondary/30 mt-4">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center">
-                    <Database className="h-4 w-4 mr-2" />
-                    Cache Statistics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-sm mb-2">
-                    <p>Total items: <span className="font-medium">{cacheStats.totalItems}</span></p>
-                    <p>Total size: <span className="font-medium">{formatBytes(cacheStats.totalBytes)}</span></p>
-                    <p>Average size: <span className="font-medium">{formatBytes(cacheStats.averageBytes)}</span></p>
+        <div className="grid grid-cols-1 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Connection Test</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Test if the application can connect to the Federal Reserve API.</p>
+              <div className="flex items-center space-x-4">
+                <Button 
+                  onClick={testConnection} 
+                  disabled={isTestingConnection}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isTestingConnection ? 'animate-spin' : ''}`} />
+                  {isTestingConnection ? 'Testing...' : 'Test Connection'}
+                </Button>
+                {connectionStatus !== null && (
+                  <div className="flex items-center">
+                    {connectionStatus ? (
+                      <>
+                        <Check className="text-green-500 mr-2" />
+                        <span className="text-green-500">Connected</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="text-amber-500 mr-2" />
+                        <span className="text-amber-500">Connection Failed</span>
+                      </>
+                    )}
                   </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cache Management</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex space-x-4">
+                <Button onClick={clearCache} variant="outline">
+                  Clear All Cache
+                </Button>
+                <Button onClick={getCacheStats} variant="outline">
+                  View Cache Stats
+                </Button>
+              </div>
+
+              {cacheStats && (
+                <div className="mt-4 p-4 bg-muted rounded-md">
+                  <h3 className="text-lg font-medium mb-2">Cache Statistics</h3>
+                  <p>Total Items: {cacheStats.totalItems}</p>
+                  <p>Total Size: {(cacheStats.totalBytes / 1024).toFixed(2)} KB</p>
                   
-                  {cacheStats.items.length > 0 && (
-                    <div className="mt-4 overflow-auto max-h-48 text-xs">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-1">Cache Key</th>
-                            <th className="text-center py-1">Size</th>
-                            <th className="text-right py-1">Last Updated</th>
-                            <th className="text-right py-1">Age</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cacheStats.items.map((item, i) => (
-                            <tr key={i} className="border-b border-secondary/30">
-                              <td className="py-1 truncate max-w-[180px]">{item.key}</td>
-                              <td className="py-1 text-center">{formatBytes(item.bytes)}</td>
-                              <td className="py-1 text-right">{formatDate(item.timestamp)}</td>
-                              <td className="py-1 text-right">
-                                {item.age !== null ? `${item.age}s ago` : 'Unknown'}
-                              </td>
+                  {cacheStats.items && cacheStats.items.length > 0 && (
+                    <div className="mt-2">
+                      <h4 className="font-medium">Cached Items:</h4>
+                      <div className="max-h-60 overflow-y-auto mt-2">
+                        <table className="w-full text-sm">
+                          <thead className="border-b">
+                            <tr>
+                              <th className="text-left pb-2">Key</th>
+                              <th className="text-right pb-2">Size</th>
+                              <th className="text-right pb-2">Age</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {cacheStats.items.map((item: any, index: number) => (
+                              <tr key={index} className="border-b border-muted-foreground/20">
+                                <td className="py-1 truncate max-w-[200px]">{item.key}</td>
+                                <td className="text-right py-1">{(item.bytes / 1024).toFixed(2)} KB</td>
+                                <td className="text-right py-1">
+                                  {item.age !== null ? `${item.age}s ago` : 'N/A'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="space-y-2">
-              {results.map((result, index) => (
-                <Alert key={index} variant={result.status === "error" ? "destructive" : "default"}>
-                  <div className="flex items-center gap-2">
-                    {result.status === "success" ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    <div className="flex-1">
-                      <AlertDescription>
-                        <span className="font-medium">{result.name}</span>
-                        <span className="text-sm text-muted-foreground ml-2">
-                          {result.timestamp.toLocaleTimeString()}
-                        </span>
-                        <p className="mt-1">{result.message}</p>
-                      </AlertDescription>
-                    </div>
-                  </div>
-                </Alert>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
