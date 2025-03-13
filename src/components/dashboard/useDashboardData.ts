@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { toast } from "sonner";
 import apiService from "@/services/apiService";
@@ -13,7 +14,7 @@ import {
   MarketMovers,
   UserSettings
 } from "@/types/marketTypes";
-import { getFeatureFlags, isFeatureEnabled } from "@/services/featureFlags";
+import { getFeatureFlags, isFeatureEnabled } from "@/services/features"; // Fixed import path
 
 export const useDashboardData = (settings: UserSettings) => {
   // State for market data
