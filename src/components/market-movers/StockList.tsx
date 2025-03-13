@@ -2,8 +2,7 @@
 import React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react"; // Replace ReloadIcon with RefreshCw from lucide-react
-import { AlertCircle } from "lucide-react";
+import { RefreshCw, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import StockItem from "./StockItem";
@@ -17,6 +16,7 @@ interface StockListProps {
   sparklines: { [key: string]: number[] };
   loadingSparklines: boolean;
   compactMode?: boolean;
+  onStockClick?: (ticker: string) => void;
 }
 
 const StockList: React.FC<StockListProps> = ({
@@ -26,7 +26,8 @@ const StockList: React.FC<StockListProps> = ({
   refreshData,
   sparklines,
   loadingSparklines,
-  compactMode = false
+  compactMode = false,
+  onStockClick
 }) => {
   // Render loading skeleton
   if (isLoading) {
@@ -86,6 +87,7 @@ const StockList: React.FC<StockListProps> = ({
             sparklineData={sparklines[stock.ticker]}
             isLoadingSparkline={loadingSparklines}
             compactMode={compactMode}
+            onClick={onStockClick}
           />
         ))}
       </div>

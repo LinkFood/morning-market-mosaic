@@ -1,15 +1,13 @@
 
-import { useState, useEffect, useMemo, memo, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { RotateCw, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { useStockDetail } from "@/components/stock-detail";
 import { StockData, MarketStatus } from "@/types/marketTypes";
-import apiService from "@/services/apiService";
-import { toast } from "sonner";
 import StockList from "./StockList";
-import { useMediaQuery } from "@/hooks/use-mobile";
-import { useStockDetail } from "../StockDetail";
+import apiService from "@/services/apiService";
 
 interface MarketMoversProps {
   gainers: StockData[];
@@ -21,144 +19,87 @@ interface MarketMoversProps {
   compactMode?: boolean;
 }
 
-/**
- * Displays top gaining and losing stocks in a tabbed interface
- */
 const MarketMovers: React.FC<MarketMoversProps> = ({
-  gainers = [],
-  losers = [],
-  isLoading = false,
-  error = null,
+  gainers,
+  losers,
+  isLoading,
+  error,
   marketStatus,
   refreshData,
-  compactMode = false,
+  compactMode = false
 }) => {
+  const [activeTab, setActiveTab] = useState<"gainers" | "losers">("gainers");
   const [sparklines, setSparklines] = useState<{ [key: string]: number[] }>({});
-  const [activeTab, setActiveTab] = useState<string>("gainers");
-  const [loadingSparklines, setLoadingSparklines] = useState<boolean>(false);
-  const isMobile = useMediaQuery("(max-width: 768px)");
-  const isCompact = compactMode && isMobile;
+  const [loadingSparklines, setLoadingSparklines] = useState(true);
   const { openStockDetail } = useStockDetail();
 
-  // Get all tickers from both gainers and losers
-  const allTickers = useMemo(() => {
-    return [...gainers, ...losers].map(stock => stock.ticker);
+  // Load sparkline data for all stocks
+  const loadSparklines = useCallback(async () => {
+    setLoadingSparklines(true);
+    const allStocks = [...gainers, ...losers];
+    const uniqueTickers = Array.from(new Set(allStocks.map(stock => stock.ticker)));
+
+    try {
+      const sparklinePromises = uniqueTickers.map(ticker => 
+        apiService.getStockSparkline(ticker, "1D")
+      );
+      
+      const results = await Promise.allSettled(sparklinePromises);
+      
+      const newSparklines: { [key: string]: number[] } = {};
+      
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled" && result.value) {
+          newSparklines[uniqueTickers[index]] = result.value;
+        }
+      });
+      
+      setSparklines(newSparklines);
+    } catch (error) {
+      console.error("Failed to load sparklines:", error);
+    } finally {
+      setLoadingSparklines(false);
+    }
   }, [gainers, losers]);
 
-  /**
-   * Handle click on a stock item
-   */
+  // Load sparklines when stocks data changes
+  useEffect(() => {
+    if (gainers.length > 0 || losers.length > 0) {
+      loadSparklines();
+    }
+  }, [gainers.length, losers.length, loadSparklines]);
+
+  // Handle stock click to open detail drawer
   const handleStockClick = useCallback((ticker: string) => {
     openStockDetail(ticker);
   }, [openStockDetail]);
 
-  /**
-   * Manually refresh the data
-   */
-  const handleRefresh = useCallback(() => {
-    refreshData();
-    toast.info("Refreshing market movers data...");
-  }, [refreshData]);
-
-  // Load sparkline data for stocks
-  useEffect(() => {
-    const loadSparklines = async () => {
-      if (!allTickers.length) return;
-      
-      setLoadingSparklines(true);
-      try {
-        const sparklineData: { [key: string]: number[] } = {};
-        
-        // Batch load sparklines to avoid too many parallel requests
-        const batchSize = 5;
-        const batches = Math.ceil(allTickers.length / batchSize);
-        
-        for (let i = 0; i < batches; i++) {
-          const batchTickers = allTickers.slice(i * batchSize, (i + 1) * batchSize);
-          await Promise.all(
-            batchTickers.map(async (ticker) => {
-              try {
-                const data = await apiService.getStockSparkline(ticker);
-                sparklineData[ticker] = data;
-              } catch (error) {
-                console.error(`Failed to load sparkline for ${ticker}:`, error);
-                // Provide fallback data
-                sparklineData[ticker] = [100, 101, 99, 102, 101, 103];
-              }
-            })
-          );
-        }
-        
-        setSparklines(sparklineData);
-      } catch (error) {
-        console.error("Failed to load sparklines:", error);
-        toast.error("Failed to load stock charts");
-      } finally {
-        setLoadingSparklines(false);
-      }
-    };
-
-    loadSparklines();
-  }, [allTickers]);
-
-  const isMarketClosed = marketStatus && !marketStatus.isOpen;
-
-  return (
-    <Card className="animate-fade-in">
-      <CardHeader className={`pb-3 ${isCompact ? 'py-3' : ''}`}>
-        <div className="flex justify-between items-center">
-          <CardTitle className={isCompact ? 'text-base' : ''}>Market Movers</CardTitle>
-          <div className="flex items-center gap-2">
-            {isMarketClosed && (
-              <div className="text-xs font-medium bg-muted px-2 py-1 rounded-md">
-                Market Closed
-              </div>
-            )}
+  // Conditional rendering for mobile view
+  if (compactMode) {
+    return (
+      <Card className="animate-fade-in">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-base">Market Movers</CardTitle>
             <Button 
               variant="ghost" 
-              size="icon"
-              onClick={handleRefresh}
+              size="icon" 
+              className="h-8 w-8" 
+              onClick={refreshData}
               disabled={isLoading}
-              aria-label="Refresh market movers data"
-              className="h-8 w-8"
             >
               <RotateCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span className="sr-only">Refresh</span>
             </Button>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {error ? (
-          <div className="p-6 text-center">
-            <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-2" />
-            <p className="text-red-500 font-medium">Failed to load market data</p>
-            <p className="text-muted-foreground text-sm mt-1 mb-4">{error.message}</p>
-            <Button onClick={handleRefresh}>
-              <RotateCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        ) : (
-          <Tabs
-            defaultValue="gainers"
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="w-full">
-              <TabsTrigger value="gainers" className="flex-1">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                <span className={isMobile && compactMode ? 'text-xs' : ''}>Top Gainers</span>
-              </TabsTrigger>
-              <TabsTrigger value="losers" className="flex-1">
-                <TrendingDown className="h-4 w-4 mr-2" />
-                <span className={isMobile && compactMode ? 'text-xs' : ''}>Top Losers</span>
-              </TabsTrigger>
+        </CardHeader>
+        <CardContent className="p-3">
+          <Tabs defaultValue="gainers" value={activeTab} onValueChange={(value) => setActiveTab(value as "gainers" | "losers")}>
+            <TabsList className="grid w-full grid-cols-2 mb-2">
+              <TabsTrigger value="gainers">Top Gainers</TabsTrigger>
+              <TabsTrigger value="losers">Top Losers</TabsTrigger>
             </TabsList>
-            <TabsContent
-              value="gainers"
-              className="mt-0 animate-fade-in"
-            >
+            <TabsContent value="gainers" className="mt-0">
               <StockList
                 stocks={gainers}
                 isLoading={isLoading}
@@ -166,14 +107,11 @@ const MarketMovers: React.FC<MarketMoversProps> = ({
                 refreshData={refreshData}
                 sparklines={sparklines}
                 loadingSparklines={loadingSparklines}
-                compactMode={isCompact}
+                compactMode={true}
                 onStockClick={handleStockClick}
               />
             </TabsContent>
-            <TabsContent
-              value="losers"
-              className="mt-0 animate-fade-in"
-            >
+            <TabsContent value="losers" className="mt-0">
               <StockList
                 stocks={losers}
                 isLoading={isLoading}
@@ -181,16 +119,64 @@ const MarketMovers: React.FC<MarketMoversProps> = ({
                 refreshData={refreshData}
                 sparklines={sparklines}
                 loadingSparklines={loadingSparklines}
-                compactMode={isCompact}
+                compactMode={true}
                 onStockClick={handleStockClick}
               />
             </TabsContent>
           </Tabs>
-        )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="animate-fade-in">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle>Market Movers</CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refreshData}
+            disabled={isLoading}
+          >
+            <RotateCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="gainers" value={activeTab} onValueChange={(value) => setActiveTab(value as "gainers" | "losers")}>
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="gainers">Top Gainers</TabsTrigger>
+            <TabsTrigger value="losers">Top Losers</TabsTrigger>
+          </TabsList>
+          <TabsContent value="gainers" className="mt-0">
+            <StockList
+              stocks={gainers}
+              isLoading={isLoading}
+              error={error}
+              refreshData={refreshData}
+              sparklines={sparklines}
+              loadingSparklines={loadingSparklines}
+              onStockClick={handleStockClick}
+            />
+          </TabsContent>
+          <TabsContent value="losers" className="mt-0">
+            <StockList
+              stocks={losers}
+              isLoading={isLoading}
+              error={error}
+              refreshData={refreshData}
+              sparklines={sparklines}
+              loadingSparklines={loadingSparklines}
+              onStockClick={handleStockClick}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
 };
 
-// Export memoized component for better performance
-export default memo(MarketMovers);
+export default MarketMovers;
