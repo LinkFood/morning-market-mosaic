@@ -1,6 +1,11 @@
 
 /**
- * Normalize data for better chart visualization
+ * Normalizes chart data to ensure consistent visualization across different scales
+ * 
+ * @param data - The array of data objects to normalize
+ * @param dataKeys - The keys in the data objects that represent different series
+ * @param xAxisKey - The key in the data objects that represents the x-axis
+ * @returns The normalized data array
  */
 export const normalizeChartData = (data: any[], dataKeys: string[], xAxisKey: string) => {
   if (!data || data.length === 0 || !dataKeys || dataKeys.length === 0) return data;

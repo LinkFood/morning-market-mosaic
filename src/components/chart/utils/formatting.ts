@@ -2,7 +2,12 @@
 import { formatDateByFrequency, determineFrequency } from "@/utils/dateUtils";
 
 /**
- * Format values based on the data type
+ * Formats numeric values for display based on data type and context
+ * 
+ * @param value - The numeric value to format
+ * @param dataKey - The data key/series name for context
+ * @param title - Optional chart title for additional context
+ * @returns Formatted string representation of the value
  */
 export const formatChartValue = (value: number, dataKey: string, title?: string): string => {
   if (dataKey === 'value') {
@@ -22,7 +27,11 @@ export const formatChartValue = (value: number, dataKey: string, title?: string)
 };
 
 /**
- * Format tick values for Y axis based on data
+ * Formats Y-axis tick values based on data context
+ * 
+ * @param value - The axis tick value to format
+ * @param title - Optional chart title for context
+ * @returns Formatted string for the axis tick
  */
 export const formatYAxisTick = (value: number, title?: string): string => {
   if (title?.toLowerCase().includes('gdp')) {
@@ -45,7 +54,11 @@ export const formatYAxisTick = (value: number, title?: string): string => {
 };
 
 /**
- * Format chart dates based on frequency
+ * Formats chart dates based on the detected frequency
+ * 
+ * @param data - Array of data objects containing dates
+ * @param xAxisKey - The key in the data objects that contains date values
+ * @returns Data array with additional formatted date properties
  */
 export const formatChartDates = (data: any[], xAxisKey: string): any[] => {
   if (!data || data.length === 0) return data;

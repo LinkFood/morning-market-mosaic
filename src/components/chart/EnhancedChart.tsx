@@ -1,4 +1,8 @@
 
+/**
+ * EnhancedChart - A configurable chart component that adapts to different data frequencies
+ * and provides consistent formatting and styling
+ */
 import React, { useState, useMemo, useEffect } from "react";
 import { useTheme } from "@/components/theme-provider";
 import TimeFrameSelector, { TimeFrame } from "./TimeFrameSelector";
@@ -171,16 +175,16 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   // Enhanced tooltip formatter with more context
   const enhancedTooltipFormatter = (value: number | string, name: string) => {
     // Basic formatting
-    const formattedValue = formatChartValue(value as number, name as string, title);
+    const formattedValue = formatChartValue(Number(value), name, title);
     
     // Add context based on chart type
     let context = '';
     if (title?.toLowerCase().includes('inflation')) {
-      context = value > 2 ? ' (Above Target)' : ' (At/Below Target)';
+      context = Number(value) > 2 ? ' (Above Target)' : ' (At/Below Target)';
     } else if (title?.toLowerCase().includes('unemployment')) {
-      context = value < 4 ? ' (Low)' : value > 6 ? ' (High)' : ' (Moderate)';
+      context = Number(value) < 4 ? ' (Low)' : Number(value) > 6 ? ' (High)' : ' (Moderate)';
     } else if (title?.toLowerCase().includes('interest') && name.includes('rate')) {
-      context = value > 4 ? ' (Restrictive)' : value < 1 ? ' (Accommodative)' : ' (Neutral)';
+      context = Number(value) > 4 ? ' (Restrictive)' : Number(value) < 1 ? ' (Accommodative)' : ' (Neutral)';
     }
     
     return `${formattedValue}${context}`;
@@ -202,7 +206,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         axisColor={axisColor}
         chartColors={chartColors}
         yAxisTicks={yAxisTicks}
-        yAxisFormatter={(value) => formatYAxisTick(value as number, title)}
+        yAxisFormatter={(value) => formatYAxisTick(Number(value), title)}
         dataFrequency={dataFrequency}
         xAxisTickInterval={xAxisTickSettings.interval}
         referenceLines={referenceLines}
