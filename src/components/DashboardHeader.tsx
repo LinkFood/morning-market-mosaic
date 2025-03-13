@@ -7,9 +7,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { MoonIcon, SunIcon } from "lucide-react";
-import { BarChart3, RefreshCw, Settings } from "lucide-react";
+import { 
+  MoonIcon, 
+  SunIcon, 
+  BarChart3, 
+  RefreshCw, 
+  Settings, 
+  ChevronDown, 
+  X,
+  Check,
+  Layout,
+  ListOrdered,
+  PlusCircle
+} from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import SettingsModal from "@/components/SettingsModal";
 import { UserSettings } from "@/types/marketTypes";
@@ -31,6 +44,30 @@ const DashboardHeader = ({
 }: DashboardHeaderProps) => {
   const { theme, setTheme } = useTheme();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
+  
+  // Toggle component visibility in settings
+  const toggleComponentVisibility = (componentId: string) => {
+    const updatedVisibleComponents = userSettings.visibleComponents.includes(componentId)
+      ? userSettings.visibleComponents.filter(id => id !== componentId)
+      : [...userSettings.visibleComponents, componentId];
+    
+    updateUserSettings({
+      ...userSettings,
+      visibleComponents: updatedVisibleComponents
+    });
+  };
+  
+  // Components that can be toggled
+  const dashboardComponents = [
+    { id: 'market-overview', label: 'Market Overview' },
+    { id: 'es1-futures', label: 'S&P 500 Futures' },
+    { id: 'major-stocks', label: 'Watchlist' },
+    { id: 'economic-data', label: 'Economic Indicators' },
+    { id: 'sector-performance', label: 'Sector Performance' },
+    { id: 'market-events', label: 'Market Events' },
+    { id: 'market-movers', label: 'Market Movers' }
+  ];
   
   return (
     <header className="mb-6">
@@ -53,6 +90,33 @@ const DashboardHeader = ({
               Fed Data
             </Button>
           </Link>
+          
+          {/* Layout Customization Menu */}
+          <DropdownMenu open={isLayoutMenuOpen} onOpenChange={setIsLayoutMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Layout className="h-4 w-4 mr-2" />
+                Layout
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Dashboard Components</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {dashboardComponents.map(component => (
+                <DropdownMenuItem 
+                  key={component.id}
+                  onClick={() => toggleComponentVisibility(component.id)}
+                >
+                  {userSettings.visibleComponents.includes(component.id) ? (
+                    <Check className="h-4 w-4 mr-2 text-green-500" />
+                  ) : (
+                    <X className="h-4 w-4 mr-2 text-muted-foreground" />
+                  )}
+                  {component.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -89,9 +153,14 @@ const DashboardHeader = ({
           Real-time market data and analysis
         </p>
         {lastUpdated && (
-          <p className="text-sm text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleString()}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              Last updated: {lastUpdated.toLocaleString()}
+            </p>
+            {isRefreshing && (
+              <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+            )}
+          </div>
         )}
       </div>
       

@@ -1,19 +1,40 @@
 
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UserSettings } from "@/types/marketTypes";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  settings: any;
-  updateSettings: (settings: any) => void;
+  settings: UserSettings;
+  updateSettings: (settings: UserSettings) => void;
 }
 
 const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsModalProps) => {
   const [watchlistInput, setWatchlistInput] = useState(settings?.watchlist?.join(", ") || "");
+  const [refreshSettings, setRefreshSettings] = useState({
+    marketHours: settings.refreshInterval?.marketHours || 60,
+    afterHours: settings.refreshInterval?.afterHours || 300,
+    closed: settings.refreshInterval?.closed || 900
+  });
+  
+  // Handle changes to refresh interval settings
+  const handleRefreshIntervalChange = (
+    field: 'marketHours' | 'afterHours' | 'closed',
+    value: number
+  ) => {
+    setRefreshSettings({
+      ...refreshSettings,
+      [field]: value
+    });
+  };
   
   const handleSave = () => {
     // Parse watchlist input
@@ -26,6 +47,11 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
     updateSettings({
       ...settings,
       watchlist,
+      refreshInterval: {
+        marketHours: refreshSettings.marketHours,
+        afterHours: refreshSettings.afterHours,
+        closed: refreshSettings.closed
+      }
     });
     
     onClose();
@@ -38,20 +64,119 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
           <DialogTitle>Dashboard Settings</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="watchlist">Stock Watchlist</Label>
-            <Input
-              id="watchlist"
-              placeholder="AAPL, MSFT, AMZN, GOOGL, META"
-              value={watchlistInput}
-              onChange={(e) => setWatchlistInput(e.target.value)}
-            />
-            <p className="text-sm text-muted-foreground">
-              Enter stock tickers separated by commas
-            </p>
-          </div>
-        </div>
+        <Tabs defaultValue="watchlist">
+          <TabsList className="grid grid-cols-2 mb-4">
+            <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
+            <TabsTrigger value="refresh">Data Refresh</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="watchlist" className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="watchlist">Stock Watchlist</Label>
+              <Input
+                id="watchlist"
+                placeholder="AAPL, MSFT, AMZN, GOOGL, META"
+                value={watchlistInput}
+                onChange={(e) => setWatchlistInput(e.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Enter stock tickers separated by commas
+              </p>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="refresh" className="space-y-4">
+            <div className="space-y-4">
+              <Label>Refresh Intervals</Label>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">During Market Hours</CardTitle>
+                  <CardDescription className="text-xs">
+                    9:30 AM - 4:00 PM ET on trading days
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup 
+                    value={refreshSettings.marketHours.toString()} 
+                    onValueChange={(value) => handleRefreshIntervalChange('marketHours', parseInt(value))}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="30" id="market-30" />
+                      <Label htmlFor="market-30">30 seconds</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="60" id="market-60" />
+                      <Label htmlFor="market-60">1 minute</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="300" id="market-300" />
+                      <Label htmlFor="market-300">5 minutes</Label>
+                    </div>
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Pre-Market & After Hours</CardTitle>
+                  <CardDescription className="text-xs">
+                    4:00 AM - 9:30 AM & 4:00 PM - 8:00 PM ET
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup 
+                    value={refreshSettings.afterHours.toString()} 
+                    onValueChange={(value) => handleRefreshIntervalChange('afterHours', parseInt(value))}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="60" id="after-60" />
+                      <Label htmlFor="after-60">1 minute</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="300" id="after-300" />
+                      <Label htmlFor="after-300">5 minutes</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="600" id="after-600" />
+                      <Label htmlFor="after-600">10 minutes</Label>
+                    </div>
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Market Closed</CardTitle>
+                  <CardDescription className="text-xs">
+                    Outside of trading hours and weekends
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup 
+                    value={refreshSettings.closed.toString()} 
+                    onValueChange={(value) => handleRefreshIntervalChange('closed', parseInt(value))}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="600" id="closed-600" />
+                      <Label htmlFor="closed-600">10 minutes</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="900" id="closed-900" />
+                      <Label htmlFor="closed-900">15 minutes</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1800" id="closed-1800" />
+                      <Label htmlFor="closed-1800">30 minutes</Label>
+                    </div>
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+        
+        <Separator className="my-4" />
         
         <div className="flex justify-end">
           <Button variant="outline" className="mr-2" onClick={onClose}>
