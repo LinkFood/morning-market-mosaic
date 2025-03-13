@@ -1,4 +1,3 @@
-
 // Common types used across the market dashboard
 
 export interface MarketIndex {
@@ -39,6 +38,7 @@ export interface StockData {
   volume?: number; // Added volume property as optional
   lastUpdated?: Date; // Added lastUpdated property for realtime tracking
   previousClose?: number; // Added for day-over-day comparison
+  avgVolume?: number; // Added for volume comparison analysis
 }
 
 export interface EconomicIndicator {
