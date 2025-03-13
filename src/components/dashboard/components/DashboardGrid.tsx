@@ -12,6 +12,7 @@ import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
 import StockPicks from "@/components/stock-picks/StockPicks";
+import AIStockPicker from "@/components/stock-picker/AIStockPicker";
 
 const DashboardGrid: React.FC = () => {
   const { 
@@ -84,6 +85,18 @@ const DashboardGrid: React.FC = () => {
               isLoading={isLoadingStockPicks}
               isLoadingAnalysis={isLoadingAnalysis}
             />
+          </CollapsibleComponent>
+        </div>
+      )}
+      
+      {/* AI Stock Picker */}
+      {isComponentVisible('ai-stock-picker') && (
+        <div className={`${isComponentVisible('ai-stock-picker') ? 'lg:col-span-2' : 'hidden'}`}>
+          <CollapsibleComponent
+            componentId="ai-stock-picker"
+            title="AI Stock Recommendations"
+          >
+            <AIStockPicker />
           </CollapsibleComponent>
         </div>
       )}

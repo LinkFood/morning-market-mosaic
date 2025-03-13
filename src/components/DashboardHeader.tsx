@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -52,9 +51,7 @@ const DashboardHeader = ({
   const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
   
-  // Toggle component visibility in settings
   const toggleComponentVisibility = (componentId: string) => {
-    // Ensure we have a valid array to work with
     const visibleComponents = userSettings.visibleComponents || [];
     
     const updatedVisibleComponents = visibleComponents.includes(componentId)
@@ -67,7 +64,6 @@ const DashboardHeader = ({
     });
   };
   
-  // Components that can be toggled
   const dashboardComponents = [
     { id: 'market-overview', label: 'Market Overview' },
     { id: 'es1-futures', label: 'S&P 500 Futures' },
@@ -75,7 +71,9 @@ const DashboardHeader = ({
     { id: 'economic-data', label: 'Economic Indicators' },
     { id: 'sector-performance', label: 'Sector Performance' },
     { id: 'market-events', label: 'Market Events' },
-    { id: 'market-movers', label: 'Market Movers' }
+    { id: 'market-movers', label: 'Market Movers' },
+    { id: 'stock-picks', label: 'Stock Picks' },
+    { id: 'ai-stock-picker', label: 'AI Stock Recommendations' }
   ];
   
   return (
@@ -118,7 +116,6 @@ const DashboardHeader = ({
             </Link>
           )}
           
-          {/* Layout Customization Menu */}
           {!isMobile && (
             <DropdownMenu open={isLayoutMenuOpen} onOpenChange={setIsLayoutMenuOpen}>
               <DropdownMenuTrigger asChild>
