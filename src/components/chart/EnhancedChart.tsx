@@ -28,6 +28,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   xAxisKey,
   stacked = false,
   title,
+  referenceLines = [],
 }) => {
   const { theme } = useTheme();
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("1Y");
@@ -66,6 +67,10 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
       allValues = [...allValues, ...series];
     });
     
+    // Also consider reference line values when calculating the range
+    const referenceValues = referenceLines.map(line => line.y);
+    allValues = [...allValues, ...referenceValues];
+    
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
     const range = max - min;
@@ -75,7 +80,48 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
       min: min - (range * 0.05), 
       max: max + (range * 0.05)
     };
-  }, [filteredData, dataKeys]);
+  }, [filteredData, dataKeys, referenceLines]);
+  
+  // Generate appropriate Y-axis ticks based on data range
+  const yAxisTicks = useMemo(() => {
+    const { min, max } = valueMinMax;
+    const range = max - min;
+    
+    // Adjust tick count based on data range
+    let tickCount = 5;
+    if (range < 1 && range > 0) tickCount = 7; // More ticks for small ranges
+    if (range > 1000) tickCount = 4; // Fewer ticks for large ranges
+    
+    const step = range / (tickCount - 1);
+    
+    return Array.from({ length: tickCount }, (_, i) => min + i * step);
+  }, [valueMinMax]);
+  
+  // Determine appropriate X-axis ticks based on data frequency and length
+  const xAxisTickSettings = useMemo(() => {
+    // For sparse data (like quarterly or less frequent), show all points
+    if (dataFrequency === 'quarterly' && filteredData.length < 20) {
+      return { interval: 0 };
+    }
+    
+    // For monthly data, adjust based on time frame
+    if (dataFrequency === 'monthly') {
+      if (timeFrame === '1Y') return { interval: 2 }; // Every 3rd month for 1Y
+      if (timeFrame === '5Y') return { interval: 11 }; // Roughly yearly for 5Y
+      if (filteredData.length > 24) return { interval: Math.floor(filteredData.length / 8) };
+      return { interval: 1 }; // Every other month for smaller timeframes
+    }
+    
+    // For daily data, use dynamic interval based on number of points
+    if (dataFrequency === 'daily') {
+      if (filteredData.length <= 14) return { interval: 1 }; // Every other day for 2 weeks
+      if (filteredData.length <= 30) return { interval: 3 }; // Every 4th day for a month
+      if (filteredData.length <= 90) return { interval: 6 }; // Weekly for 3 months
+      return { interval: Math.floor(filteredData.length / 12) }; // ~12 ticks total
+    }
+    
+    return { interval: 0 }; // Default: let the chart decide
+  }, [dataFrequency, filteredData.length, timeFrame]);
   
   // Add debug logging to trace data flow issues
   useEffect(() => {
@@ -104,16 +150,6 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   const tooltipStyle = getTooltipStyle(theme);
   const axisColor = theme === 'dark' ? '#888888' : '#666666';
   
-  // Generate appropriate Y-axis ticks based on data range
-  const yAxisTicks = useMemo(() => {
-    const { min, max } = valueMinMax;
-    const range = max - min;
-    const tickCount = 5;
-    const step = range / (tickCount - 1);
-    
-    return Array.from({ length: tickCount }, (_, i) => min + i * step);
-  }, [valueMinMax]);
-  
   // If no data, show placeholder
   if (!data || data.length === 0 || filteredData.length === 0) {
     return <ChartEmptyState title={title} hasData={!!(data && data.length > 0)} />;
@@ -132,6 +168,24 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
     }
   };
   
+  // Enhanced tooltip formatter with more context
+  const enhancedTooltipFormatter = (value: number | string, name: string) => {
+    // Basic formatting
+    const formattedValue = formatChartValue(value as number, name as string, title);
+    
+    // Add context based on chart type
+    let context = '';
+    if (title?.toLowerCase().includes('inflation')) {
+      context = value > 2 ? ' (Above Target)' : ' (At/Below Target)';
+    } else if (title?.toLowerCase().includes('unemployment')) {
+      context = value < 4 ? ' (Low)' : value > 6 ? ' (High)' : ' (Moderate)';
+    } else if (title?.toLowerCase().includes('interest') && name.includes('rate')) {
+      context = value > 4 ? ' (Restrictive)' : value < 1 ? ' (Accommodative)' : ' (Neutral)';
+    }
+    
+    return `${formattedValue}${context}`;
+  };
+  
   return (
     <div className="w-full">
       {title && <h3 className="text-sm font-medium mb-2">{title}</h3>}
@@ -142,7 +196,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         dataKeys={dataKeys}
         xAxisKey={xAxisKey}
         stacked={stacked}
-        tooltipFormatter={(value, name) => formatChartValue(value as number, name as string, title)}
+        tooltipFormatter={enhancedTooltipFormatter}
         labelFormatter={(label) => formatTooltipDate(label as string)}
         tooltipStyle={tooltipStyle}
         axisColor={axisColor}
@@ -150,6 +204,8 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         yAxisTicks={yAxisTicks}
         yAxisFormatter={(value) => formatYAxisTick(value as number, title)}
         dataFrequency={dataFrequency}
+        xAxisTickInterval={xAxisTickSettings.interval}
+        referenceLines={referenceLines}
       />
     </div>
   );

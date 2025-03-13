@@ -18,6 +18,13 @@ export interface ChartPoint {
   index: number;
 }
 
+export interface ReferenceLine {
+  y: number;
+  label?: string;
+  color?: string;
+  strokeDasharray?: string;
+}
+
 export interface EnhancedChartProps {
   data: any[];
   height?: number;
@@ -28,4 +35,5 @@ export interface EnhancedChartProps {
   comparisonPeriod?: string; // 'yoy', 'mom', 'qoq'
   title?: string;
   tooltipFormatter?: (value: number) => string;
+  referenceLines?: ReferenceLine[];
 }
