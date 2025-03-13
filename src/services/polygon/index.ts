@@ -7,6 +7,7 @@ import client from './client';
 import marketData from './marketData';
 import historical from './historical';
 import referenceData from './reference';
+import realtime from './realtime';
 import { clearAllCache, getCacheTimestamp } from './cache';
 
 // Integrate market data functions
@@ -55,6 +56,9 @@ export default {
   getCompanyNews,
   getMarketBreadth,
   
+  // Realtime updates
+  realtime,
+  
   // Cache management
   clearCache: clearAllCache,
   getCacheTimestamp
@@ -80,6 +84,9 @@ export {
   getMarketHolidays,
   getCompanyNews,
   getMarketBreadth,
+  
+  // Realtime updates
+  realtime,
   
   // Cache management
   clearAllCache as clearCache,

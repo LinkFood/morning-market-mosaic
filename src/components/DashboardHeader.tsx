@@ -26,6 +26,7 @@ import {
 import { useTheme } from "@/components/theme-provider";
 import SettingsModal from "@/components/SettingsModal";
 import { UserSettings } from "@/types/marketTypes";
+import UpdateIndicator from "./realtime/UpdateIndicator";
 
 interface DashboardHeaderProps {
   lastUpdated: Date | null;
@@ -155,16 +156,7 @@ const DashboardHeader = ({
         <p className="text-muted-foreground">
           Real-time market data and analysis
         </p>
-        {lastUpdated && (
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-muted-foreground">
-              Last updated: {lastUpdated.toLocaleString()}
-            </p>
-            {isRefreshing && (
-              <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
-            )}
-          </div>
-        )}
+        <UpdateIndicator onRefresh={refreshData} />
       </div>
       
       <SettingsModal 

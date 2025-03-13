@@ -37,6 +37,8 @@ export interface StockData {
   change: number;
   changePercent: number;
   volume?: number; // Added volume property as optional
+  lastUpdated?: Date; // Added lastUpdated property for realtime tracking
+  previousClose?: number; // Added for day-over-day comparison
 }
 
 export interface EconomicIndicator {
@@ -65,6 +67,11 @@ export interface UserSettings {
     marketHours: number; // seconds
     afterHours: number; // seconds
     closed: number; // seconds
+  };
+  realtimeUpdates?: {
+    enabled: boolean;
+    method: 'auto' | 'polling' | 'websocket';
+    priorityData: 'watchlist' | 'visible' | 'all';
   };
 }
 
@@ -139,4 +146,18 @@ export interface MarketBreadthData {
   newHighs: number;
   newLows: number;
   timestamp: string;
+}
+
+// Realtime update specific types
+export interface RealtimeUpdateStatus {
+  isConnected: boolean;
+  isPolling: boolean;
+  lastUpdated: Date | null;
+  isPaused: boolean;
+}
+
+export interface RealtimeOptions {
+  updateMethod?: 'auto' | 'polling' | 'websocket';
+  updateInterval?: number;
+  prioritySymbols?: string[];
 }

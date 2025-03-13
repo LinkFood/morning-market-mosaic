@@ -11,6 +11,7 @@ import marketMovers from "./marketMovers";
 import marketBreadth from "./marketBreadth";
 import events from "./events";
 import cacheUtils from "./cacheUtils";
+import { realtime } from "../polygon/realtime";
 
 // Export all services
 export default {
@@ -28,6 +29,9 @@ export default {
   getStockDetails: stocks.getStockDetails,
   getStockCandles: stocks.getStockCandles,
   
+  // Realtime updates
+  realtime,
+  
   // Cache utilities
   ...cacheUtils
 };
@@ -41,5 +45,6 @@ export {
   marketMovers,
   marketBreadth,
   events,
-  cacheUtils
+  cacheUtils,
+  realtime
 };
