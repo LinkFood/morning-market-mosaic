@@ -1,6 +1,6 @@
 
 import RealtimeService from './RealtimeService';
-// Fix type exports by adding the 'type' keyword
+// Fix type exports by adding the 'export type' keyword
 export type { DataUpdateType, UpdateEventCallback } from './DataSubscriptionManager';
 
 // Create and initialize realtime service
