@@ -1,8 +1,10 @@
 
 import React from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { StockAnalysis } from '@/services/stockPicker/aiAnalysis';
 import { ScoredStock } from '@/services/stockPicker/algorithm';
+import StockHeader from './StockHeader';
+import StockItem from './StockItem';
+import StockSkeleton from './StockSkeleton';
 
 interface AIAnalysisTabProps {
   stockAnalysis: StockAnalysis | null;
@@ -17,17 +19,7 @@ const AIAnalysisTab: React.FC<AIAnalysisTabProps> = ({
 }) => {
   
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="space-y-2">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        ))}
-      </div>
-    );
+    return <StockSkeleton />;
   }
   
   if (!stockAnalysis) {
@@ -56,15 +48,10 @@ const AIAnalysisTab: React.FC<AIAnalysisTabProps> = ({
           if (!analysis) return null;
           
           return (
-            <div key={stock.ticker} className="border-b pb-3 last:border-0">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-medium">{stock.ticker}</div>
-                <div className="text-sm text-muted-foreground">
-                  ${stock.close.toFixed(2)} · {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
-                </div>
-              </div>
+            <StockItem key={stock.ticker}>
+              <StockHeader stock={stock} className="mb-2" />
               <p className="text-sm">{analysis}</p>
-            </div>
+            </StockItem>
           );
         })}
       </div>
