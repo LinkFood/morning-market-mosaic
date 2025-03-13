@@ -1,9 +1,9 @@
 
 import React from "react";
-import { getChangeColor, getChangeSymbol, getIndicatorDescription } from "./economicIndicatorUtils";
+import { getChangeColor, getChangeSymbol, getIndicatorDescription, getIndicatorUnit } from "./economicIndicatorUtils";
 import EnhancedChart from "@/components/chart/EnhancedChart";
 import IndicatorInfo from "./IndicatorInfo";
-import { formatDate } from "@/utils/dateUtils";
+import { formatDailyDate, formatMonthlyDate, formatQuarterlyDate, detectDateFrequency } from "@/utils/dateUtils";
 import { Card, CardContent } from "@/components/ui/card";
 
 export interface EconomicIndicator {
@@ -58,9 +58,28 @@ const EconomicIndicatorCard = ({ indicator }: EconomicIndicatorCardProps) => {
     return null;
   };
   
+  // Determine the frequency of trend data for proper date formatting
+  const dataFrequency = indicator.trend && indicator.trend.length > 1 
+    ? detectDateFrequency(indicator.trend.map(t => t.date))
+    : 'monthly';
+  
+  // Format display dates based on data frequency
+  const formatDisplayDate = (dateStr: string): string => {
+    switch(dataFrequency) {
+      case 'daily':
+        return formatDailyDate(dateStr);
+      case 'monthly':
+        return formatMonthlyDate(dateStr);
+      case 'quarterly':
+        return formatQuarterlyDate(dateStr);
+      default:
+        return dateStr;
+    }
+  };
+  
   const historicalContext = getHistoricalContext(indicator);
-  const formattedDisplayDate = formatDate(indicator.date, 'long') || indicator.formattedDate || indicator.date;
-  const formattedUpdateDate = indicator.lastUpdated ? formatDate(indicator.lastUpdated, 'short') : null;
+  const formattedDisplayDate = formatDisplayDate(indicator.date);
+  const formattedUpdateDate = indicator.lastUpdated ? formatDailyDate(indicator.lastUpdated) : null;
   
   return (
     <Card key={indicator.id} className="overflow-hidden">

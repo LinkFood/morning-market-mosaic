@@ -4,6 +4,11 @@ import {
   Line, Bar, Area, ComposedChart, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, ReferenceLine 
 } from "recharts";
+import { 
+  formatDailyDate, 
+  formatMonthlyDate, 
+  formatQuarterlyDate 
+} from "@/utils/dateUtils";
 
 interface ChartComponentProps {
   data: any[];
@@ -49,15 +54,14 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
     if (!dateStr) return '';
     
     try {
-      const date = new Date(dateStr);
       switch (dataFrequency) {
         case 'quarterly':
-          return `Q${Math.floor(date.getMonth() / 3) + 1} '${date.getFullYear().toString().substr(2)}`;
+          return formatQuarterlyDate(dateStr);
         case 'monthly':
-          return `${date.toLocaleString('default', { month: 'short' })} '${date.getFullYear().toString().substr(2)}`;
+          return formatMonthlyDate(dateStr).split(' ')[0]; // Just show month name for brevity
         case 'daily':
         default:
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return formatDailyDate(dateStr).split(',')[0]; // Just day and month for brevity
       }
     } catch (e) {
       return dateStr;

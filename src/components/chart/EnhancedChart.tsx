@@ -14,7 +14,12 @@ import {
   formatYAxisTick
 } from "./chartUtils";
 import { EnhancedChartProps } from "./types";
-import { formatDate, determineFrequency } from "@/utils/dateUtils";
+import { 
+  formatDailyDate, 
+  formatMonthlyDate, 
+  formatQuarterlyDate, 
+  detectDateFrequency 
+} from "@/utils/dateUtils";
 
 const EnhancedChart: React.FC<EnhancedChartProps> = ({
   data,
@@ -45,7 +50,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   // Determine data frequency for proper labeling
   const dataFrequency = useMemo(() => 
     formattedData?.length > 1 ? 
-    determineFrequency(formattedData.map(item => item[xAxisKey])) : 
+    detectDateFrequency(formattedData.map(item => item[xAxisKey])) : 
     'monthly',
     [formattedData, xAxisKey]
   );
@@ -118,12 +123,12 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   const formatTooltipDate = (dateStr: string) => {
     switch (dataFrequency) {
       case 'quarterly':
-        return formatDate(dateStr, 'monthYear') || dateStr;
+        return formatQuarterlyDate(dateStr);
       case 'monthly':
-        return formatDate(dateStr, 'monthYear') || dateStr;
+        return formatMonthlyDate(dateStr);
       case 'daily':
       default:
-        return formatDate(dateStr, 'short') || dateStr;
+        return formatDailyDate(dateStr);
     }
   };
   

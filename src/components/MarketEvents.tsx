@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketEvent } from "@/types/marketTypes";
 import { CalendarClock, DollarSign, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatDailyDate } from "@/utils/dateUtils";
 
 interface MarketEventsProps {
   events: MarketEvent[];
@@ -13,15 +14,6 @@ const MarketEvents = ({ events }: MarketEventsProps) => {
   const sortedEvents = [...events].sort((a, b) => {
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
-  
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  };
   
   const getEventIcon = (type: string) => {
     if (type === "earnings") return <DollarSign className="h-4 w-4" />;
@@ -68,7 +60,7 @@ const MarketEvents = ({ events }: MarketEventsProps) => {
                 
                 <div className="flex items-center text-sm text-muted-foreground">
                   <CalendarClock className="mr-1 h-3 w-3" />
-                  <span>{formatDate(event.date)} • {event.time}</span>
+                  <span>{formatDailyDate(event.date)} • {event.time}</span>
                 </div>
               </div>
             </div>
