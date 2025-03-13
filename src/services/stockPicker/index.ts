@@ -6,7 +6,7 @@
 import algorithm, { ScoredStock } from './algorithm';
 import aiAnalysis, { StockAnalysis } from './aiAnalysis';
 import { StockData } from '@/types/marketTypes';
-import { isFeatureEnabled } from '@/services/featureFlags';
+import { isFeatureEnabled } from '@/services/features'; // Fixed import path
 
 /**
  * Get top stock picks based on algorithmic analysis
@@ -23,6 +23,13 @@ async function getTopPicks(stocks: StockData[]): Promise<ScoredStock[]> {
   try {
     // Apply algorithm to evaluate stocks
     const recommendations = algorithm.evaluateStocks(stocks);
+    
+    // Log the recommendations for debugging
+    console.log(`Stock picker generated ${recommendations.length} recommendations`);
+    if (recommendations.length > 0) {
+      console.log('Top pick:', recommendations[0].ticker, 'with score:', recommendations[0].scores.composite);
+    }
+    
     return recommendations;
   } catch (error) {
     console.error('Error in stock picker algorithm:', error);
@@ -47,7 +54,15 @@ async function getStockAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   }
   
   try {
-    return await aiAnalysis.getAIAnalysis(stocks);
+    console.log(`Requesting AI analysis for ${stocks.length} stocks`);
+    const result = await aiAnalysis.getAIAnalysis(stocks);
+    
+    // Log the result for debugging
+    console.log('AI analysis received with market insight:', 
+      result.marketInsight ? result.marketInsight.substring(0, 50) + '...' : 'None');
+    console.log('AI analysis received for stocks:', Object.keys(result.stockAnalyses).join(', '));
+    
+    return result;
   } catch (error) {
     console.error('Error in AI stock analysis:', error);
     return {
