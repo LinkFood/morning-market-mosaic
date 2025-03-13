@@ -12,6 +12,7 @@ export interface FeatureFlags {
   enableNewsSection: boolean;  // Show financial news
   useFredEconomicData: boolean; // Use FRED API for economic data
   enableDataRefresh: boolean;  // Allow automatic data refresh
+  useStockPickerAlgorithm: boolean; // Use algorithmic stock picking
 }
 
 // Default feature flags (everything enabled)
@@ -21,7 +22,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
   enableDetailedCharts: true,
   enableNewsSection: true,
   useFredEconomicData: true,
-  enableDataRefresh: true
+  enableDataRefresh: true,
+  useStockPickerAlgorithm: true
 };
 
 // Current feature flags
@@ -41,7 +43,8 @@ export function updateFeatureFlags(polygonApiAvailable: boolean, fredApiAvailabl
     enableDetailedCharts: polygonApiAvailable,
     enableNewsSection: polygonApiAvailable,
     useFredEconomicData: fredApiAvailable,
-    enableDataRefresh: polygonApiAvailable || fredApiAvailable
+    enableDataRefresh: polygonApiAvailable || fredApiAvailable,
+    useStockPickerAlgorithm: polygonApiAvailable  // Stock picker depends on Polygon API
   };
   
   // Store in localStorage for persistence

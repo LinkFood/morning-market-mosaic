@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import apiService from "@/services/apiService";
 import { marketStatus } from "@/services/market";
+import stockPicker, { ScoredStock } from "@/services/stockPicker";
 import { 
   MarketIndex, 
   SectorPerformance, 
@@ -26,11 +27,13 @@ export const useDashboardData = (settings: UserSettings) => {
     gainers: [],
     losers: []
   });
+  const [stockPicks, setStockPicks] = useState<ScoredStock[]>([]);
   
   // UI state
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEcon, setIsLoadingEcon] = useState(true);
   const [isLoadingMovers, setIsLoadingMovers] = useState(true);
+  const [isLoadingStockPicks, setIsLoadingStockPicks] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [moversError, setMoversError] = useState<Error | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,6 +85,36 @@ export const useDashboardData = (settings: UserSettings) => {
     }
   };
   
+  // Function to load stock picks
+  const loadStockPicks = async () => {
+    setIsLoadingStockPicks(true);
+    
+    try {
+      // Check if stock picker is enabled via feature flag
+      if (!isFeatureEnabled('useStockPickerAlgorithm')) {
+        console.log("Stock picker algorithm is disabled by feature flag");
+        setIsLoadingStockPicks(false);
+        return;
+      }
+      
+      // Get market movers to use as input for the stock picker
+      const moversData = await apiService.getMarketMovers(15); // Get more stocks for better selection
+      
+      // Combine gainers and losers
+      const stocksToAnalyze = [...moversData.gainers, ...moversData.losers];
+      
+      // Apply the stock picker algorithm
+      const pickedStocks = await stockPicker.getTopPicks(stocksToAnalyze);
+      
+      setStockPicks(pickedStocks);
+    } catch (error) {
+      console.error("Error loading stock picks:", error);
+      toast.error("Failed to load stock picks");
+    } finally {
+      setIsLoadingStockPicks(false);
+    }
+  };
+  
   // Function to load all market data
   const loadData = async () => {
     setIsLoading(true);
@@ -118,6 +151,11 @@ export const useDashboardData = (settings: UserSettings) => {
         loadEconomicIndicators();
       }
       
+      // Load stock picks if the feature is enabled
+      if (isFeatureEnabled('useStockPickerAlgorithm')) {
+        loadStockPicks();
+      }
+      
     } catch (error) {
       console.error("Error loading market data:", error);
       toast.error("Failed to load some market data");
@@ -136,11 +174,13 @@ export const useDashboardData = (settings: UserSettings) => {
     events,
     marketStatusData,
     marketMovers,
+    stockPicks,
     
     // Loading states
     isLoading,
     isLoadingEcon,
     isLoadingMovers,
+    isLoadingStockPicks,
     lastUpdated,
     moversError,
     refreshing,
@@ -148,6 +188,7 @@ export const useDashboardData = (settings: UserSettings) => {
     // Actions
     loadData,
     loadEconomicIndicators,
-    loadMarketMovers
+    loadMarketMovers,
+    loadStockPicks
   };
 };

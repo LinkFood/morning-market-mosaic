@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect } from "react";
 import { getFeatureFlags } from "@/services/featureFlags";
 import { DashboardContextType, defaultSettings } from "./types";
@@ -29,15 +30,18 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     events,
     marketStatusData,
     marketMovers,
+    stockPicks,
     isLoading,
     isLoadingEcon,
     isLoadingMovers,
+    isLoadingStockPicks,
     lastUpdated,
     moversError,
     refreshing,
     loadData,
     loadEconomicIndicators,
-    loadMarketMovers
+    loadMarketMovers,
+    loadStockPicks
   } = useDashboardData(settings);
   
   // Initialize refresh scheduler
@@ -102,9 +106,11 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         events,
         marketStatusData,
         marketMovers,
+        stockPicks,
         isLoading,
         isLoadingEcon,
         isLoadingMovers,
+        isLoadingStockPicks,
         lastUpdated,
         settings,
         moversError,
@@ -115,6 +121,7 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         loadData,
         loadEconomicIndicators,
         loadMarketMovers,
+        loadStockPicks,
         updateSettings,
         toggleComponentCollapse,
         expandComponent,

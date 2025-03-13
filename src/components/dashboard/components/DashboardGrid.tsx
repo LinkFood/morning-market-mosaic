@@ -11,6 +11,7 @@ import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
+import StockPicks from "@/components/stock-picks/StockPicks";
 
 const DashboardGrid: React.FC = () => {
   const { 
@@ -20,8 +21,10 @@ const DashboardGrid: React.FC = () => {
     indicators, 
     indices,
     marketMovers,
+    stockPicks,
     marketStatusData, 
     isLoadingMovers,
+    isLoadingStockPicks,
     isLoadingEcon, 
     moversError,
     loadMarketMovers,
@@ -62,6 +65,18 @@ const DashboardGrid: React.FC = () => {
             title="Economic Indicators"
           >
             <EconomicData indicators={indicators} isLoading={isLoadingEcon} />
+          </CollapsibleComponent>
+        </div>
+      )}
+      
+      {/* Stock Picks */}
+      {isComponentVisible('stock-picks') && (
+        <div className={`${isComponentVisible('stock-picks') ? '' : 'hidden'}`}>
+          <CollapsibleComponent
+            componentId="stock-picks"
+            title="Algorithmic Stock Picks"
+          >
+            <StockPicks stocks={stockPicks} isLoading={isLoadingStockPicks} />
           </CollapsibleComponent>
         </div>
       )}

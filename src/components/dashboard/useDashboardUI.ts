@@ -55,6 +55,10 @@ export const useDashboardUI = (onSettingsChange: () => void) => {
       return false;
     }
     
+    if (componentId === "stock-picks" && !isFeatureEnabled('useStockPickerAlgorithm')) {
+      return false;
+    }
+    
     return settings.visibleComponents.includes(componentId);
   };
 

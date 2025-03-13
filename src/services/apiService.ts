@@ -16,9 +16,11 @@ import {
   MarketEvent,
   EconomicIndicator
 } from "@/types/marketTypes";
+import { ScoredStock } from "@/services/stockPicker/algorithm";
 
 // Import specialized services
 import marketService from "./market";
+import stockPickerService from "./stockPicker";
 // Import FRED service methods directly to avoid circular imports
 import {
   getEconomicCategory,
@@ -41,6 +43,11 @@ export const {
   getStockCandles,
   getMarketEvents
 } = marketService;
+
+// Re-export stock picker services
+export const {
+  getTopPicks
+} = stockPickerService;
 
 // Get economic indicators from FRED
 async function getEconomicIndicators(): Promise<EconomicIndicator[]> {
@@ -90,6 +97,9 @@ export {
 export default {
   // Market data APIs
   ...marketService,
+  
+  // Stock picker APIs
+  ...stockPickerService,
   
   // Economic data APIs
   getEconomicIndicators,

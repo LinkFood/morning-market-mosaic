@@ -11,6 +11,7 @@ import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
 import ES1FuturesChart from "@/components/ES1FuturesChart";
+import StockPicks from "@/components/stock-picks/StockPicks";
 
 const FullScreenViews: React.FC = () => {
   const { 
@@ -20,13 +21,16 @@ const FullScreenViews: React.FC = () => {
     indicators, 
     indices,
     marketMovers,
+    stockPicks,
     marketStatusData, 
     isLoadingMovers,
+    isLoadingStockPicks,
     isLoadingEcon, 
     moversError,
     expandedComponent,
     setExpandedComponent,
-    loadMarketMovers
+    loadMarketMovers,
+    loadStockPicks
   } = useDashboard();
 
   if (!expandedComponent) return null;
@@ -62,6 +66,16 @@ const FullScreenViews: React.FC = () => {
           title="Economic Indicators"
         >
           <EconomicData indicators={indicators} isLoading={isLoadingEcon} />
+        </FullScreenComponent>
+      )}
+      
+      {expandedComponent === 'stock-picks' && (
+        <FullScreenComponent 
+          isOpen={true} 
+          onClose={() => setExpandedComponent(null)}
+          title="Algorithmic Stock Picks"
+        >
+          <StockPicks stocks={stockPicks} isLoading={isLoadingStockPicks} />
         </FullScreenComponent>
       )}
       

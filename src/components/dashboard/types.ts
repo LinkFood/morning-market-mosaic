@@ -9,6 +9,7 @@ import {
   MarketStatus,
   MarketMovers
 } from "@/types/marketTypes";
+import { ScoredStock } from "@/services/stockPicker/algorithm";
 
 // Dashboard context type
 export type DashboardContextType = {
@@ -19,9 +20,11 @@ export type DashboardContextType = {
   events: MarketEvent[];
   marketStatusData: MarketStatus | null;
   marketMovers: MarketMovers;
+  stockPicks: ScoredStock[];
   isLoading: boolean;
   isLoadingEcon: boolean;
   isLoadingMovers: boolean;
+  isLoadingStockPicks: boolean;
   lastUpdated: Date | null;
   settings: UserSettings;
   moversError: Error | null;
@@ -32,6 +35,7 @@ export type DashboardContextType = {
   loadData: () => Promise<void>;
   loadEconomicIndicators: () => Promise<void>;
   loadMarketMovers: () => Promise<void>;
+  loadStockPicks: () => Promise<void>;
   updateSettings: (newSettings: UserSettings) => void;
   toggleComponentCollapse: (componentId: string) => void;
   expandComponent: (componentId: string) => void;
@@ -49,7 +53,8 @@ export const defaultSettings: UserSettings = {
     "economic-data", 
     "sector-performance", 
     "market-events", 
-    "market-movers"
+    "market-movers",
+    "stock-picks"
   ],
   componentOrder: [
     "market-overview", 
@@ -58,7 +63,8 @@ export const defaultSettings: UserSettings = {
     "economic-data", 
     "sector-performance", 
     "market-events", 
-    "market-movers"
+    "market-movers",
+    "stock-picks"
   ],
   refreshInterval: {
     marketHours: 60, // seconds
