@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RefreshCw, TrendingUp, Info, Cpu } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from "sonner";
 import { ScoredStock } from '@/services/stockPicker/algorithm';
 import { StockAnalysis } from '@/services/stockPicker/aiAnalysis';
 import StockPickerCard from './StockPickerCard';
@@ -42,8 +43,14 @@ const AIStockPicker = () => {
       
       // Get AI analysis for these stocks
       if (scoredStocks.length > 0) {
-        const analysis = await apiService.getStockAnalysis(scoredStocks);
-        setAiAnalysis(analysis);
+        try {
+          const analysis = await apiService.getStockAnalysis(scoredStocks);
+          setAiAnalysis(analysis);
+        } catch (analysisError) {
+          console.error('Error getting AI analysis:', analysisError);
+          toast.error('Could not load AI analysis. Algorithm results still available.');
+          // Still show the stocks, just without AI analysis
+        }
       }
       
       setLastUpdated(new Date());
