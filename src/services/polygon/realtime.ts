@@ -39,6 +39,9 @@ class RealtimeService {
     level: 1.0 
   };
   
+  // Add the missing subscribers property
+  private subscribers: Array<(data: any) => void> = [];
+  
   constructor() {
     this.initBatteryMonitoring();
   }
