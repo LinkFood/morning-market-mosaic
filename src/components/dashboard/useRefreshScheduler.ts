@@ -1,7 +1,6 @@
-
 import { useRef, useEffect } from "react";
 import { MarketStatus, UserSettings } from "@/types/marketTypes";
-import { isFeatureEnabled } from "@/services/features";
+import { isFeatureEnabled } from "@/services/featureFlags";
 
 export const useRefreshScheduler = (
   marketStatusData: MarketStatus | null,
