@@ -30,7 +30,8 @@ const {
   getTickerDetails,
   getSectorPerformance,
   getMarketHolidays,
-  getCompanyNews
+  getCompanyNews,
+  getMarketBreadth
 } = referenceData;
 
 // Export all functions
@@ -52,6 +53,7 @@ export default {
   getSectorPerformance,
   getMarketHolidays,
   getCompanyNews,
+  getMarketBreadth,
   
   // Cache management
   clearCache: clearAllCache,
@@ -77,6 +79,7 @@ export {
   getSectorPerformance,
   getMarketHolidays,
   getCompanyNews,
+  getMarketBreadth,
   
   // Cache management
   clearAllCache as clearCache,

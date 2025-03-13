@@ -1,3 +1,4 @@
+
 // Common types used across the market dashboard
 
 export interface MarketIndex {
@@ -7,6 +8,14 @@ export interface MarketIndex {
   open: number;
   change: number;
   changePercent: number;
+  high?: number;
+  low?: number;
+  volume?: number;
+  previousClose?: number;
+  preMarketChange?: number;
+  preMarketChangePercent?: number;
+  afterHoursChange?: number;
+  afterHoursChangePercent?: number;
 }
 
 export interface SectorPerformance {
@@ -114,4 +123,13 @@ export interface CandleData {
   low: number;
   close: number;
   volume: number;
+}
+
+export interface MarketBreadthData {
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+  newHighs: number;
+  newLows: number;
+  timestamp: string;
 }
