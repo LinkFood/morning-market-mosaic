@@ -1,44 +1,58 @@
 
+/**
+ * Sector performance service
+ * Provides performance data for market sectors
+ */
 import { SectorPerformance } from "@/types/marketTypes";
 import cacheUtils from "./cacheUtils";
 import mockData from "./mockData";
-import { POLYGON_API_KEY, POLYGON_BASE_URL } from "./config";
+import { getPolygonApiKey } from "./config";
+import polygonService from "../polygon";
 
 // Get sector performance
 async function getSectorPerformance(): Promise<SectorPerformance[]> {
   return cacheUtils.fetchWithCache("market_sectors", async () => {
-    if (POLYGON_API_KEY === "DEMO_API_KEY") {
-      return mockData.MOCK_SECTOR_DATA;
+    try {
+      // Get API key from Supabase
+      const apiKey = await getPolygonApiKey();
+      
+      if (apiKey === "DEMO_API_KEY") {
+        console.log("Using demo API key for sector performance, returning mock data");
+        return mockData.MOCK_SECTOR_DATA;
+      }
+      
+      // Sector ETFs for the major market sectors
+      const sectorTickers = {
+        "XLF": "Financials",
+        "XLK": "Technology",
+        "XLE": "Energy",
+        "XLV": "Healthcare",
+        "XLY": "Consumer Cyclical",
+        "XLP": "Consumer Defensive",
+        "XLI": "Industrials",
+        "XLB": "Materials",
+        "XLU": "Utilities",
+        "XLRE": "Real Estate",
+        "XLC": "Communication Services"
+      };
+      
+      // Get snapshots for sector ETFs
+      const tickers = Object.keys(sectorTickers);
+      const stockData = await polygonService.getBatchStockSnapshots(tickers);
+      
+      // Convert to SectorPerformance format
+      return stockData.map(stock => ({
+        ticker: stock.ticker,
+        name: sectorTickers[stock.ticker as keyof typeof sectorTickers],
+        close: stock.close,
+        open: stock.open,
+        change: stock.change,
+        changePercent: stock.changePercent
+      }));
+    } catch (error) {
+      console.error("Error fetching sector performance:", error);
+      return mockData.MOCK_SECTOR_DATA; // Fallback to mock data
     }
-    
-    // Sector ETFs
-    const sectors = [
-      { ticker: "XLF", name: "Financials" },
-      { ticker: "XLK", name: "Technology" },
-      { ticker: "XLE", name: "Energy" },
-      { ticker: "XLV", name: "Healthcare" },
-      { ticker: "XLY", name: "Consumer Cyclical" },
-      { ticker: "XLP", name: "Consumer Defensive" },
-      { ticker: "XLI", name: "Industrials" },
-      { ticker: "XLB", name: "Materials" },
-      { ticker: "XLU", name: "Utilities" },
-      { ticker: "XLRE", name: "Real Estate" }
-    ];
-    
-    const promises = sectors.map(sector => 
-      fetch(`${POLYGON_BASE_URL}/v2/aggs/ticker/${sector.ticker}/prev?apiKey=${POLYGON_API_KEY}`)
-        .then(res => res.json())
-        .then(data => ({
-          ticker: sector.ticker,
-          name: sector.name,
-          close: data.results[0].c,
-          open: data.results[0].o,
-          change: data.results[0].c - data.results[0].o,
-          changePercent: ((data.results[0].c - data.results[0].o) / data.results[0].o) * 100
-        }))
-    );
-    
-    return Promise.all(promises);
   });
 }
 

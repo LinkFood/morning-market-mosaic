@@ -1,36 +1,39 @@
 
-// Define API endpoints
+/**
+ * Market data configuration
+ */
+import { getSupabaseClient } from "@/integrations/supabase/client";
+
+// API configuration for Polygon.io
 export const POLYGON_BASE_URL = "https://api.polygon.io";
-export const FRED_BASE_URL = "https://api.stlouisfed.org/fred";
 
-// Import Supabase client to access secrets
-import { supabase } from "@/integrations/supabase/client";
-
-// This would be set by user in a real app
-export const POLYGON_API_KEY = "DEMO_API_KEY"; // Demo mode will return sample data until we fetch the real key
-export const FRED_API_KEY = "DEMO_API_KEY";    // Demo mode will return sample data
-
-// Cache TTL in milliseconds
-export const CACHE_TTL = 24 * 60 * 60 * 1000; // 1 day
-
-// Function to get the Polygon API key from Supabase
+// Get API key from Supabase
 export async function getPolygonApiKey(): Promise<string> {
   try {
-    // Try to get the API key from Supabase
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.functions.invoke("get-polygon-api-key");
     
     if (error) {
       console.error("Error fetching Polygon API key:", error);
-      return POLYGON_API_KEY; // Fall back to demo key
+      return "DEMO_API_KEY";
     }
     
-    if (data && data.apiKey) {
-      return data.apiKey;
-    }
-    
-    return POLYGON_API_KEY; // Fall back to demo key
+    return data?.apiKey || "DEMO_API_KEY";
   } catch (error) {
     console.error("Failed to get Polygon API key:", error);
-    return POLYGON_API_KEY; // Fall back to demo key
+    return "DEMO_API_KEY";
   }
 }
+
+// Store API key once fetched
+let POLYGON_API_KEY: string | null = null;
+
+// Initialize API key
+export const initializeApiKey = async (): Promise<string> => {
+  if (!POLYGON_API_KEY) {
+    POLYGON_API_KEY = await getPolygonApiKey();
+  }
+  return POLYGON_API_KEY;
+};
+
+export { POLYGON_API_KEY };

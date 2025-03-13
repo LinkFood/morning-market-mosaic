@@ -1,32 +1,42 @@
 
-import { toast } from "sonner";
+/**
+ * Market Data Service
+ * Main entry point for market data APIs
+ */
 import marketIndices from "./marketIndices";
 import sectorPerformance from "./sectorPerformance";
 import stocks from "./stocks";
+import marketStatus from "./marketStatus";
+import marketMovers from "./marketMovers";
 import events from "./events";
-import economicIndicators from "./economicIndicators";
 import cacheUtils from "./cacheUtils";
-import mockData from "./mockData";
 
-// Export individual services
-export { 
-  marketIndices,
-  sectorPerformance,
-  stocks,
-  events,
-  economicIndicators,
-  cacheUtils
-};
-
-// Export default combined API
+// Export all services
 export default {
-  ...marketIndices,
-  ...sectorPerformance,
-  ...stocks,
-  ...events,
-  ...economicIndicators,
+  // Market data
+  getMarketIndices: marketIndices.getMarketIndices,
+  getSectorPerformance: sectorPerformance.getSectorPerformance,
+  getMajorStocks: stocks.getMajorStocks,
+  getStockSparkline: stocks.getStockSparkline,
+  getMarketStatus: marketStatus.getMarketStatus,
+  getMarketMovers: marketMovers.getMarketMovers,
+  getMarketEvents: events.getMarketEvents,
+  
+  // Stock details
+  getStockDetails: stocks.getStockDetails,
+  getStockCandles: stocks.getStockCandles,
+  
+  // Cache utilities
   ...cacheUtils
 };
 
-// Export mock data for testing
-export { mockData };
+// Export individual services for direct imports
+export {
+  marketIndices,
+  sectorPerformance,
+  stocks,
+  marketStatus,
+  marketMovers,
+  events,
+  cacheUtils
+};

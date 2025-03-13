@@ -1,85 +1,132 @@
-import { toast } from "sonner";
 
-// Cache TTL in milliseconds (1 day)
-const CACHE_TTL = 24 * 60 * 60 * 1000;
+/**
+ * Cache utilities for market data
+ * Implements intelligent caching to reduce API calls
+ */
 
-// Interface for cache items
-interface CacheItem<T> {
-  data: T;
-  timestamp: number;
-}
+// Cache TTL (Time To Live) settings
+const CACHE_TTL = {
+  SHORT: 60 * 1000, // 1 minute
+  MEDIUM: 5 * 60 * 1000, // 5 minutes
+  LONG: 60 * 60 * 1000, // 1 hour
+  EXTENDED: 24 * 60 * 60 * 1000 // 24 hours
+};
 
-// Fetch with caching utility
-async function fetchWithCache<T>(
-  cacheKey: string,
-  fetcher: () => Promise<T>
-): Promise<T> {
+// Cache keys
+const CACHE_KEYS = {
+  MARKET_INDICES: "market_indices",
+  MARKET_SECTORS: "market_sectors",
+  MARKET_STOCKS: "market_stocks_",
+  STOCK_SPARKLINE: "market_sparkline_",
+  MARKET_STATUS: "market_status",
+  MARKET_MOVERS: "market_movers_",
+  STOCK_DETAILS: "stock_details_",
+  MARKET_EVENTS: "market_events",
+  STOCK_CANDLES: "stock_candles_"
+};
+
+/**
+ * Fetch data with cache support
+ * @param cacheKey The key to store/retrieve cache
+ * @param fetcher Function to fetch fresh data if cache is invalid
+ * @returns Promise with data (from cache or freshly fetched)
+ */
+async function fetchWithCache<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
   try {
-    // Check if data exists in cache and is still valid
-    const cachedItem = localStorage.getItem(cacheKey);
+    // Check if data is in cache
+    const cachedData = localStorage.getItem(cacheKey);
     
-    if (cachedItem) {
-      const parsedItem: CacheItem<T> = JSON.parse(cachedItem);
+    if (cachedData) {
+      const { data, timestamp } = JSON.parse(cachedData);
       const now = Date.now();
       
-      // If cache is still valid, return the cached data
-      if (now - parsedItem.timestamp < CACHE_TTL) {
-        console.log(`Using cached data for ${cacheKey}`);
-        return parsedItem.data;
+      // Determine TTL based on cache key
+      let ttl = CACHE_TTL.MEDIUM; // Default TTL
+      
+      if (cacheKey.startsWith(CACHE_KEYS.MARKET_MOVERS)) {
+        ttl = CACHE_TTL.SHORT;
+      } else if (
+        cacheKey.startsWith(CACHE_KEYS.MARKET_INDICES) ||
+        cacheKey.startsWith(CACHE_KEYS.MARKET_STATUS)
+      ) {
+        ttl = CACHE_TTL.MEDIUM;
+      } else if (
+        cacheKey.startsWith(CACHE_KEYS.MARKET_SECTORS) ||
+        cacheKey.startsWith(CACHE_KEYS.MARKET_STOCKS)
+      ) {
+        ttl = CACHE_TTL.LONG;
+      } else if (cacheKey.startsWith(CACHE_KEYS.STOCK_DETAILS)) {
+        ttl = CACHE_TTL.EXTENDED;
       }
+      
+      // Check if cache is still valid
+      if (now - timestamp < ttl) {
+        console.log(`Using cached data for ${cacheKey}`);
+        return data;
+      }
+      
+      console.log(`Cache expired for ${cacheKey}`);
     }
     
-    // If no valid cache exists, fetch new data
-    console.log(`Fetching fresh data for ${cacheKey}`);
-    const data = await fetcher();
+    // Fetch fresh data
+    const freshData = await fetcher();
     
-    // Store in cache
+    // Save to cache
     localStorage.setItem(
       cacheKey,
       JSON.stringify({
-        data,
-        timestamp: Date.now(),
+        data: freshData,
+        timestamp: Date.now()
       })
     );
     
-    return data;
+    return freshData;
   } catch (error) {
-    console.error(`Error fetching ${cacheKey}:`, error);
-    
-    // If error occurs but we have cached data, return that even if expired
-    const cachedItem = localStorage.getItem(cacheKey);
-    if (cachedItem) {
-      toast.error("Using cached data due to API error");
-      return JSON.parse(cachedItem).data;
-    }
-    
-    // Otherwise, throw the error to be handled by the caller
+    console.error(`Error in fetchWithCache for ${cacheKey}:`, error);
     throw error;
   }
 }
 
-// Clear all cache data
-function clearAllCacheData() {
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith("market_") || key.startsWith("econ_")) {
+/**
+ * Clear all cache data
+ */
+function clearAllCacheData(): void {
+  Object.keys(localStorage).forEach(key => {
+    if (
+      key.startsWith(CACHE_KEYS.MARKET_INDICES) ||
+      key.startsWith(CACHE_KEYS.MARKET_SECTORS) ||
+      key.startsWith(CACHE_KEYS.MARKET_STOCKS) ||
+      key.startsWith(CACHE_KEYS.STOCK_SPARKLINE) ||
+      key.startsWith(CACHE_KEYS.MARKET_STATUS) ||
+      key.startsWith(CACHE_KEYS.MARKET_MOVERS) ||
+      key.startsWith(CACHE_KEYS.STOCK_DETAILS) ||
+      key.startsWith(CACHE_KEYS.MARKET_EVENTS) ||
+      key.startsWith(CACHE_KEYS.STOCK_CANDLES)
+    ) {
       localStorage.removeItem(key);
     }
   });
-  toast.success("Cache cleared, refreshing data");
 }
 
-// Get cache timestamp for a specific key
+/**
+ * Get the timestamp of when data was cached
+ * @param cacheKey The cache key to check
+ * @returns Date object or null if not cached
+ */
 function getCacheTimestamp(cacheKey: string): Date | null {
-  const cachedItem = localStorage.getItem(cacheKey);
-  if (cachedItem) {
-    const parsedItem = JSON.parse(cachedItem);
-    return new Date(parsedItem.timestamp);
+  const cachedData = localStorage.getItem(cacheKey);
+  
+  if (cachedData) {
+    const { timestamp } = JSON.parse(cachedData);
+    return new Date(timestamp);
   }
+  
   return null;
 }
 
 export default {
   fetchWithCache,
   clearAllCacheData,
-  getCacheTimestamp
+  getCacheTimestamp,
+  CACHE_KEYS
 };

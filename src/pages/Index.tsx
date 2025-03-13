@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/DashboardHeader";
 import MarketOverview from "@/components/MarketOverview";
@@ -75,24 +74,7 @@ const Dashboard = () => {
   const loadEconomicIndicators = async () => {
     setIsLoadingEcon(true);
     try {
-      // Get key economic indicators from FRED 
-      // GDP, GDP Growth, Unemployment, Inflation (CPI)
-      const keySeriesIds = ["GDPC1", "A191RL1Q225SBEA", "UNRATE", "CPIAUCSL"];
-      const promises = keySeriesIds.map(seriesId => fedApiService.getEconomicSeries(seriesId));
-      
-      const results = await Promise.all(promises);
-      
-      // Convert to EconomicIndicator type
-      const fedIndicators: EconomicIndicator[] = results.map(item => ({
-        id: item.id,
-        name: item.name,
-        value: parseFloat(item.value),
-        previous: parseFloat(item.previous),
-        change: parseFloat(item.change),
-        unit: item.unit,
-        date: item.date
-      }));
-      
+      const fedIndicators = await apiService.getEconomicIndicators();
       setIndicators(fedIndicators);
     } catch (error) {
       console.error("Error loading economic indicators:", error);
