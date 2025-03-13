@@ -1,4 +1,3 @@
-
 import { 
   MarketIndex, 
   SectorPerformance, 
@@ -34,7 +33,7 @@ export type DashboardContextType = {
   refreshing: boolean;
   expandedComponent: string | null;
   collapsedComponents: {[key: string]: boolean};
-  featureFlags: ReturnType<typeof import("@/services/features").getFeatureFlags>;
+  featureFlags: ReturnType<typeof import("@/services/featureFlags").getFeatureFlags>;
   loadData: () => Promise<void>;
   loadEconomicIndicators: () => Promise<void>;
   loadMarketMovers: () => Promise<void>;

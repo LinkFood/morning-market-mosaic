@@ -1,272 +1,212 @@
 
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ScoredStock } from "@/services/stockPicker/algorithm";
-import { StockAnalysis } from "@/services/stockPicker/aiAnalysis";
-import { Star, TrendingUp, Volume2, Shuffle, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { isFeatureEnabled } from '@/services/featureFlags';
+import { useDashboard } from '../dashboard/DashboardContext';
+import { ScoredStock } from '@/services/stockPicker/algorithm';
+import { StockAnalysis } from '@/services/stockPicker/aiAnalysis';
 
-interface StockPicksProps {
-  stocks: ScoredStock[];
-  analysis?: StockAnalysis | null;
-  isLoading: boolean;
-  isLoadingAnalysis?: boolean;
-}
-
-const StockPicks: React.FC<StockPicksProps> = ({ 
-  stocks, 
-  analysis, 
-  isLoading,
-  isLoadingAnalysis = false
-}) => {
-  const [activeTab, setActiveTab] = useState<string>("algorithmic");
-
-  if (isLoading) {
+const StockPicks: React.FC = () => {
+  const { 
+    stockPicks, 
+    stockAnalysis, 
+    isLoadingStockPicks, 
+    isLoadingAnalysis, 
+    featureFlags 
+  } = useDashboard();
+  
+  const [activeTab, setActiveTab] = useState<string>('algorithm');
+  
+  const isAIEnabled = isFeatureEnabled('useAIStockAnalysis');
+  
+  if (isLoadingStockPicks && !stockPicks.length) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Top Stock Picks</CardTitle>
+          <CardTitle className="flex items-center">
+            Stock Picks
+            <Badge variant="outline" className="ml-2">Beta</Badge>
+          </CardTitle>
+          <CardDescription>Algorithmic stock selection</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-40">
-            <div className="animate-pulse text-muted-foreground">Loading stock picks...</div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
     );
   }
-
-  if (!stocks || stocks.length === 0) {
+  
+  // Handle no stock picks
+  if (!isLoadingStockPicks && stockPicks.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Top Stock Picks</CardTitle>
+          <CardTitle className="flex items-center">
+            Stock Picks
+            <Badge variant="outline" className="ml-2">Beta</Badge>
+          </CardTitle>
+          <CardDescription>Algorithmic stock selection</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-muted-foreground text-center p-6">
-            No stock picks available at this time. Try again later.
+          <div className="p-4 text-center text-muted-foreground">
+            No stock picks available for current market conditions
           </div>
         </CardContent>
       </Card>
     );
   }
-
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Star className="h-5 w-5 text-amber-500" />
-          Top Stock Picks
+        <CardTitle className="flex items-center">
+          Stock Picks
+          <Badge variant="outline" className="ml-2">Beta</Badge>
         </CardTitle>
-        {analysis && (
-          <CardDescription>
-            Analysis generated at: {new Date(analysis.generatedAt).toLocaleString()}
-          </CardDescription>
-        )}
+        <CardDescription>
+          {isAIEnabled ? 'AI-enhanced stock analysis' : 'Algorithmic stock selection'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="algorithmic" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="algorithmic">Algorithmic</TabsTrigger>
-            <TabsTrigger value="ai" disabled={!analysis}>AI Analysis</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="algorithmic" className="space-y-4">
-            {stocks.map((stock) => (
-              <StockPickCard key={stock.ticker} stock={stock} />
-            ))}
-          </TabsContent>
-          
-          <TabsContent value="ai">
-            {isLoadingAnalysis ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="animate-pulse text-muted-foreground">Loading AI analysis...</div>
-              </div>
-            ) : analysis ? (
-              <div className="space-y-6">
-                <MarketInsightCard insight={analysis.marketInsight} />
-                
-                {stocks.map((stock) => (
-                  <AIAnalysisCard 
-                    key={stock.ticker} 
-                    stock={stock} 
-                    analysis={analysis.stockAnalyses[stock.ticker] || "No analysis available for this stock."}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-muted-foreground text-center p-6">
-                AI analysis is not available at this time.
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+        {isAIEnabled ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="algorithm">Algorithm</TabsTrigger>
+              <TabsTrigger value="ai">AI Analysis</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="algorithm" className="space-y-4">
+              <AlgorithmTab stockPicks={stockPicks} />
+            </TabsContent>
+            
+            <TabsContent value="ai" className="space-y-4">
+              <AIAnalysisTab 
+                stockAnalysis={stockAnalysis} 
+                isLoading={isLoadingAnalysis} 
+                stockPicks={stockPicks}
+              />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <AlgorithmTab stockPicks={stockPicks} />
+        )}
       </CardContent>
     </Card>
   );
 };
 
-interface StockPickCardProps {
-  stock: ScoredStock;
-}
-
-const StockPickCard: React.FC<StockPickCardProps> = ({ stock }) => {
-  const { ticker, name, changePercent, scores, signals } = stock;
-  
-  // Format the score to be out of 100
-  const formatScore = (score: number) => `${score}/100`;
-  
+// Algorithm analysis tab
+const AlgorithmTab: React.FC<{ stockPicks: ScoredStock[] }> = ({ stockPicks }) => {
   return (
-    <div className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <h3 className="font-semibold text-lg">{ticker}</h3>
-          <p className="text-sm text-muted-foreground">{name || ticker}</p>
-        </div>
-        <div className="flex items-center">
-          <div className={`px-2 py-1 rounded text-sm font-medium ${
-            changePercent > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 
-            'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-          }`}>
-            {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
+    <div className="space-y-4">
+      {stockPicks.map((stock) => (
+        <div key={stock.ticker} className="border-b pb-3 last:border-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="font-medium text-lg">{stock.ticker}</span>
+              <div className="flex">
+                <span className="text-sm text-muted-foreground">
+                  ${stock.close.toFixed(2)} · {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+            
+            <div>
+              <div className="flex items-center">
+                <span className="font-bold">Score: </span>
+                <Badge variant={stock.scores.composite > 70 ? "success" : 
+                                stock.scores.composite > 50 ? "default" : 
+                                "destructive"}
+                    className="ml-2">
+                  {stock.scores.composite}/100
+                </Badge>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {stock.signals.slice(0, 3).join(' · ')}
+                {stock.signals.length > 3 && ' · ...'}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-3 mb-3 mt-4">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-blue-500" />
-          <span className="text-sm">Momentum: {formatScore(scores.momentum)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Volume2 className="h-4 w-4 text-purple-500" />
-          <span className="text-sm">Volume: {formatScore(scores.volume)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-emerald-500" />
-          <span className="text-sm">Trend: {formatScore(scores.trend)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Shuffle className="h-4 w-4 text-amber-500" />
-          <span className="text-sm">Volatility: {formatScore(scores.volatility)}</span>
-        </div>
-      </div>
-      
-      <div className="mt-3">
-        <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Signals</div>
-        <div className="flex flex-wrap gap-1">
-          {signals.map((signal, index) => (
-            <span 
-              key={`${ticker}-${index}`}
-              className={`px-2 py-0.5 rounded-full text-xs ${
-                signal.includes('Bullish') ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' :
-                signal.includes('Bearish') ? 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400' :
-                'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400'
-              }`}
-            >
-              {signal}
-            </span>
-          ))}
-        </div>
-      </div>
-      
-      <div className="mt-4 bg-muted/50 rounded-full h-2">
-        <div 
-          className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500" 
-          style={{ width: `${scores.composite}%` }}
-        />
-      </div>
-      <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-        <span>Composite Score</span>
-        <span className="font-medium">{scores.composite}/100</span>
-      </div>
+      ))}
     </div>
   );
 };
 
-interface AIAnalysisCardProps {
-  stock: ScoredStock;
-  analysis: string;
-}
-
-const AIAnalysisCard: React.FC<AIAnalysisCardProps> = ({ stock, analysis }) => {
-  const [expanded, setExpanded] = useState(false);
-  const { ticker, name, changePercent } = stock;
+// AI analysis tab
+const AIAnalysisTab: React.FC<{ 
+  stockAnalysis: StockAnalysis | null, 
+  isLoading: boolean,
+  stockPicks: ScoredStock[]
+}> = ({ stockAnalysis, isLoading, stockPicks }) => {
+  
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  
+  if (!stockAnalysis) {
+    return (
+      <div className="p-4 text-center text-muted-foreground">
+        AI analysis not available
+      </div>
+    );
+  }
   
   return (
-    <div className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-amber-500" />
-          <div>
-            <h3 className="font-semibold text-lg">{ticker}</h3>
-            <p className="text-sm text-muted-foreground">{name || ticker}</p>
-          </div>
-        </div>
-        <div className="flex items-center">
-          <div className={`px-2 py-1 rounded text-sm font-medium ${
-            changePercent > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 
-            'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-          }`}>
-            {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* Market insight section */}
+      <div>
+        <h4 className="text-sm font-semibold mb-2">Market Insight</h4>
+        <p className="text-sm">{stockAnalysis.marketInsight}</p>
       </div>
       
-      <div className={expanded ? "" : "line-clamp-3"}>
-        <p className="text-sm">{analysis}</p>
+      {/* Individual stock analyses */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold">Stock Analysis</h4>
+        
+        {stockPicks.map((stock) => {
+          const analysis = stockAnalysis.stockAnalyses[stock.ticker];
+          
+          if (!analysis) return null;
+          
+          return (
+            <div key={stock.ticker} className="border-b pb-3 last:border-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-medium">{stock.ticker}</div>
+                <div className="text-sm text-muted-foreground">
+                  ${stock.close.toFixed(2)} · {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
+                </div>
+              </div>
+              <p className="text-sm">{analysis}</p>
+            </div>
+          );
+        })}
       </div>
       
-      <button
-        className="mt-3 text-sm text-primary flex items-center gap-1 hover:underline"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {expanded ? (
-          <>
-            Show less <ChevronUp className="h-3 w-3" />
-          </>
-        ) : (
-          <>
-            Read more <ChevronDown className="h-3 w-3" />
-          </>
-        )}
-      </button>
-    </div>
-  );
-};
-
-interface MarketInsightCardProps {
-  insight: string;
-}
-
-const MarketInsightCard: React.FC<MarketInsightCardProps> = ({ insight }) => {
-  const [expanded, setExpanded] = useState(false);
-  
-  return (
-    <div className="p-4 rounded-lg border bg-accent/30">
-      <div className="flex items-center gap-2 mb-3">
-        <Badge variant="outline" className="bg-primary/10 text-primary">Market Insight</Badge>
+      <div className="text-xs text-muted-foreground text-right mt-2">
+        Analysis generated: {new Date(stockAnalysis.generatedAt).toLocaleString()}
       </div>
-      
-      <div className={expanded ? "" : "line-clamp-3"}>
-        <p className="text-sm">{insight}</p>
-      </div>
-      
-      <button
-        className="mt-3 text-sm text-primary flex items-center gap-1 hover:underline"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {expanded ? (
-          <>
-            Show less <ChevronUp className="h-3 w-3" />
-          </>
-        ) : (
-          <>
-            Read more <ChevronDown className="h-3 w-3" />
-          </>
-        )}
-      </button>
     </div>
   );
 };

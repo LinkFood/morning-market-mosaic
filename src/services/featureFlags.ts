@@ -1,19 +1,40 @@
+
 /**
  * Feature Flags Service
  * Provides a centralized way to manage feature flags in the application
  */
 
+// Import the FeatureFlags interface from the features service
+import { FeatureFlags } from './features';
+
+// Re-export the FeatureFlags type
+export type { FeatureFlags };
+
 /**
  * Get all feature flags
  * @returns Dictionary of feature flags and their values
  */
-export function getFeatureFlags() {
+export function getFeatureFlags(): FeatureFlags & {
+  // Additional flags not in the core FeatureFlags interface
+  enableDarkMode: boolean;
+  enableAnimations: boolean;
+  showExperimentalCharts: boolean;
+  useTouchGestures: boolean;
+  useBatteryOptimization: boolean;
+  showDebugInfo: boolean;
+  allowCustomWatchlists: boolean;
+  allowThemeCustomization: boolean;
+  useAIStockAnalysis: boolean; // Add this flag for AI stock analysis
+} {
   return {
-    // Market Data Features
+    // Core FeatureFlags from features service
+    useRealTimeData: true,
     showMarketMovers: true,
-    useStockPickerAlgorithm: true,
-    useAIStockAnalysis: true,
+    enableDetailedCharts: true,
+    enableNewsSection: true,
     useFredEconomicData: true,
+    enableDataRefresh: true,
+    useStockPickerAlgorithm: true,
     
     // UI Features
     enableDarkMode: true,
@@ -32,7 +53,10 @@ export function getFeatureFlags() {
     
     // User-specific Features
     allowCustomWatchlists: true,
-    allowThemeCustomization: true
+    allowThemeCustomization: true,
+    
+    // AI Analysis Feature
+    useAIStockAnalysis: true
   };
 }
 
@@ -43,7 +67,7 @@ export function getFeatureFlags() {
  */
 export function isFeatureEnabled(featureName: string): boolean {
   const flags = getFeatureFlags();
-  return flags[featureName] === true;
+  return flags[featureName as keyof ReturnType<typeof getFeatureFlags>] === true;
 }
 
 /**

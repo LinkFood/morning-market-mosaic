@@ -18,14 +18,18 @@ let cachedAnalysis: StockAnalysis | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
 
-// Gemini API Key (this should be moved to a secure environment variable)
-const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"; // Replace with actual key or env variable
-
 /**
  * Call the Google Gemini API to analyze stock picks
  */
 async function callGeminiAPI(prompt: string): Promise<string> {
   try {
+    // Get the Gemini API key from Supabase secrets
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+    
+    if (!GEMINI_API_KEY) {
+      throw new Error("Gemini API key is not configured");
+    }
+    
     // Google Gemini API endpoint
     const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
     

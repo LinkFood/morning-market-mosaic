@@ -13,6 +13,7 @@ export interface FeatureFlags {
   useFredEconomicData: boolean; // Use FRED API for economic data
   enableDataRefresh: boolean;  // Allow automatic data refresh
   useStockPickerAlgorithm: boolean; // Use algorithmic stock picking
+  useAIStockAnalysis: boolean; // Use AI for stock analysis
 }
 
 // Default feature flags (everything enabled)
@@ -23,7 +24,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
   enableNewsSection: true,
   useFredEconomicData: true,
   enableDataRefresh: true,
-  useStockPickerAlgorithm: true
+  useStockPickerAlgorithm: true,
+  useAIStockAnalysis: true
 };
 
 // Current feature flags
@@ -33,8 +35,13 @@ let currentFlags: FeatureFlags = { ...DEFAULT_FLAGS };
  * Update feature flags based on service availability
  * @param polygonApiAvailable Whether Polygon API is available
  * @param fredApiAvailable Whether FRED API is available
+ * @param geminiApiAvailable Whether Gemini API is available
  */
-export function updateFeatureFlags(polygonApiAvailable: boolean, fredApiAvailable: boolean): void {
+export function updateFeatureFlags(
+  polygonApiAvailable: boolean, 
+  fredApiAvailable: boolean,
+  geminiApiAvailable: boolean = false
+): void {
   // Update flags based on API availability
   currentFlags = {
     ...DEFAULT_FLAGS,
@@ -44,7 +51,8 @@ export function updateFeatureFlags(polygonApiAvailable: boolean, fredApiAvailabl
     enableNewsSection: polygonApiAvailable,
     useFredEconomicData: fredApiAvailable,
     enableDataRefresh: polygonApiAvailable || fredApiAvailable,
-    useStockPickerAlgorithm: polygonApiAvailable  // Stock picker depends on Polygon API
+    useStockPickerAlgorithm: polygonApiAvailable,  // Stock picker depends on Polygon API
+    useAIStockAnalysis: geminiApiAvailable && polygonApiAvailable  // AI Analysis depends on both Polygon and Gemini APIs
   };
   
   // Store in localStorage for persistence
