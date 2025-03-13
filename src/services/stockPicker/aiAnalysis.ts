@@ -44,7 +44,13 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
     
     if (!data || !data.stockAnalyses || !data.marketInsight) {
       console.error("Invalid response from function:", data);
-      throw new Error("Invalid response from analysis function");
+      
+      // Check if there's a detailed error in the response
+      if (data?.error && data?.details) {
+        throw new Error(`Analysis error: ${data.error} - ${data.details}`);
+      } else {
+        throw new Error("Invalid response from analysis function");
+      }
     }
     
     // Create the analysis object

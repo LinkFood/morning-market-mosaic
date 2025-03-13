@@ -30,19 +30,26 @@ serve(async (req) => {
   try {
     // Validate API key
     if (!GEMINI_API_KEY) {
-      console.error("Gemini API key is not configured");
+      console.error("GEMINI_API_KEY environment variable is not set");
       return new Response(
-        JSON.stringify({ error: "API key is not configured" }),
+        JSON.stringify({ 
+          error: "API key is not configured",
+          details: "The GEMINI_API_KEY environment variable is not set in Supabase Edge Function secrets"
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Parse request body
-    const { stocks } = await req.json() as RequestBody;
+    const requestBody = await req.json();
+    const { stocks } = requestBody as RequestBody;
     
     if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
       return new Response(
-        JSON.stringify({ error: "Invalid request: stocks array is required" }),
+        JSON.stringify({ 
+          error: "Invalid request", 
+          details: "The stocks array is required and cannot be empty" 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -104,14 +111,62 @@ serve(async (req) => {
       }),
     });
     
+    // Check response status
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`API Error: ${response.status} ${response.statusText}`, errorData);
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      const status = response.status;
+      console.error(`Gemini API Error (${status}):`, errorText);
+      
+      // Return a more detailed error response
+      return new Response(
+        JSON.stringify({ 
+          error: `Gemini API Error: ${response.statusText}`,
+          status: response.status,
+          details: errorText
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
+    // Process successful response
     const data = await response.json();
+    
+    // Validate response structure
+    if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
+      console.error("Invalid response format from Gemini API:", data);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid API response format", 
+          details: "The Gemini API returned an unexpected response format"
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
     const aiResponse = data.candidates[0].content.parts[0].text;
+    
+    // Validate AI response isn't empty
+    if (!aiResponse) {
+      console.error("Empty response from Gemini API");
+      return new Response(
+        JSON.stringify({ 
+          error: "Empty API response", 
+          details: "The Gemini API returned an empty response"
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log("Successfully received response from Gemini API");
 
     // Parse the AI response
     const stockAnalyses = parseAnalysisResponse(aiResponse);
@@ -130,11 +185,15 @@ serve(async (req) => {
     );
     
   } catch (error) {
+    // Log the full error
     console.error("Error in gemini-stock-analysis function:", error);
+    
+    // Return a detailed error response
     return new Response(
       JSON.stringify({ 
         error: "Failed to generate analysis", 
-        details: error.message 
+        details: error.message,
+        stack: error.stack
       }),
       { 
         status: 500, 
@@ -169,7 +228,7 @@ function parseAnalysisResponse(response: string): { [ticker: string]: string } {
  */
 function extractMarketInsight(response: string): string {
   // Look for a section about market conditions or overall analysis
-  const marketSectionMatch = response.match(/(?:Overall Analysis|Market Context|Market Conditions|In Summary|Market Insight):\s*([\s\S]+?)(?:\n\n|\n[A-Z]|$)/i);
+  const marketSectionMatch = response.match(/(?:Market Insight|Overall Analysis|Market Context|Market Conditions|In Summary):\s*([\s\S]+?)(?:\n\n|\n[A-Z]|$)/i);
   
   if (marketSectionMatch && marketSectionMatch[1]) {
     return marketSectionMatch[1].trim();
