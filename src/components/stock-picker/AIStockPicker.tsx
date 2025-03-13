@@ -22,8 +22,29 @@ const AIStockPicker = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  // Check for AI analysis feature flag - fixed with correct import
+  // Check for AI analysis feature flag
   const isAIEnabled = isFeatureEnabled('useAIStockAnalysis');
+  
+  // Function to get well-known liquid stocks
+  const getWellKnownStocks = () => {
+    // Focus on large cap, high-volume, well-known stocks
+    return [
+      // Big Tech
+      "AAPL", "MSFT", "AMZN", "GOOGL", "META", 
+      // Semiconductors
+      "NVDA", "AMD", "INTC", "TSM", "MU",
+      // Finance
+      "JPM", "BAC", "GS", "V", "MA", 
+      // Healthcare
+      "JNJ", "PFE", "MRK", "UNH", "ABBV",
+      // Consumer
+      "WMT", "PG", "KO", "PEP", "MCD",
+      // Energy
+      "XOM", "CVX", "COP", "EOG", "SLB",
+      // Other Tech
+      "CRM", "ADBE", "ORCL", "IBM", "CSCO"
+    ];
+  };
   
   const loadData = async () => {
     setRefreshing(true);
@@ -32,16 +53,8 @@ const AIStockPicker = () => {
     try {
       console.log("Starting AI Stock Picker data load");
       
-      // Get a broader mix of active stocks to analyze
-      const stockSymbols = [
-        "AAPL", "MSFT", "AMZN", "GOOGL", "META", 
-        "NVDA", "TSLA", "AMD", "NFLX", "DIS",
-        "JPM", "BAC", "WMT", "PG", "JNJ", 
-        "XOM", "CVX", "PFE", "KO", "PEP",
-        "INTC", "VZ", "T", "MCD", "CSCO",
-        "NKE", "IBM", "GS", "V", "PYPL",
-        "ADBE", "CRM", "QCOM", "TXN", "CMCSA"
-      ];
+      // Get stock symbols with focus on liquid, well-known stocks
+      const stockSymbols = getWellKnownStocks();
       
       // Get stock data for the symbols
       console.log("Fetching stock data for analysis...");
@@ -68,15 +81,20 @@ const AIStockPicker = () => {
       if (isFeatureEnabled('useAIStockAnalysis') && scoredStocks.length > 0) {
         try {
           console.log("Requesting AI analysis for selected stocks...");
-          const analysis = await apiService.getStockAnalysis(scoredStocks);
-          console.log("AI analysis received:", analysis ? "success" : "empty");
-          if (analysis && analysis.stockAnalyses && Object.keys(analysis.stockAnalyses).length > 0) {
-            console.log("AI analysis contains data for", Object.keys(analysis.stockAnalyses).length, "stocks");
-            setAiAnalysis(analysis);
-          } else {
-            console.warn("AI analysis response was empty or malformed");
-            toast.warning('AI analysis returned empty results');
-          }
+          // Make async call
+          apiService.getStockAnalysis(scoredStocks).then(analysis => {
+            console.log("AI analysis received:", analysis ? "success" : "empty");
+            if (analysis && analysis.stockAnalyses && Object.keys(analysis.stockAnalyses).length > 0) {
+              console.log("AI analysis contains data for", Object.keys(analysis.stockAnalyses).length, "stocks");
+              setAiAnalysis(analysis);
+            } else {
+              console.warn("AI analysis response was empty or malformed");
+              toast.warning('AI analysis returned empty results');
+            }
+          }).catch(err => {
+            console.error('Error processing AI analysis:', err);
+            toast.error('Could not load AI analysis. Algorithm results still available.');
+          });
         } catch (analysisError) {
           console.error('Error getting AI analysis:', analysisError);
           toast.error('Could not load AI analysis. Algorithm results still available.');
@@ -93,6 +111,29 @@ const AIStockPicker = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+  
+  // Manual trigger for AI analysis
+  const triggerAIAnalysis = async () => {
+    if (!topStocks || topStocks.length === 0) {
+      toast.error("No stocks available for analysis");
+      return;
+    }
+    
+    toast.info("Requesting AI analysis...");
+    
+    try {
+      const analysis = await apiService.getStockAnalysis(topStocks);
+      if (analysis && analysis.stockAnalyses && Object.keys(analysis.stockAnalyses).length > 0) {
+        setAiAnalysis(analysis);
+        toast.success("AI analysis updated");
+      } else {
+        toast.error("Received empty analysis from AI");
+      }
+    } catch (error) {
+      console.error("Error triggering AI analysis:", error);
+      toast.error("Failed to get AI analysis");
     }
   };
   
@@ -147,12 +188,22 @@ const AIStockPicker = () => {
               </span>
             )}
             <button 
-              className="p-1 hover:bg-secondary rounded-full"
+              className="p-1 hover:bg-secondary rounded-full mr-2"
               onClick={loadData}
               disabled={refreshing}
+              title="Refresh all data"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            {isAIEnabled && (
+              <button
+                className="p-1 px-2 text-xs border rounded hover:bg-secondary"
+                onClick={triggerAIAnalysis}
+                title="Refresh AI analysis only"
+              >
+                Analyze
+              </button>
+            )}
           </div>
         </CardTitle>
       </CardHeader>
@@ -192,7 +243,7 @@ const AIStockPicker = () => {
                   {aiAnalysis && (
                     <p>Analysis received for: {Object.keys(aiAnalysis.stockAnalyses || {}).join(', ') || 'none'}</p>
                   )}
-                  <p>Check the console logs for more details.</p>
+                  <p>Try clicking the "Analyze" button to request analysis again.</p>
                 </div>
               )}
             </>
