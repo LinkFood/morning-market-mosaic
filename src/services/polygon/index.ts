@@ -5,7 +5,7 @@
  */
 import client from './client';
 import marketData from './marketData';
-import historicalData from './historicalData';
+import historical from './historical';
 import referenceData from './reference';
 import { clearAllCache, getCacheTimestamp } from './cache';
 
@@ -23,7 +23,7 @@ const {
   getAggregates,
   getIndexData,
   getBatchIndexData
-} = historicalData;
+} = historical;
 
 // Integrate reference data functions
 const {
