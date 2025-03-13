@@ -9,20 +9,26 @@ import { useDashboard } from '../dashboard/DashboardContext';
 import { ScoredStock } from '@/services/stockPicker/algorithm';
 import { StockAnalysis } from '@/services/stockPicker/aiAnalysis';
 
-const StockPicks: React.FC = () => {
-  const { 
-    stockPicks, 
-    stockAnalysis, 
-    isLoadingStockPicks, 
-    isLoadingAnalysis, 
-    featureFlags 
-  } = useDashboard();
-  
+// Define prop interface for StockPicks
+interface StockPicksProps {
+  stocks: ScoredStock[];
+  analysis?: StockAnalysis | null;
+  isLoading: boolean;
+  isLoadingAnalysis?: boolean;
+}
+
+const StockPicks: React.FC<StockPicksProps> = ({ 
+  stocks, 
+  analysis, 
+  isLoading, 
+  isLoadingAnalysis = false 
+}) => {
+  const { featureFlags } = useDashboard();
   const [activeTab, setActiveTab] = useState<string>('algorithm');
   
   const isAIEnabled = isFeatureEnabled('useAIStockAnalysis');
   
-  if (isLoadingStockPicks && !stockPicks.length) {
+  if (isLoading && !stocks.length) {
     return (
       <Card>
         <CardHeader>
@@ -48,7 +54,7 @@ const StockPicks: React.FC = () => {
   }
   
   // Handle no stock picks
-  if (!isLoadingStockPicks && stockPicks.length === 0) {
+  if (!isLoading && stocks.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -87,19 +93,19 @@ const StockPicks: React.FC = () => {
             </TabsList>
             
             <TabsContent value="algorithm" className="space-y-4">
-              <AlgorithmTab stockPicks={stockPicks} />
+              <AlgorithmTab stockPicks={stocks} />
             </TabsContent>
             
             <TabsContent value="ai" className="space-y-4">
               <AIAnalysisTab 
-                stockAnalysis={stockAnalysis} 
+                stockAnalysis={analysis} 
                 isLoading={isLoadingAnalysis} 
-                stockPicks={stockPicks}
+                stockPicks={stocks}
               />
             </TabsContent>
           </Tabs>
         ) : (
-          <AlgorithmTab stockPicks={stockPicks} />
+          <AlgorithmTab stockPicks={stocks} />
         )}
       </CardContent>
     </Card>
@@ -125,8 +131,8 @@ const AlgorithmTab: React.FC<{ stockPicks: ScoredStock[] }> = ({ stockPicks }) =
             <div>
               <div className="flex items-center">
                 <span className="font-bold">Score: </span>
-                <Badge variant={stock.scores.composite > 70 ? "success" : 
-                                stock.scores.composite > 50 ? "default" : 
+                <Badge variant={stock.scores.composite > 70 ? "default" : 
+                                stock.scores.composite > 50 ? "secondary" : 
                                 "destructive"}
                     className="ml-2">
                   {stock.scores.composite}/100

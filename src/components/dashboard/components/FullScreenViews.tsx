@@ -22,9 +22,11 @@ const FullScreenViews: React.FC = () => {
     indices,
     marketMovers,
     stockPicks,
+    stockAnalysis,
     marketStatusData, 
     isLoadingMovers,
     isLoadingStockPicks,
+    isLoadingAnalysis,
     isLoadingEcon, 
     moversError,
     expandedComponent,
@@ -75,7 +77,12 @@ const FullScreenViews: React.FC = () => {
           onClose={() => setExpandedComponent(null)}
           title="Algorithmic Stock Picks"
         >
-          <StockPicks stocks={stockPicks} isLoading={isLoadingStockPicks} />
+          <StockPicks 
+            stocks={stockPicks} 
+            analysis={stockAnalysis}
+            isLoading={isLoadingStockPicks}
+            isLoadingAnalysis={isLoadingAnalysis}
+          />
         </FullScreenComponent>
       )}
       

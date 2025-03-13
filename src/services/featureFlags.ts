@@ -41,7 +41,7 @@ export function getFeatureFlags(): FeatureFlags & {
     enableAnimations: true,
     
     // Experimental Features
-    useRealtimeUpdates: false,
+    // Fixed property name from 'useRealtimeUpdates' to 'useRealTimeData'
     showExperimentalCharts: false,
     
     // Mobile Features
