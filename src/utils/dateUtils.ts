@@ -1,4 +1,3 @@
-
 import { format, isValid, isAfter, isFuture, parseISO } from "date-fns";
 
 /**
@@ -214,3 +213,21 @@ export function determineFrequency(dates: string[]): 'daily' | 'monthly' | 'quar
     return 'monthly';
   }
 }
+
+/**
+ * Formats a date with time
+ * @param timestamp The timestamp to format
+ * @param timeFrame Optional timeframe to adjust formatting
+ * @returns Formatted date string with time
+ */
+export const formatTimeWithDate = (timestamp: number, timeFrame?: string): string => {
+  const date = new Date(timestamp);
+  
+  if (timeFrame === "1D" || timeFrame === "1W") {
+    // For 1 day and 1 week views, show time with date
+    return date.toLocaleString();
+  } else {
+    // For longer timeframes, just show the date
+    return date.toLocaleDateString();
+  }
+};

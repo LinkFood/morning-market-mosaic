@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   ExternalLink, 
@@ -42,7 +41,6 @@ import VolumeIndicator from './chart/VolumeIndicator';
 import { TickerDetails, StockData, CandleData, MarketStatus } from '@/types/marketTypes';
 import { stocks, marketStatus } from '@/services/market';
 
-// Context to manage the stock detail drawer state
 interface StockDetailContextType {
   openStockDetail: (ticker: string) => void;
   isOpen: boolean;
@@ -80,14 +78,12 @@ export const StockDetailProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 };
 
-// Types for stock data
 interface StockDetailProps {
   ticker: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-// The main StockDetail component
 const StockDetailDrawer: React.FC<StockDetailProps> = ({ 
   ticker, 
   open = false, 
@@ -104,7 +100,6 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
   const [technicalSectionOpen, setTechnicalSectionOpen] = useState(false);
   const [companySectionOpen, setCompanySectionOpen] = useState(true);
 
-  // Load stock data when ticker changes
   useEffect(() => {
     if (!ticker) return;
 
@@ -113,25 +108,20 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
       setError(null);
       
       try {
-        // Get market status
         const marketStatusData = await marketStatus.getMarketStatus();
         setMarket(marketStatusData);
         
-        // Get current stock data
         const majorStocks = await stocks.getMajorStocks([ticker]);
         if (majorStocks && majorStocks.length > 0) {
           setStockData(majorStocks[0]);
         }
         
-        // Get 52-week high/low
         const highLowData = await stocks.get52WeekHighLow(ticker);
         setWeekHighLow(highLowData);
         
-        // Get company details
         const details = await stocks.getStockDetails(ticker);
         setStockDetails(details);
         
-        // Get candle data based on timeframe
         await loadCandleData(ticker, timeFrame);
       } catch (err) {
         console.error('Error loading stock data:', err);
@@ -145,60 +135,54 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
     loadStockData();
   }, [ticker]);
   
-  // Load candle data when timeframe changes
   useEffect(() => {
     if (ticker) {
       loadCandleData(ticker, timeFrame);
     }
   }, [timeFrame, ticker]);
   
-  // Function to load candle data based on timeframe
   const loadCandleData = async (ticker: string, timeFrame: TimeFrame) => {
     try {
-      // Calculate date range based on timeframe
       const endDate = new Date();
       let startDate = new Date();
       
       switch (timeFrame) {
-        case '1D':
+        case "1D":
           startDate.setDate(endDate.getDate() - 1);
           break;
-        case '1W':
+        case "1W":
           startDate.setDate(endDate.getDate() - 7);
           break;
-        case '1M':
+        case "1M":
           startDate.setMonth(endDate.getMonth() - 1);
           break;
-        case '3M':
+        case "3M":
           startDate.setMonth(endDate.getMonth() - 3);
           break;
-        case '6M':
+        case "6M":
           startDate.setMonth(endDate.getMonth() - 6);
           break;
-        case '1Y':
+        case "1Y":
           startDate.setFullYear(endDate.getFullYear() - 1);
           break;
-        case '5Y':
+        case "5Y":
           startDate.setFullYear(endDate.getFullYear() - 5);
           break;
-        case 'MAX':
-          startDate.setFullYear(endDate.getFullYear() - 10); // Use 10 years as MAX
+        case "MAX":
+          startDate.setFullYear(endDate.getFullYear() - 10);
           break;
       }
       
-      // Format dates for API
       const fromDate = startDate.toISOString().split('T')[0];
       const toDate = endDate.toISOString().split('T')[0];
       
-      // Determine timespan based on timeFrame
       let timespan = 'day';
-      if (timeFrame === '1D') {
+      if (timeFrame === "1D") {
         timespan = 'minute';
-      } else if (timeFrame === '1W') {
+      } else if (timeFrame === "1W") {
         timespan = 'hour';
       }
       
-      // Get candle data
       const candles = await stocks.getStockCandles(ticker, timespan, fromDate, toDate);
       setCandleData(candles);
     } catch (err) {
@@ -207,20 +191,17 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
     }
   };
   
-  // Handle refresh data
   const handleRefresh = () => {
     if (ticker) {
       setIsLoading(true);
       toast.info('Refreshing stock data...');
       
-      // Reload all data
       loadCandleData(ticker, timeFrame)
         .catch(err => console.error('Error refreshing candle data:', err))
         .finally(() => setIsLoading(false));
     }
   };
   
-  // Handle sheet close
   const handleSheetClose = () => {
     if (onOpenChange) {
       onOpenChange(false);
@@ -307,7 +288,6 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
             </div>
           </div>
           
-          {/* 52-week range */}
           {weekHighLow && (
             <div className="mt-4">
               <div className="text-xs text-muted-foreground mb-1">
@@ -327,7 +307,6 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
         </SheetHeader>
         
         <div className="pb-20">
-          {/* Advanced Chart */}
           <div className="mb-6">
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2">Price Chart</h3>
@@ -348,7 +327,6 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
               </div>
             </div>
             
-            {/* Trading Information */}
             {stockData && (
               <Card>
                 <CardHeader className="py-3">
@@ -377,7 +355,7 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
                         <div className="text-xs text-muted-foreground">Volume</div>
                         <VolumeIndicator 
                           volume={stockData.volume} 
-                          avgVolume={stockData.volume * 0.8} // Estimated avg volume
+                          avgVolume={stockData.volume * 0.8}
                         />
                       </div>
                     )}
@@ -387,7 +365,6 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
             )}
           </div>
           
-          {/* Company Information */}
           <Collapsible
             open={companySectionOpen}
             onOpenChange={setCompanySectionOpen}
@@ -480,7 +457,6 @@ const StockDetailDrawer: React.FC<StockDetailProps> = ({
             </CollapsibleContent>
           </Collapsible>
           
-          {/* Technical Indicators Section */}
           <Collapsible
             open={technicalSectionOpen}
             onOpenChange={setTechnicalSectionOpen}
