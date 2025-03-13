@@ -41,7 +41,7 @@ const MarketMovers: React.FC<MarketMoversProps> = ({
 
     try {
       const sparklinePromises = uniqueTickers.map(ticker => 
-        apiService.getStockSparkline(ticker, "1D")
+        apiService.getStockSparkline(ticker)
       );
       
       const results = await Promise.allSettled(sparklinePromises);
