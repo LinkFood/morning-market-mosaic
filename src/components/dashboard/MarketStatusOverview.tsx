@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { MarketIndex, MarketStatus } from "@/types/marketTypes";
+import { useDashboard } from "./DashboardContext";
 
 // Market status indicator component
 export const MarketStatusIndicator = ({ status }: { status: MarketStatus | null }) => {
@@ -179,5 +180,4 @@ const MarketStatusOverview = () => {
   );
 };
 
-import { useDashboard } from "./DashboardContext";
 export default MarketStatusOverview;
