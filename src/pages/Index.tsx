@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -285,20 +284,38 @@ const Dashboard = () => {
   
   // Effect to load settings from localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem("market_dashboard_settings");
-    if (savedSettings) {
-      try {
-        setSettings(JSON.parse(savedSettings));
-      } catch (error) {
-        console.error("Failed to parse saved settings:", error);
+    try {
+      const savedSettings = localStorage.getItem("market_dashboard_settings");
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        setSettings({
+          ...defaultSettings,
+          ...parsed,
+          refreshInterval: {
+            ...defaultSettings.refreshInterval,
+            ...(parsed.refreshInterval || {})
+          }
+        });
       }
+    } catch (error) {
+      console.error("Failed to parse saved settings:", error);
+      setSettings(defaultSettings);
     }
   }, []);
   
   // Function to update settings
   const updateSettings = (newSettings: UserSettings) => {
-    setSettings(newSettings);
-    localStorage.setItem("market_dashboard_settings", JSON.stringify(newSettings));
+    const updatedSettings = {
+      ...defaultSettings,
+      ...newSettings,
+      refreshInterval: {
+        ...defaultSettings.refreshInterval,
+        ...(newSettings.refreshInterval || {})
+      }
+    };
+    
+    setSettings(updatedSettings);
+    localStorage.setItem("market_dashboard_settings", JSON.stringify(updatedSettings));
     toast.success("Settings updated");
     loadData(); // Reload data with new settings
   };
@@ -336,11 +353,9 @@ const Dashboard = () => {
     setMoversError(null);
     
     try {
-      // Load market status to check if market is open
       const status = await apiService.getMarketStatus();
       setMarketStatus(status);
       
-      // Load market movers
       const moversData = await apiService.getMarketMovers(5);
       setMarketMovers(moversData);
     } catch (error) {
@@ -357,36 +372,28 @@ const Dashboard = () => {
     setRefreshing(true);
     
     try {
-      // Load market status
       const status = await marketStatus.getMarketStatus();
       setMarketStatus(status);
       
-      // Load market indices
       const indicesData = await apiService.getMarketIndices();
       setIndices(indicesData);
       
-      // Use the timestamp from the indices cache as the last updated time
       const timestamp = apiService.getCacheTimestamp("market_indices");
       if (timestamp) {
         setLastUpdated(timestamp);
       }
       
-      // Load sectors
       const sectorsData = await apiService.getSectorPerformance();
       setSectors(sectorsData);
       
-      // Load stocks based on user's watchlist
       const stocksData = await apiService.getMajorStocks(settings.watchlist);
       setStocks(stocksData);
       
-      // Load market events
       const eventsData = await apiService.getMarketEvents();
       setEvents(eventsData);
       
-      // Load market movers in parallel
       loadMarketMovers();
       
-      // Load economic indicators separately
       loadEconomicIndicators();
       
     } catch (error) {
@@ -401,10 +408,14 @@ const Dashboard = () => {
   
   // Schedule next data refresh based on market hours
   const scheduleNextRefresh = (status: MarketStatus | null) => {
-    // Clear any existing timer
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = null;
+    }
+    
+    if (!settings || !settings.refreshInterval) {
+      console.error("Refresh interval settings not available, using default");
+      return;
     }
     
     let interval = settings.refreshInterval.closed; // Default to closed market interval
@@ -416,14 +427,12 @@ const Dashboard = () => {
         const now = new Date();
         const hour = now.getHours();
         
-        // Check if we're in pre-market or after-hours
         if ((hour >= 4 && hour < 9.5) || (hour >= 16 && hour < 20)) {
           interval = settings.refreshInterval.afterHours; // Pre-market or after-hours
         }
       }
     }
     
-    // Schedule next refresh
     refreshTimerRef.current = setTimeout(() => {
       loadData();
     }, interval * 1000);
@@ -441,7 +450,7 @@ const Dashboard = () => {
   // Load data on component mount
   useEffect(() => {
     loadData();
-  }, [settings.watchlist.join(",")]); // Reload when watchlist changes
+  }, [settings.watchlist.join(",")]);
   
   // Update refresh timer when market status changes
   useEffect(() => {
@@ -450,6 +459,9 @@ const Dashboard = () => {
   
   // Determine which components to render based on settings
   const isComponentVisible = (componentId: string) => {
+    if (!settings || !settings.visibleComponents) {
+      return false;
+    }
     return settings.visibleComponents.includes(componentId);
   };
   

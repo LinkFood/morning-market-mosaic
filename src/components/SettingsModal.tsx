@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,13 +17,30 @@ interface SettingsModalProps {
   updateSettings: (settings: UserSettings) => void;
 }
 
+const defaultRefreshSettings = {
+  marketHours: 60,
+  afterHours: 300,
+  closed: 900
+};
+
 const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsModalProps) => {
-  const [watchlistInput, setWatchlistInput] = useState(settings?.watchlist?.join(", ") || "");
-  const [refreshSettings, setRefreshSettings] = useState({
-    marketHours: settings.refreshInterval?.marketHours || 60,
-    afterHours: settings.refreshInterval?.afterHours || 300,
-    closed: settings.refreshInterval?.closed || 900
-  });
+  const [watchlistInput, setWatchlistInput] = useState("");
+  const [refreshSettings, setRefreshSettings] = useState(defaultRefreshSettings);
+  
+  // Initialize state when settings change or modal opens
+  useEffect(() => {
+    if (isOpen && settings) {
+      // Set watchlist
+      setWatchlistInput(settings.watchlist?.join(", ") || "");
+      
+      // Set refresh intervals
+      setRefreshSettings({
+        marketHours: settings.refreshInterval?.marketHours || defaultRefreshSettings.marketHours,
+        afterHours: settings.refreshInterval?.afterHours || defaultRefreshSettings.afterHours,
+        closed: settings.refreshInterval?.closed || defaultRefreshSettings.closed
+      });
+    }
+  }, [isOpen, settings]);
   
   // Handle changes to refresh interval settings
   const handleRefreshIntervalChange = (
@@ -43,15 +60,20 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
       .map((ticker) => ticker.trim().toUpperCase())
       .filter((ticker) => ticker.length > 0);
     
+    // If watchlist is empty, use default
+    const finalWatchlist = watchlist.length > 0 ? watchlist : ["AAPL", "MSFT", "GOOGL", "AMZN", "META"];
+    
+    // Ensure visible components is not empty
+    const visibleComponents = settings.visibleComponents && settings.visibleComponents.length > 0 
+      ? settings.visibleComponents 
+      : ["market-overview", "major-stocks", "economic-data"];
+    
     // Update settings
     updateSettings({
       ...settings,
-      watchlist,
-      refreshInterval: {
-        marketHours: refreshSettings.marketHours,
-        afterHours: refreshSettings.afterHours,
-        closed: refreshSettings.closed
-      }
+      watchlist: finalWatchlist,
+      visibleComponents,
+      refreshInterval: refreshSettings
     });
     
     onClose();

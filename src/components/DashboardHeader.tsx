@@ -48,7 +48,9 @@ const DashboardHeader = ({
   
   // Toggle component visibility in settings
   const toggleComponentVisibility = (componentId: string) => {
+    // Ensure we have a valid array to work with
     const visibleComponents = userSettings.visibleComponents || [];
+    
     const updatedVisibleComponents = visibleComponents.includes(componentId)
       ? visibleComponents.filter(id => id !== componentId)
       : [...visibleComponents, componentId];

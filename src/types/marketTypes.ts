@@ -61,7 +61,7 @@ export interface UserSettings {
   watchlist: string[];
   visibleComponents: string[];
   componentOrder?: string[];
-  refreshInterval?: {
+  refreshInterval: {
     marketHours: number; // seconds
     afterHours: number; // seconds
     closed: number; // seconds
