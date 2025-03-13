@@ -1,161 +1,89 @@
 
 /**
- * Polygon.io API Cache Management
- * Implements intelligent caching strategies
+ * Polygon.io API Cache Service
+ * Handles caching API responses to reduce API usage and speed up the application
  */
 
-// Default TTL values based on data type (in milliseconds)
-export const CACHE_TTL = {
-  // Long-lived data that rarely changes
-  TICKER_DETAILS: 24 * 60 * 60 * 1000, // 24 hours
-  MARKET_HOLIDAYS: 24 * 60 * 60 * 1000, // 24 hours
-  
-  // Medium-lived data that updates periodically
-  INDEX_DATA: 60 * 60 * 1000, // 1 hour
-  SECTOR_PERFORMANCE: 60 * 60 * 1000, // 1 hour
-  
-  // Short-lived data that updates frequently
-  STOCK_SNAPSHOT: 5 * 60 * 1000, // 5 minutes
-  MARKET_STATUS: 5 * 60 * 1000, // 5 minutes
-  
-  // Very short-lived data
-  MARKET_MOVERS: 60 * 1000, // 1 minute
-};
-
-// Interface for cache items
-interface CacheItem<T> {
-  data: T;
+// Simple in-memory cache
+interface CacheEntry {
+  data: any;
   timestamp: number;
+  expiresAt: number;
+}
+
+// Cache storage
+const cache: Record<string, CacheEntry> = {};
+
+// Cache timestamp for last cache update
+let lastCacheUpdate = Date.now();
+
+/**
+ * Add data to cache with expiration
+ */
+export function addToCache(key: string, data: any, ttlSeconds: number = 300) {
+  const now = Date.now();
+  
+  cache[key] = {
+    data,
+    timestamp: now,
+    expiresAt: now + (ttlSeconds * 1000)
+  };
+  
+  // Update the cache timestamp
+  lastCacheUpdate = now;
+  
+  return data;
 }
 
 /**
- * Get cached data if available and not expired
- * @param key Cache key
- * @param ttl Time-to-live in milliseconds
- * @returns Cached data or null if not found or expired
+ * Get data from cache if it exists and is not expired
  */
-export function getCachedData<T>(key: string, ttl: number): T | null {
-  try {
-    const cacheKey = `polygon_${key}`;
-    const cachedItem = localStorage.getItem(cacheKey);
-    
-    if (cachedItem) {
-      const parsedItem: CacheItem<T> = JSON.parse(cachedItem);
-      const now = Date.now();
-      
-      // Check if cache is still valid
-      if (now - parsedItem.timestamp < ttl) {
-        console.log(`Using cached data for ${key}`);
-        return parsedItem.data;
-      } else {
-        console.log(`Cache expired for ${key}`);
-        return null;
-      }
-    }
-    
+export function getFromCache(key: string): any | null {
+  const entry = cache[key];
+  
+  if (!entry) {
     return null;
-  } catch (error) {
-    console.error(`Error retrieving cache for ${key}:`, error);
+  }
+  
+  const now = Date.now();
+  
+  // Check if entry is expired
+  if (entry.expiresAt < now) {
+    // Remove expired entry
+    delete cache[key];
     return null;
   }
+  
+  return entry.data;
 }
 
 /**
- * Cache data with the specified key
- * @param key Cache key
- * @param data Data to cache
+ * Remove data from cache by key
  */
-export function cacheData<T>(key: string, data: T): void {
-  try {
-    const cacheKey = `polygon_${key}`;
-    const cacheItem: CacheItem<T> = {
-      data,
-      timestamp: Date.now(),
-    };
-    
-    localStorage.setItem(cacheKey, JSON.stringify(cacheItem));
-  } catch (error) {
-    console.error(`Error caching data for ${key}:`, error);
+export function removeFromCache(key: string): boolean {
+  if (cache[key]) {
+    delete cache[key];
+    return true;
   }
+  
+  return false;
 }
 
 /**
- * Check if a cache item exists and is not expired
- * @param key Cache key
- * @param ttl Time-to-live in milliseconds
- * @returns Whether cache is valid
- */
-export function isCacheValid(key: string, ttl: number): boolean {
-  try {
-    const cacheKey = `polygon_${key}`;
-    const cachedItem = localStorage.getItem(cacheKey);
-    
-    if (cachedItem) {
-      const parsedItem: CacheItem<any> = JSON.parse(cachedItem);
-      const now = Date.now();
-      
-      return now - parsedItem.timestamp < ttl;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error(`Error checking cache for ${key}:`, error);
-    return false;
-  }
-}
-
-/**
- * Invalidate a specific cache item
- * @param key Cache key to invalidate
- */
-export function invalidateCache(key: string): void {
-  try {
-    const cacheKey = `polygon_${key}`;
-    localStorage.removeItem(cacheKey);
-  } catch (error) {
-    console.error(`Error invalidating cache for ${key}:`, error);
-  }
-}
-
-/**
- * Clear all Polygon.io API cache data
+ * Clear all cache entries
  */
 export function clearAllCache(): void {
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('polygon_')) {
-      localStorage.removeItem(key);
-    }
+  Object.keys(cache).forEach(key => {
+    delete cache[key];
   });
+  
+  // Update the cache timestamp
+  lastCacheUpdate = Date.now();
 }
 
 /**
- * Get cache timestamp for a specific key
- * @param key Cache key
- * @returns Date object of the cache timestamp or null if not found
+ * Get cache timestamp
  */
-export function getCacheTimestamp(key: string): Date | null {
-  try {
-    const cacheKey = `polygon_${key}`;
-    const cachedItem = localStorage.getItem(cacheKey);
-    
-    if (cachedItem) {
-      const parsedItem: CacheItem<any> = JSON.parse(cachedItem);
-      return new Date(parsedItem.timestamp);
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`Error getting cache timestamp for ${key}:`, error);
-    return null;
-  }
+export function getCacheTimestamp(): number {
+  return lastCacheUpdate;
 }
-
-export default {
-  getCachedData,
-  cacheData,
-  isCacheValid,
-  invalidateCache,
-  clearAllCache,
-  getCacheTimestamp,
-  CACHE_TTL
-};
