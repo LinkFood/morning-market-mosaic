@@ -22,6 +22,9 @@ interface RequestBody {
 }
 
 serve(async (req) => {
+  // Add detailed logging for debugging
+  console.log("gemini-stock-analysis function called");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -40,23 +43,26 @@ serve(async (req) => {
       );
     }
 
-    // Test if the API key is a valid format
-    if (GEMINI_API_KEY.trim() === "") {
-      console.error("GEMINI_API_KEY appears to be invalid (empty string)");
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("Request body parsed successfully");
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
       return new Response(
         JSON.stringify({ 
-          error: "API key appears to be invalid",
-          details: "The GEMINI_API_KEY environment variable is set but is empty"
+          error: "Invalid request format", 
+          details: "Could not parse JSON request body" 
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Parse request body
-    const requestBody = await req.json();
+    
     const { stocks } = requestBody as RequestBody;
     
     if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
+      console.error("Invalid request: stocks array is missing or empty");
       return new Response(
         JSON.stringify({ 
           error: "Invalid request", 
@@ -66,6 +72,8 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Analyzing ${stocks.length} stocks`);
+    
     // Format the stock data for the AI
     const stocksContext = stocks.map(s => {
       const signals = s.signals.join(', ');
@@ -98,71 +106,47 @@ serve(async (req) => {
 
     console.log("Calling Gemini API with prompt...");
     
-    // Updated Gemini API endpoint for Gemini 1.5 Pro
-    const endpoint = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent";
+    // Google Gemini API endpoint
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
+    
+    console.log(`Using Gemini API endpoint: ${endpoint}`);
+    console.log(`API key exists: ${!!GEMINI_API_KEY}`);
     
     try {
-      console.log("Making API request to Google Gemini endpoint");
-      
-      // Add more detailed logging for request troubleshooting
-      const requestData = {
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        }
-      };
-      
-      const requestURL = `${endpoint}?key=${GEMINI_API_KEY}`;
-      console.log(`Request URL (without key): ${endpoint}?key=[REDACTED]`);
-      console.log("API version: v1");
-      console.log("Model: gemini-1.5-pro");
-      
-      const response = await fetch(requestURL, {
+      const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+          }
+        }),
       });
       
       // Check response status
-      console.log(`Gemini API response status: ${response.status}`);
-      
       if (!response.ok) {
         const errorText = await response.text();
         const status = response.status;
         console.error(`Gemini API Error (${status}):`, errorText);
-        
-        // Enhanced error handling based on status code
-        let errorDetails = errorText;
-        
-        if (status === 401) {
-          errorDetails = "Authentication failed. The Gemini API key appears to be invalid.";
-        } else if (status === 403) {
-          errorDetails = "Permission denied. The API key may not have access to the Gemini API.";
-        } else if (status === 404) {
-          errorDetails = "Model not found. The API endpoint or model name may be incorrect. Check API version and model name.";
-        } else if (status === 429) {
-          errorDetails = "Rate limit exceeded. The API quota may have been reached.";
-        } else if (status >= 500) {
-          errorDetails = "Gemini API server error. The service may be experiencing issues.";
-        }
         
         // Return a more detailed error response
         return new Response(
           JSON.stringify({ 
             error: `Gemini API Error: ${response.statusText}`,
             status: response.status,
-            details: errorDetails
+            details: errorText
           }),
           { 
             status: 500, 
@@ -171,24 +155,19 @@ serve(async (req) => {
         );
       }
       
+      console.log("Received successful response from Gemini API");
+      
       // Process successful response
       const data = await response.json();
-      console.log("Successfully received response from Gemini API");
-      
-      // Enhanced logging for debugging
-      if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
-        console.log("Response contains expected structure");
-      } else {
-        console.error("Unexpected response structure:", JSON.stringify(data).substring(0, 500) + "...");
-      }
       
       // Validate response structure
       if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-        console.error("Invalid response format from Gemini API:", JSON.stringify(data).substring(0, 500) + "...");
+        console.error("Invalid response format from Gemini API:", data);
         return new Response(
           JSON.stringify({ 
             error: "Invalid API response format", 
-            details: "The Gemini API returned an unexpected response format"
+            details: "The Gemini API returned an unexpected response format",
+            data: data
           }),
           { 
             status: 500, 
@@ -214,9 +193,15 @@ serve(async (req) => {
         );
       }
 
+      console.log("Successfully received response from Gemini API");
+      console.log("AI Response excerpt:", aiResponse.substring(0, 100) + "...");
+
       // Parse the AI response
-      const stockAnalyses = parseAnalysisResponse(aiResponse);
+      const stockAnalyses = parseAnalysisResponse(aiResponse, stocks.map(s => s.ticker));
       const marketInsight = extractMarketInsight(aiResponse);
+      
+      console.log("Extracted analyses for tickers:", Object.keys(stockAnalyses));
+      console.log("Market insight excerpt:", marketInsight.substring(0, 100) + "...");
       
       // Create the analysis object
       const analysis = {
@@ -225,18 +210,16 @@ serve(async (req) => {
         generatedAt: new Date().toISOString()
       };
       
-      console.log("Successfully processed Gemini response");
-      
       return new Response(
         JSON.stringify(analysis),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } catch (fetchError) {
-      console.error("Error during Gemini API fetch:", fetchError);
+      console.error("Error making API request:", fetchError);
       return new Response(
         JSON.stringify({ 
-          error: "API communication error", 
-          details: fetchError instanceof Error ? fetchError.message : "Unknown fetch error"
+          error: "API request failed", 
+          details: fetchError.message
         }),
         { 
           status: 500, 
@@ -244,6 +227,7 @@ serve(async (req) => {
         }
       );
     }
+    
   } catch (error) {
     // Log the full error
     console.error("Error in gemini-stock-analysis function:", error);
@@ -252,8 +236,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: "Failed to generate analysis", 
-        details: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined
+        details: error.message,
+        stack: error.stack
       }),
       { 
         status: 500, 
@@ -265,18 +249,63 @@ serve(async (req) => {
 
 /**
  * Parse the AI response to extract individual stock analyses
+ * Improved to make sure we catch all tickers
  */
-function parseAnalysisResponse(response: string): { [ticker: string]: string } {
+function parseAnalysisResponse(response: string, expectedTickers: string[]): { [ticker: string]: string } {
   const stockAnalyses: { [ticker: string]: string } = {};
   
-  // Find sections that start with a ticker symbol pattern (1-5 capital letters)
-  const sections = response.split(/\n\s*([A-Z]{1,5}):\s*/).filter(Boolean);
+  console.log("Parsing analysis response for", expectedTickers.length, "expected tickers");
   
-  for (let i = 0; i < sections.length; i += 2) {
-    if (i + 1 < sections.length) {
-      const ticker = sections[i].trim();
-      const analysis = sections[i + 1].trim();
-      stockAnalyses[ticker] = analysis;
+  // First, try to find sections that start with a ticker symbol pattern (1-5 capital letters)
+  const tickerPattern = new RegExp(`(${expectedTickers.join('|')}):\\s*([\\s\\S]+?)(?=\\n\\s*(?:${expectedTickers.join('|')}):|\\n\\s*Market Insight:|$)`, 'g');
+  
+  let match;
+  while ((match = tickerPattern.exec(response)) !== null) {
+    const ticker = match[1].trim();
+    const analysis = match[2].trim();
+    stockAnalyses[ticker] = analysis;
+    console.log(`Found analysis for ${ticker}, length: ${analysis.length} chars`);
+  }
+  
+  // If we didn't find all expected tickers, try another approach
+  if (Object.keys(stockAnalyses).length < expectedTickers.length) {
+    console.log("Some tickers not found with first method, trying alternative parsing");
+    
+    // Split by lines and look for lines starting with ticker
+    const lines = response.split('\n');
+    let currentTicker = null;
+    let currentAnalysis = '';
+    
+    for (const line of lines) {
+      // Check if line starts with any of our expected tickers
+      const tickerMatch = line.match(new RegExp(`^\\s*(${expectedTickers.join('|')}):\\s*(.*)$`));
+      
+      if (tickerMatch) {
+        // If we were building an analysis for another ticker, save it
+        if (currentTicker && currentAnalysis) {
+          stockAnalyses[currentTicker] = currentAnalysis.trim();
+        }
+        
+        // Start new ticker analysis
+        currentTicker = tickerMatch[1];
+        currentAnalysis = tickerMatch[2];
+      } else if (currentTicker && !line.match(/^Market Insight:/i)) {
+        // Continue adding to current analysis if not a new section
+        currentAnalysis += '\n' + line;
+      }
+    }
+    
+    // Save the last ticker's analysis
+    if (currentTicker && currentAnalysis && !stockAnalyses[currentTicker]) {
+      stockAnalyses[currentTicker] = currentAnalysis.trim();
+    }
+  }
+  
+  // For any missing tickers, provide a fallback
+  for (const ticker of expectedTickers) {
+    if (!stockAnalyses[ticker]) {
+      console.log(`No analysis found for ${ticker}, adding fallback`);
+      stockAnalyses[ticker] = `Analysis for ${ticker} could not be properly extracted. This stock was selected based on technical indicators showing potential strength in current market conditions.`;
     }
   }
   
