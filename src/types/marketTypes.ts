@@ -50,3 +50,67 @@ export interface MarketEvent {
 export interface UserSettings {
   watchlist: string[];
 }
+
+// New interfaces for Polygon API data
+
+export interface MarketStatus {
+  market: string;
+  serverTime: string;
+  exchanges: Record<string, string>;
+  isOpen: boolean;
+  nextOpeningTime: string | null;
+}
+
+export interface MarketMovers {
+  gainers: StockData[];
+  losers: StockData[];
+}
+
+export interface TickerDetails {
+  ticker: string;
+  name: string;
+  description: string;
+  homepageUrl: string;
+  phoneNumber: string;
+  listDate: string;
+  marketCap: number;
+  employees: number;
+  sector: string;
+  exchange: string;
+  address: {
+    address1: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  };
+}
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  author: string;
+  source: string;
+  url: string;
+  imageUrl: string;
+  description: string;
+  publishedDate: string;
+  tickers: string[];
+  keywords: string[];
+}
+
+export interface MarketHoliday {
+  name: string;
+  date: string;
+  status: string;
+  exchange: string;
+}
+
+export interface CandleData {
+  date: string;
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}

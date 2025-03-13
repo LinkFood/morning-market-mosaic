@@ -1,0 +1,84 @@
+
+/**
+ * Polygon.io API Service
+ * Main entry point that exports all functionality
+ */
+import client from './client';
+import marketData from './marketData';
+import historicalData from './historicalData';
+import referenceData from './reference';
+import { clearAllCache, getCacheTimestamp } from './cache';
+
+// Integrate market data functions
+const {
+  getStockSnapshot,
+  getBatchStockSnapshots,
+  getMarketStatus,
+  getMarketMovers
+} = marketData;
+
+// Integrate historical data functions
+const {
+  getStockCandles,
+  getAggregates,
+  getIndexData,
+  getBatchIndexData
+} = historicalData;
+
+// Integrate reference data functions
+const {
+  getTickerDetails,
+  getSectorPerformance,
+  getMarketHolidays,
+  getCompanyNews
+} = referenceData;
+
+// Export all functions
+export default {
+  // Market data
+  getStockSnapshot,
+  getBatchStockSnapshots,
+  getMarketStatus,
+  getMarketMovers,
+  
+  // Historical data
+  getStockCandles,
+  getAggregates,
+  getIndexData,
+  getBatchIndexData,
+  
+  // Reference data
+  getTickerDetails,
+  getSectorPerformance,
+  getMarketHolidays,
+  getCompanyNews,
+  
+  // Cache management
+  clearCache: clearAllCache,
+  getCacheTimestamp
+};
+
+// Export for named imports
+export {
+  // Market data
+  getStockSnapshot,
+  getBatchStockSnapshots,
+  getMarketStatus,
+  getMarketMovers,
+  
+  // Historical data
+  getStockCandles,
+  getAggregates,
+  getIndexData,
+  getBatchIndexData,
+  
+  // Reference data
+  getTickerDetails,
+  getSectorPerformance,
+  getMarketHolidays,
+  getCompanyNews,
+  
+  // Cache management
+  clearAllCache as clearCache,
+  getCacheTimestamp
+};
