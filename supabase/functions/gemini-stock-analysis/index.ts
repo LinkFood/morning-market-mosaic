@@ -41,12 +41,12 @@ serve(async (req) => {
     }
 
     // Test if the API key is a valid format
-    if (GEMINI_API_KEY.trim() === "" || !GEMINI_API_KEY.trim().startsWith("AI")) {
-      console.error("GEMINI_API_KEY appears to be invalid (should start with 'AI')");
+    if (GEMINI_API_KEY.trim() === "") {
+      console.error("GEMINI_API_KEY appears to be invalid (empty string)");
       return new Response(
         JSON.stringify({ 
           error: "API key appears to be invalid",
-          details: "The GEMINI_API_KEY environment variable is set but doesn't appear to be in the correct format (should start with 'AI')"
+          details: "The GEMINI_API_KEY environment variable is set but is empty"
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -98,8 +98,8 @@ serve(async (req) => {
 
     console.log("Calling Gemini API with prompt...");
     
-    // Google Gemini API endpoint
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
+    // Updated Gemini API endpoint for Gemini 1.5 Pro
+    const endpoint = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent";
     
     try {
       console.log("Making API request to Google Gemini endpoint");
@@ -122,7 +122,9 @@ serve(async (req) => {
       };
       
       const requestURL = `${endpoint}?key=${GEMINI_API_KEY}`;
-      console.log(`Request URL (without key): ${endpoint}?key=AI...`);
+      console.log(`Request URL (without key): ${endpoint}?key=[REDACTED]`);
+      console.log("API version: v1");
+      console.log("Model: gemini-1.5-pro");
       
       const response = await fetch(requestURL, {
         method: "POST",
@@ -147,6 +149,8 @@ serve(async (req) => {
           errorDetails = "Authentication failed. The Gemini API key appears to be invalid.";
         } else if (status === 403) {
           errorDetails = "Permission denied. The API key may not have access to the Gemini API.";
+        } else if (status === 404) {
+          errorDetails = "Model not found. The API endpoint or model name may be incorrect. Check API version and model name.";
         } else if (status === 429) {
           errorDetails = "Rate limit exceeded. The API quota may have been reached.";
         } else if (status >= 500) {

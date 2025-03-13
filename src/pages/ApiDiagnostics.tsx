@@ -315,6 +315,8 @@ const ApiDiagnostics = () => {
                 <li>Verify the GEMINI_API_KEY is set in Supabase Edge Function environment</li>
                 <li>Check that the gemini-stock-analysis function is deployed</li>
                 <li>Ensure your Gemini API key is active and has sufficient quota</li>
+                <li>Confirm the API key is authorized for the Gemini 1.5 Pro model</li>
+                <li>If you see a "model not found" error, the API version or model name might be incorrect</li>
               </ul>
             </div>
             
@@ -324,6 +326,7 @@ const ApiDiagnostics = () => {
                 <li>Check Supabase Edge Function logs for detailed error messages</li>
                 <li>Verify your Supabase project is active and functioning</li>
                 <li>Ensure your network can reach api.polygon.io and generativelanguage.googleapis.com</li>
+                <li>For 404 errors with Gemini, verify the API endpoint and model names are correct</li>
               </ul>
             </div>
           </div>
