@@ -32,7 +32,6 @@ class RealtimeService {
   private pollingIntervals: Record<string, number> = {};
   private websocket: WebSocket | null = null;
   private marketStatus: MarketStatus | null = null;
-  private subscribers: Array<(data: any) => void> = [];
   private lastMarketStatusCheck: Date = new Date(0);
   private cachedData: Map<string, any> = new Map();
   private batteryStatus: { charging: boolean, level: number } = { 
@@ -110,17 +109,19 @@ class RealtimeService {
     if (timeSinceLastCheck > 5 * 60 * 1000 || !this.marketStatus) {
       try {
         const status = await marketData.getMarketStatus();
-        this.updateMarketStatus(status);
+        this.updateMarketStatus(status as MarketStatus);
         this.lastMarketStatusCheck = now;
       } catch (error) {
         console.error('Failed to get market status:', error);
-        this.marketStatus = {
+        // Create a default MarketStatus object if the API call fails
+        const defaultStatus: MarketStatus = {
           market: 'unknown',
           serverTime: new Date().toISOString(),
           exchanges: {},
           isOpen: false,
           nextOpeningTime: null
         };
+        this.marketStatus = defaultStatus;
       }
     }
     
