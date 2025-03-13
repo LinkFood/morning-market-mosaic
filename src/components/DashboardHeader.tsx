@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ const DashboardHeader = ({
             Refresh
           </Button>
           
-          <Link to="/fed">
+          <Link to="/fed-dashboard">
             <Button variant="outline" size="sm">
               <BarChart3 className="h-4 w-4 mr-2" />
               Fed Data
