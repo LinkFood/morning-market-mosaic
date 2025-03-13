@@ -1,57 +1,62 @@
 
 /**
- * Market status service
- * Provides current market status information
+ * Market Status Service
+ * Provides information about current market status (open/closed)
  */
-import { MarketStatus } from "@/types/marketTypes";
+import marketService from ".";
+import polygonService from "../polygon";
 import cacheUtils from "./cacheUtils";
 import mockData from "./mockData";
-import { getPolygonApiKey } from "./config";
-import polygonService from "../polygon";
-
-// Define mock market status data to fix the missing MOCK_MARKET_STATUS error
-const MOCK_MARKET_STATUS: MarketStatus = {
-  market: "us_equity",
-  serverTime: new Date().toISOString(),
-  exchanges: {
-    nasdaq: "open",
-    nyse: "open"
-  },
-  isOpen: true,
-  nextOpeningTime: null
-};
+import { MarketStatus } from "@/types/marketTypes";
 
 // Get current market status (open/closed)
 async function getMarketStatus(): Promise<MarketStatus> {
   return cacheUtils.fetchWithCache("market_status", async () => {
     try {
-      // Get API key from Supabase
-      const apiKey = await getPolygonApiKey();
-      
-      if (apiKey === "DEMO_API_KEY") {
-        console.log("Using demo API key for market status, returning mock data");
-        return MOCK_MARKET_STATUS;
-      }
-      
-      // Get market status from Polygon
+      // Get API key from config
       const status = await polygonService.getMarketStatus();
       
-      // Properly type cast the response to fix TypeScript errors
-      return {
-        market: "us_equity",
-        serverTime: new Date().toISOString(),
+      // Transform to our MarketStatus type
+      const marketStatus: MarketStatus = {
+        market: status.market || "closed",
+        serverTime: status.serverTime || new Date().toISOString(),
         exchanges: status.exchanges || {},
-        isOpen: !!status.isOpen,
+        isOpen: status.isOpen || false,
         nextOpeningTime: status.nextOpeningTime || null
       };
+      
+      return marketStatus;
     } catch (error) {
       console.error("Error fetching market status:", error);
-      // Return mock data as fallback
-      return MOCK_MARKET_STATUS;
+      return mockData.MOCK_MARKET_STATUS;
     }
   });
 }
 
+// Check if market is currently open
+async function isMarketOpen(): Promise<boolean> {
+  try {
+    const status = await getMarketStatus();
+    return status.isOpen;
+  } catch (error) {
+    console.error("Error checking if market is open:", error);
+    return false;
+  }
+}
+
+// Get formatted next market opening time
+async function getNextMarketOpeningTime(): Promise<string | null> {
+  try {
+    const status = await getMarketStatus();
+    return status.nextOpeningTime;
+  } catch (error) {
+    console.error("Error getting next market opening time:", error);
+    return null;
+  }
+}
+
 export default {
-  getMarketStatus
+  getMarketStatus,
+  isMarketOpen,
+  getNextMarketOpeningTime
 };
