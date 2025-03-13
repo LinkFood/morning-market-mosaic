@@ -1,3 +1,4 @@
+
 // Common types used across the market dashboard
 
 export interface MarketIndex {
