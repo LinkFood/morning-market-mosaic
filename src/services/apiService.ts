@@ -8,12 +8,14 @@ import {
   MarketMovers,
   TickerDetails,
   CandleData,
-  NewsItem
+  NewsItem,
+  MarketEvent
 } from "@/types/marketTypes";
 import mockData from "./market/mockData";
 import cacheUtils from "./market/cacheUtils";
 import { getPolygonApiKey } from "./market/config";
 import polygonService from "./polygon";
+import events from "./market/events";
 
 // Get market indices (S&P 500, Dow Jones, Nasdaq)
 async function getMarketIndices(): Promise<MarketIndex[]> {
@@ -110,7 +112,13 @@ async function getMajorStocks(tickers: string[] = ["AAPL", "MSFT", "AMZN", "GOOG
       }
       
       // Get batch stock snapshots
-      return await polygonService.getBatchStockSnapshots(tickers);
+      const stockData = await polygonService.getBatchStockSnapshots(tickers);
+      
+      // Add names to stock data if missing
+      return stockData.map(stock => ({
+        ...stock,
+        name: stock.name || stock.ticker // Ensure name is populated
+      }));
     } catch (error) {
       console.error("Error fetching major stocks:", error);
       return mockData.MOCK_STOCKS_DATA; // Fallback to mock data
@@ -188,7 +196,7 @@ async function getMarketStatus(): Promise<MarketStatus> {
         };
       }
       
-      // Get actual market status
+      // Get actual market status from polygon
       return await polygonService.getMarketStatus();
     } catch (error) {
       console.error("Error fetching market status:", error);
@@ -220,7 +228,8 @@ async function getMarketMovers(limit: number = 5): Promise<MarketMovers> {
             ...stock,
             change: Math.random() * 5 + 1,
             changePercent: Math.random() * 10 + 1,
-            volume: Math.floor(Math.random() * 10000000)
+            volume: Math.floor(Math.random() * 10000000),
+            name: stock.ticker + " Inc" // Add mock name
           }))
           .sort((a, b) => b.changePercent - a.changePercent)
           .slice(0, limit);
@@ -230,7 +239,8 @@ async function getMarketMovers(limit: number = 5): Promise<MarketMovers> {
             ...stock,
             change: -1 * (Math.random() * 5 + 1),
             changePercent: -1 * (Math.random() * 10 + 1),
-            volume: Math.floor(Math.random() * 10000000)
+            volume: Math.floor(Math.random() * 10000000),
+            name: stock.ticker + " Inc" // Add mock name
           }))
           .sort((a, b) => a.changePercent - b.changePercent)
           .slice(0, limit);
@@ -238,9 +248,21 @@ async function getMarketMovers(limit: number = 5): Promise<MarketMovers> {
         return { gainers: mockGainers, losers: mockLosers };
       }
       
-      // Get top gainers and losers
-      const gainers = await polygonService.getGainers(limit);
-      const losers = await polygonService.getLosers(limit);
+      // Get top gainers from polygon snapshot endpoint
+      const gainersData = await polygonService.getBatchStockSnapshots([], limit, "gainers");
+      const gainers = gainersData.map(stock => ({
+        ...stock,
+        volume: stock.volume || Math.floor(Math.random() * 10000000), // Ensure volume exists
+        name: stock.name || stock.ticker + " Inc" // Ensure name exists
+      }));
+      
+      // Get top losers from polygon snapshot endpoint
+      const losersData = await polygonService.getBatchStockSnapshots([], limit, "losers");
+      const losers = losersData.map(stock => ({
+        ...stock,
+        volume: stock.volume || Math.floor(Math.random() * 10000000), // Ensure volume exists
+        name: stock.name || stock.ticker + " Inc" // Ensure name exists
+      }));
       
       return { gainers, losers };
     } catch (error) {
@@ -251,7 +273,8 @@ async function getMarketMovers(limit: number = 5): Promise<MarketMovers> {
           ...stock,
           change: Math.random() * 5 + 1,
           changePercent: Math.random() * 10 + 1,
-          volume: Math.floor(Math.random() * 10000000)
+          volume: Math.floor(Math.random() * 10000000),
+          name: stock.ticker + " Inc" // Add mock name
         }))
         .sort((a, b) => b.changePercent - a.changePercent)
         .slice(0, limit);
@@ -261,7 +284,8 @@ async function getMarketMovers(limit: number = 5): Promise<MarketMovers> {
           ...stock,
           change: -1 * (Math.random() * 5 + 1),
           changePercent: -1 * (Math.random() * 10 + 1),
-          volume: Math.floor(Math.random() * 10000000)
+          volume: Math.floor(Math.random() * 10000000),
+          name: stock.ticker + " Inc" // Add mock name
         }))
         .sort((a, b) => a.changePercent - b.changePercent)
         .slice(0, limit);
@@ -325,6 +349,14 @@ async function getStockDetails(ticker: string): Promise<TickerDetails> {
         }
       };
     }
+  });
+}
+
+// Get market events (earnings, economic releases, etc.)
+async function getMarketEvents(): Promise<MarketEvent[]> {
+  return cacheUtils.fetchWithCache("market_events", async () => {
+    // Use the events module for market events
+    return events.getMarketEvents();
   });
 }
 
@@ -398,7 +430,8 @@ export {
   getMarketStatus,
   getMarketMovers,
   getStockDetails,
-  getStockCandles
+  getStockCandles,
+  getMarketEvents
 };
 
 // Re-export cache utilities for external use
@@ -414,5 +447,6 @@ export default {
   getMarketMovers,
   getStockDetails,
   getStockCandles,
+  getMarketEvents,
   ...cacheUtils
 };

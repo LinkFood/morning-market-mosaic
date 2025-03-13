@@ -1,4 +1,3 @@
-
 // Common types used across the market dashboard
 
 export interface MarketIndex {
@@ -21,12 +20,14 @@ export interface SectorPerformance {
 
 export interface StockData {
   ticker: string;
+  name?: string; // Added name property as optional
   close: number;
   open: number;
   high: number;
   low: number;
   change: number;
   changePercent: number;
+  volume?: number; // Added volume property as optional
 }
 
 export interface EconomicIndicator {

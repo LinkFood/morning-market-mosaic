@@ -1,4 +1,3 @@
-
 /**
  * Polygon.io Market Data Service
  * Provides real-time and delayed market data
@@ -51,9 +50,59 @@ export async function getStockSnapshot(ticker: string): Promise<StockData> {
 /**
  * Get snapshot data for multiple stocks in a single API call
  * @param tickers Array of ticker symbols
+ * @param limit Optional limit for number of results (for movers)
+ * @param type Optional type ('gainers' or 'losers' for market movers)
  * @returns Promise with array of stock data
  */
-export async function getBatchStockSnapshots(tickers: string[]): Promise<StockData[]> {
+export async function getBatchStockSnapshots(
+  tickers: string[] = [], 
+  limit: number = 10,
+  type?: 'gainers' | 'losers'
+): Promise<StockData[]> {
+  // For gainers/losers, use separate endpoint
+  if (type) {
+    const cacheKey = `market_${type}_${limit}`;
+    const cachedData = getCachedData<StockData[]>(cacheKey, CACHE_TTL.MARKET_MOVERS);
+    
+    if (cachedData) {
+      return cachedData;
+    }
+    
+    try {
+      // Use movers endpoint
+      const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/${type}?limit=${limit}`);
+      
+      // Transform the response data
+      const stocksData: StockData[] = response.tickers.map((item: any) => {
+        const stockData: StockData = {
+          ticker: item.ticker,
+          name: item.ticker, // Default name to ticker if not available
+          close: item.day.c,
+          open: item.day.o,
+          high: item.day.h,
+          low: item.day.l,
+          change: item.todaysChange,
+          changePercent: item.todaysChangePerc,
+          volume: item.day?.v || 0, // Include volume
+        };
+        
+        // Cache individual stock data
+        cacheData(`snapshot_${item.ticker}`, stockData);
+        
+        return stockData;
+      });
+      
+      // Cache the entire result
+      cacheData(cacheKey, stocksData);
+      
+      return stocksData;
+    } catch (error) {
+      console.error(`Error fetching ${type}:`, error);
+      throw error;
+    }
+  }
+  
+  // Otherwise, continue with standard batch snapshot logic
   // Check if we have all tickers in cache
   const cachedResults: StockData[] = [];
   const tickersToFetch: string[] = [];
@@ -71,7 +120,7 @@ export async function getBatchStockSnapshots(tickers: string[]): Promise<StockDa
   });
   
   // If all tickers were in cache, return them
-  if (tickersToFetch.length === 0) {
+  if (tickersToFetch.length === 0 && cachedResults.length > 0) {
     return cachedResults;
   }
   
@@ -85,12 +134,14 @@ export async function getBatchStockSnapshots(tickers: string[]): Promise<StockDa
     const stocksData: StockData[] = response.tickers.map((item: any) => {
       const stockData: StockData = {
         ticker: item.ticker,
+        name: item.ticker, // Default name to ticker if not available
         close: item.day.c,
         open: item.day.o,
         high: item.day.h,
         low: item.day.l,
         change: item.todaysChange,
         changePercent: item.todaysChangePerc,
+        volume: item.day?.v || 0, // Include volume
       };
       
       // Cache individual stock data
