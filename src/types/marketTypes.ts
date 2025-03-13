@@ -73,6 +73,12 @@ export interface UserSettings {
     method: 'auto' | 'polling' | 'websocket';
     priorityData: 'watchlist' | 'visible' | 'all';
   };
+  // Mobile-specific settings
+  compactMode?: boolean;
+  batteryOptimization?: boolean;
+  touchGestures?: boolean;
+  activeSection?: string;
+  notificationsEnabled?: boolean;
 }
 
 // New interfaces for Polygon API data
@@ -160,4 +166,10 @@ export interface RealtimeOptions {
   updateMethod?: 'auto' | 'polling' | 'websocket';
   updateInterval?: number;
   prioritySymbols?: string[];
+  batteryOptimization?: boolean;
+  intervals?: {
+    marketHours: number;
+    afterHours: number;
+    closed: number;
+  };
 }

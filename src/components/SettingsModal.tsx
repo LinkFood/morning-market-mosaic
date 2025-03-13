@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from '@/components/ui/switch';
 import { UserSettings } from "@/types/marketTypes";
 import { realtime } from "@/services/polygon/realtime";
+import { useMediaQuery } from "@/hooks/use-mobile";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,6 +29,9 @@ const defaultRefreshSettings = {
 const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsModalProps) => {
   const [watchlistInput, setWatchlistInput] = useState("");
   const [refreshSettings, setRefreshSettings] = useState(defaultRefreshSettings);
+  const [isCompactMode, setIsCompactMode] = useState(false);
+  const [batteryOptimization, setBatteryOptimization] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 768px)");
   
   // Initialize state when settings change or modal opens
   useEffect(() => {
@@ -40,6 +45,12 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
         afterHours: settings.refreshInterval?.afterHours || defaultRefreshSettings.afterHours,
         closed: settings.refreshInterval?.closed || defaultRefreshSettings.closed
       });
+
+      // Set compact mode
+      setIsCompactMode(settings.compactMode || false);
+
+      // Set battery optimization
+      setBatteryOptimization(settings.batteryOptimization || false);
     }
   }, [isOpen, settings]);
   
@@ -74,11 +85,16 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
       ...settings,
       watchlist: finalWatchlist,
       visibleComponents,
-      refreshInterval: refreshSettings
+      refreshInterval: refreshSettings,
+      compactMode: isCompactMode,
+      batteryOptimization: batteryOptimization
     };
     
     // Update settings in realtime service
-    realtime.updateSettings({ intervals: refreshSettings });
+    realtime.updateSettings({ 
+      intervals: refreshSettings,
+      batteryOptimization: batteryOptimization
+    });
     
     // Update app settings
     updateSettings(updatedSettings);
@@ -88,16 +104,17 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={isMobile ? "w-[95vw] max-w-md rounded-lg p-4" : "sm:max-w-md"}>
         <DialogHeader>
           <DialogTitle>Dashboard Settings</DialogTitle>
         </DialogHeader>
         
         <Tabs defaultValue="watchlist">
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
-            <TabsTrigger value="refresh">Data Refresh</TabsTrigger>
-            <TabsTrigger value="updates">Live Updates</TabsTrigger>
+            <TabsTrigger value="refresh">Refresh</TabsTrigger>
+            <TabsTrigger value="updates">Updates</TabsTrigger>
+            <TabsTrigger value="mobile">Mobile</TabsTrigger>
           </TabsList>
           
           <TabsContent value="watchlist" className="space-y-4">
@@ -259,6 +276,51 @@ const SettingsModal = ({ isOpen, onClose, settings, updateSettings }: SettingsMo
                       <Label htmlFor="priority-all">All Data</Label>
                     </div>
                   </RadioGroup>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="mobile" className="space-y-4">
+            <div className="space-y-4">
+              <Label>Mobile Experience</Label>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Display Options</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="compact-mode" className="cursor-pointer">
+                      <div>
+                        <span>Compact Mode</span>
+                        <p className="text-xs text-muted-foreground">
+                          Show more data with a compact interface
+                        </p>
+                      </div>
+                    </Label>
+                    <Switch 
+                      id="compact-mode"
+                      checked={isCompactMode}
+                      onCheckedChange={setIsCompactMode}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="battery-optimization" className="cursor-pointer">
+                      <div>
+                        <span>Battery Optimization</span>
+                        <p className="text-xs text-muted-foreground">
+                          Reduce updates when on battery power
+                        </p>
+                      </div>
+                    </Label>
+                    <Switch 
+                      id="battery-optimization"
+                      checked={batteryOptimization}
+                      onCheckedChange={setBatteryOptimization}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </div>

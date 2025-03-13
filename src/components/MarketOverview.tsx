@@ -30,16 +30,19 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { stocks, marketStatus, marketBreadth } from "@/services/market";
+import { useMediaQuery } from "@/hooks/use-mobile";
 
 interface MarketOverviewProps {
   indices: MarketIndex[];
+  compactMode?: boolean;
 }
 
-const MarketOverview = ({ indices }: MarketOverviewProps) => {
+const MarketOverview = ({ indices, compactMode = false }: MarketOverviewProps) => {
   const [sparklines, setSparklines] = useState<{[key: string]: number[]}>({});
   const [status, setStatus] = useState<MarketStatus | null>(null);
   const [breadth, setBreadth] = useState<MarketBreadthData | null>(null);
   const [expanded, setExpanded] = useState<{[key: string]: boolean}>({});
+  const isMobile = useMediaQuery("(max-width: 768px)");
   
   // Toggle expansion for a specific index
   const toggleExpanded = (ticker: string) => {
@@ -168,19 +171,21 @@ const MarketOverview = ({ indices }: MarketOverviewProps) => {
       </CardHeader>
       
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 ${isMobile ? '' : 'md:grid-cols-3'} gap-4`}>
           {indices.map((index) => (
             <Collapsible
               key={index.ticker} 
-              className="p-4 rounded-lg bg-secondary/50 flex flex-col"
+              className={`p-3 md:p-4 rounded-lg bg-secondary/50 flex flex-col ${compactMode && isMobile ? 'py-2' : ''}`}
               open={expanded[index.ticker]}
               onOpenChange={() => toggleExpanded(index.ticker)}
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-lg">{index.name}</h3>
+                  <h3 className={`font-bold ${compactMode && isMobile ? 'text-base' : 'text-lg'}`}>{index.name}</h3>
                   <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-semibold">{index.close.toFixed(2)}</p>
+                    <p className={`${compactMode && isMobile ? 'text-xl' : 'text-2xl'} font-semibold`}>
+                      {index.close.toFixed(2)}
+                    </p>
                     <p className={`text-sm ${index.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       {formatChange(index.change)} ({formatPercentChange(index.changePercent)})
                     </p>
@@ -204,13 +209,13 @@ const MarketOverview = ({ indices }: MarketOverviewProps) => {
               </div>
               
               {/* Sparkline */}
-              <div className="h-14 mt-2 mb-2">
+              <div className={`${compactMode && isMobile ? 'h-10' : 'h-14'} mt-2 mb-2`}>
                 {sparklines[index.ticker] && (
                   <SparklineChart 
                     data={sparklines[index.ticker]} 
                     positive={index.change >= 0}
                     showAxis={true}
-                    showLabels={true}
+                    showLabels={!compactMode || !isMobile}
                   />
                 )}
               </div>

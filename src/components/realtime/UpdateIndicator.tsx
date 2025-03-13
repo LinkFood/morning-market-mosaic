@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Clock, PauseCircle, PlayCircle, RefreshCw } from 'lucide-react';
 import { realtime } from '@/services/polygon/realtime';
+import { useMediaQuery } from '@/hooks/use-mobile';
 
 interface UpdateIndicatorProps {
   onRefresh?: () => void;
@@ -20,6 +21,7 @@ export function UpdateIndicator({
   const [lastUpdated, setLastUpdated] = useState<Date | null>(realtime.getLastUpdated());
   const [timeAgo, setTimeAgo] = useState<string>('');
   const [status, setStatus] = useState(realtime.getStatus());
+  const isMobile = useMediaQuery("(max-width: 768px)");
   
   // Format time ago string
   const formatTimeAgo = (date: Date | null) => {
@@ -28,11 +30,11 @@ export function UpdateIndicator({
     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
     
     if (seconds < 5) return 'Just now';
-    if (seconds < 60) return `${seconds} seconds ago`;
-    if (seconds < 120) return '1 minute ago';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-    if (seconds < 7200) return '1 hour ago';
-    return `${Math.floor(seconds / 3600)} hours ago`;
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 120) return '1m ago';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 7200) return '1h ago';
+    return `${Math.floor(seconds / 3600)}h ago`;
   };
   
   // Update time ago every 10 seconds
@@ -71,7 +73,7 @@ export function UpdateIndicator({
   };
   
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-1 md:gap-2 ${className}`}>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -101,7 +103,7 @@ export function UpdateIndicator({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-7 w-7 md:h-8 md:w-8"
                   onClick={toggleUpdates}
                 >
                   {status.isPaused ? (
@@ -125,7 +127,7 @@ export function UpdateIndicator({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-7 w-7 md:h-8 md:w-8"
                   onClick={handleRefresh}
                 >
                   <RefreshCw className="h-4 w-4" />

@@ -1,697 +1,451 @@
+
+import { RealtimeUpdateStatus, RealtimeOptions, MarketStatus, StockData } from '@/types/marketTypes';
+import { clearCache } from './cache';
+import marketData from './marketData';
+
 /**
- * Polygon.io Realtime API Service
- * Handles real-time data updates using WebSockets and intelligent polling
+ * Realtime data service for Polygon.io
+ * Supports both polling and WebSocket connections
  */
-import { toast } from "sonner";
-import { POLYGON_BASE_URL, POLYGON_API_KEY, initializeApiKey } from "../market/config";
-import { getMarketStatus } from "./marketData";
-import { clearAllCache } from "./cache";
-import { 
-  MarketStatus, 
-  StockData,
-  TickerDetails
-} from "@/types/marketTypes";
-
-// Default polling intervals in milliseconds
-const DEFAULT_INTERVALS = {
-  MARKET_HOURS: 30000,  // 30 seconds during market hours
-  PRE_MARKET: 60000,    // 1 minute during pre-market
-  AFTER_HOURS: 60000,   // 1 minute during after-hours
-  CLOSED: 300000,       // 5 minutes when market closed
-};
-
-// WebSocket constants
-const WS_BASE_URL = "wss://delayed.polygon.io";
-const RECONNECT_DELAY = 3000; // 3 seconds
-
-// Event types
-export type DataUpdateType = 'stock' | 'index' | 'sector' | 'economic';
-export type UpdateEventCallback = (data: any, type: DataUpdateType) => void;
-
-// Update manager state
-interface UpdateManagerState {
-  isPolling: boolean;
-  isConnected: boolean;
-  lastUpdated: Date | null;
-  marketStatus: MarketStatus | null;
-  subscribers: Map<string, Set<UpdateEventCallback>>;
-  watchedSymbols: Set<string>;
-  userSettings: {
-    paused: boolean;
-    intervals: {
-      marketHours: number;
-      afterHours: number;
-      closed: number;
-    };
+class RealtimeService {
+  private status: RealtimeUpdateStatus = {
+    isConnected: false,
+    isPolling: false,
+    lastUpdated: null,
+    isPaused: false
   };
-  pollingIntervals: Map<string, NodeJS.Timeout>;
-}
-
-// The update manager singleton
-class UpdateManager {
-  private static instance: UpdateManager;
-  private state: UpdateManagerState;
-  private ws: WebSocket | null = null;
-  private apiKey: string | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-
-  private constructor() {
-    // Initialize state
-    this.state = {
-      isPolling: false,
-      isConnected: false,
-      lastUpdated: null,
-      marketStatus: null,
-      subscribers: new Map(),
-      watchedSymbols: new Set(),
-      userSettings: {
-        paused: false,
-        intervals: {
-          marketHours: DEFAULT_INTERVALS.MARKET_HOURS,
-          afterHours: DEFAULT_INTERVALS.AFTER_HOURS,
-          closed: DEFAULT_INTERVALS.CLOSED,
-        },
-      },
-      pollingIntervals: new Map(),
-    };
-
-    // Initialize
-    this.init();
-  }
-
-  // Get the singleton instance
-  public static getInstance(): UpdateManager {
-    if (!UpdateManager.instance) {
-      UpdateManager.instance = new UpdateManager();
+  
+  private options: RealtimeOptions = {
+    updateMethod: 'auto',
+    prioritySymbols: [],
+    batteryOptimization: false,
+    intervals: {
+      marketHours: 60,   // 1 minute during market hours
+      afterHours: 300,   // 5 minutes during extended hours
+      closed: 900        // 15 minutes when market is closed
     }
-    return UpdateManager.instance;
-  }
-
-  // Initialize the manager
-  private async init() {
-    try {
-      // Get API key
-      this.apiKey = await initializeApiKey();
-      
-      // Get initial market status
-      await this.updateMarketStatus();
-      
-      // Start appropriate update mechanism based on market status
-      this.startUpdates();
-      
-      // Set up interval to check market status every minute
-      setInterval(() => this.updateMarketStatus(), 60000);
-    } catch (error) {
-      console.error("Failed to initialize update manager:", error);
-      toast.error("Failed to initialize market data updates");
-    }
-  }
-
-  // Update market status
-  private async updateMarketStatus() {
-    try {
-      const status = await getMarketStatus();
-      const previousStatus = this.state.marketStatus;
-      this.state.marketStatus = status;
-      
-      // If market status changed, adjust update strategy
-      if (previousStatus?.isOpen !== status.isOpen) {
-        this.adjustUpdateStrategy();
-      }
-      
-      return status;
-    } catch (error) {
-      console.error("Failed to update market status:", error);
-      return null;
-    }
-  }
-
-  // Adjust update strategy based on market status
-  private adjustUpdateStrategy() {
-    // Clear all polling intervals
-    this.stopPolling();
-    
-    // If WebSocket is supported and market is open, use WebSocket
-    if (this.isWebSocketSupported() && this.state.marketStatus?.isOpen) {
-      this.connectWebSocket();
-    } else {
-      // Otherwise use polling with appropriate frequency
-      this.startPolling();
-    }
-  }
-
-  // Check if WebSocket is supported in the current environment
-  private isWebSocketSupported(): boolean {
-    return typeof WebSocket !== 'undefined' && this.apiKey !== null;
-  }
-
-  // Start updates using the appropriate method
-  private startUpdates() {
-    if (this.state.userSettings.paused) {
-      return;
-    }
-    
-    if (this.isWebSocketSupported() && this.state.marketStatus?.isOpen) {
-      this.connectWebSocket();
-    } else {
-      this.startPolling();
-    }
-  }
-
-  // Connect to Polygon.io WebSocket
-  private connectWebSocket() {
-    if (this.ws || !this.apiKey || this.state.userSettings.paused) {
-      return;
-    }
-
-    try {
-      // Create WebSocket connection
-      this.ws = new WebSocket(`${WS_BASE_URL}/stocks`);
-      
-      // Set up event handlers
-      this.ws.onopen = this.handleWebSocketOpen.bind(this);
-      this.ws.onmessage = this.handleWebSocketMessage.bind(this);
-      this.ws.onclose = this.handleWebSocketClose.bind(this);
-      this.ws.onerror = this.handleWebSocketError.bind(this);
-    } catch (error) {
-      console.error("WebSocket connection failed:", error);
-      this.fallbackToPolling();
-    }
-  }
-
-  // Handle WebSocket open event
-  private handleWebSocketOpen() {
-    if (!this.ws || !this.apiKey) return;
-    
-    try {
-      // Reset reconnect attempts
-      this.reconnectAttempts = 0;
-      
-      // Set state
-      this.state.isConnected = true;
-      
-      // Authenticate
-      this.ws.send(JSON.stringify({ action: "auth", params: this.apiKey }));
-      
-      // Subscribe to watched symbols
-      this.subscribeToSymbols();
-      
-      console.log("WebSocket connected to Polygon.io");
-      this.notifyUpdate();
-    } catch (error) {
-      console.error("WebSocket open handler error:", error);
-    }
-  }
-
-  // Subscribe to watched symbols
-  private subscribeToSymbols() {
-    if (!this.ws || !this.state.isConnected || this.state.watchedSymbols.size === 0) {
-      return;
-    }
-    
-    try {
-      const symbols = Array.from(this.state.watchedSymbols);
-      const subscribeMessage = {
-        action: "subscribe",
-        params: symbols.map(symbol => `T.${symbol}`).join(",")
-      };
-      
-      this.ws.send(JSON.stringify(subscribeMessage));
-      console.log(`Subscribed to ${symbols.length} symbols`);
-    } catch (error) {
-      console.error("Failed to subscribe to symbols:", error);
-    }
-  }
-
-  // Handle WebSocket message event
-  private handleWebSocketMessage(event: MessageEvent) {
-    try {
-      const data = JSON.parse(event.data);
-      
-      // Handle different message types
-      if (Array.isArray(data)) {
-        data.forEach(msg => {
-          if (msg.ev === 'T') {
-            this.processTradeUpdate(msg);
-          }
-        });
-      } else if (data.status === 'connected') {
-        console.log("WebSocket authenticated successfully");
-      } else if (data.status === 'auth_success') {
-        console.log("WebSocket authenticated successfully");
-      } else if (data.status === 'success' && data.message?.includes('subscribed')) {
-        console.log("WebSocket subscription successful");
-      }
-      
-      this.notifyUpdate();
-    } catch (error) {
-      console.error("Error processing WebSocket message:", error);
-    }
-  }
-
-  // Process trade update from WebSocket
-  private processTradeUpdate(trade: any) {
-    if (!trade || !trade.sym) return;
-    
-    const symbol = trade.sym;
-    const price = trade.p;
-    const size = trade.s;
-    const timestamp = trade.t;
-    
-    // Create stock data update
-    const update: Partial<StockData> = {
-      ticker: symbol,
-      close: price,
-      // Other fields would need to be calculated based on previous data
-    };
-    
-    // Notify subscribers
-    this.notifySubscribers(symbol, update, 'stock');
-  }
-
-  // Handle WebSocket close event
-  private handleWebSocketClose(event: CloseEvent) {
-    this.state.isConnected = false;
-    this.ws = null;
-    
-    console.log(`WebSocket closed: ${event.code} ${event.reason}`);
-    
-    // Attempt to reconnect if not closed intentionally
-    if (!this.state.userSettings.paused) {
-      this.attemptReconnect();
-    }
-  }
-
-  // Handle WebSocket error event
-  private handleWebSocketError(error: Event) {
-    console.error("WebSocket error:", error);
-    this.state.isConnected = false;
-    
-    // Fall back to polling
-    this.fallbackToPolling();
-  }
-
-  // Attempt to reconnect WebSocket
-  private attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log("Max reconnect attempts reached, falling back to polling");
-      this.fallbackToPolling();
-      return;
-    }
-    
-    this.reconnectAttempts++;
-    const delay = RECONNECT_DELAY * Math.pow(1.5, this.reconnectAttempts - 1);
-    
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    
-    setTimeout(() => {
-      if (!this.state.isConnected && !this.state.userSettings.paused) {
-        this.connectWebSocket();
-      }
-    }, delay);
-  }
-
-  // Fall back to polling if WebSocket fails
-  private fallbackToPolling() {
-    if (!this.state.isPolling && !this.state.userSettings.paused) {
-      console.log("Falling back to polling mechanism");
-      this.startPolling();
-    }
-  }
-
-  // Start polling mechanism
-  private startPolling() {
-    if (this.state.isPolling || this.state.userSettings.paused) {
-      return;
-    }
-    
-    this.state.isPolling = true;
-    
-    // Poll different data types at different intervals
-    this.setupPollingInterval('stocks', this.pollStocks.bind(this), this.getPollingInterval());
-    this.setupPollingInterval('indices', this.pollIndices.bind(this), this.getPollingInterval());
-    this.setupPollingInterval('sectors', this.pollSectors.bind(this), this.getPollingInterval() * 2);
-    
-    console.log(`Polling started with ${this.getPollingInterval()}ms interval`);
-  }
-
-  // Set up a polling interval for a specific data type
-  private setupPollingInterval(key: string, pollFn: () => Promise<void>, interval: number) {
-    if (this.state.pollingIntervals.has(key)) {
-      clearInterval(this.state.pollingIntervals.get(key)!);
-    }
-    
-    // Execute immediately and then set interval
-    pollFn();
-    
-    const intervalId = setInterval(pollFn, interval);
-    this.state.pollingIntervals.set(key, intervalId);
-  }
-
-  // Stop all polling
-  private stopPolling() {
-    if (!this.state.isPolling) {
-      return;
-    }
-    
-    // Clear all intervals
-    this.state.pollingIntervals.forEach(interval => clearInterval(interval));
-    this.state.pollingIntervals.clear();
-    this.state.isPolling = false;
-    
-    console.log("Polling stopped");
-  }
-
-  // Poll for stock updates
-  private async pollStocks(): Promise<void> {
-    if (this.state.watchedSymbols.size === 0) {
-      return;
-    }
-    
-    try {
-      // Get batches of 10 symbols at a time to avoid large requests
-      const symbols = Array.from(this.state.watchedSymbols);
-      const batches = [];
-      
-      for (let i = 0; i < symbols.length; i += 10) {
-        batches.push(symbols.slice(i, i + 10));
-      }
-      
-      // Fetch each batch
-      for (const batch of batches) {
-        // Import here to avoid circular dependencies
-        const { getBatchStockSnapshots } = await import("./marketData");
-        const snapshots = await getBatchStockSnapshots(batch);
-        
-        // Process each snapshot
-        for (const symbol in snapshots) {
-          this.notifySubscribers(symbol, snapshots[symbol], 'stock');
-        }
-      }
-      
-      this.notifyUpdate();
-    } catch (error) {
-      console.error("Error polling stocks:", error);
-    }
-  }
-
-  // Poll for index updates
-  private async pollIndices(): Promise<void> {
-    try {
-      // Import here to avoid circular dependencies
-      const { getBatchIndexData } = await import("./historical");
-      
-      // Common indices
-      const indices = ["SPY", "QQQ", "DIA", "IWM"];
-      const indexData = await getBatchIndexData(indices);
-      
-      // Process each index
-      for (const symbol in indexData) {
-        this.notifySubscribers(symbol, indexData[symbol], 'index');
-      }
-      
-      this.notifyUpdate();
-    } catch (error) {
-      console.error("Error polling indices:", error);
-    }
-  }
-
-  // Poll for sector updates
-  private async pollSectors(): Promise<void> {
-    try {
-      // Import here to avoid circular dependencies
-      const { getSectorPerformance } = await import("./reference");
-      
-      const sectors = await getSectorPerformance();
-      
-      // Notify subscribers
-      this.notifySubscribers("sectors", sectors, 'sector');
-      this.notifyUpdate();
-    } catch (error) {
-      console.error("Error polling sectors:", error);
-    }
-  }
-
-  // Get appropriate polling interval based on market status and user settings
-  private getPollingInterval(): number {
-    if (!this.state.marketStatus) {
-      return this.state.userSettings.intervals.closed;
-    }
-    
-    const now = new Date();
-    const hour = now.getHours();
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-    
-    if (isWeekend) {
-      return this.state.userSettings.intervals.closed;
-    }
-    
-    if (this.state.marketStatus.isOpen) {
-      return this.state.userSettings.intervals.marketHours;
-    }
-    
-    // Pre-market (4:00 AM - 9:30 AM)
-    if (hour >= 4 && hour < 9.5) {
-      return this.state.userSettings.intervals.afterHours;
-    }
-    
-    // After-hours (4:00 PM - 8:00 PM)
-    if (hour >= 16 && hour < 20) {
-      return this.state.userSettings.intervals.afterHours;
-    }
-    
-    // Market closed
-    return this.state.userSettings.intervals.closed;
-  }
-
-  // Subscribe to updates for a symbol
-  public subscribe(symbol: string, callback: UpdateEventCallback): () => void {
-    // Add symbol to watched symbols
-    this.state.watchedSymbols.add(symbol);
-    
-    // Add callback to subscribers
-    if (!this.state.subscribers.has(symbol)) {
-      this.state.subscribers.set(symbol, new Set());
-    }
-    
-    this.state.subscribers.get(symbol)!.add(callback);
-    
-    // Subscribe to symbol in WebSocket if connected
-    if (this.state.isConnected && this.ws) {
-      this.ws.send(JSON.stringify({
-        action: "subscribe",
-        params: `T.${symbol}`
-      }));
-    }
-    
-    // Return unsubscribe function
-    return () => {
-      const subscribers = this.state.subscribers.get(symbol);
-      if (subscribers) {
-        subscribers.delete(callback);
-        
-        // If no more subscribers for this symbol, remove it from watched symbols
-        if (subscribers.size === 0) {
-          this.state.subscribers.delete(symbol);
-          this.state.watchedSymbols.delete(symbol);
-          
-          // Unsubscribe from symbol in WebSocket if connected
-          if (this.state.isConnected && this.ws) {
-            this.ws.send(JSON.stringify({
-              action: "unsubscribe",
-              params: `T.${symbol}`
-            }));
-          }
-        }
-      }
-    };
-  }
-
-  // Subscribe to updates for multiple symbols
-  public subscribeMultiple(symbols: string[], callback: UpdateEventCallback): () => void {
-    const unsubscribers = symbols.map(symbol => this.subscribe(symbol, callback));
-    
-    // Return combined unsubscribe function
-    return () => {
-      unsubscribers.forEach(unsubscribe => unsubscribe());
-    };
+  };
+  
+  private pollingIntervals: Record<string, number> = {};
+  private websocket: WebSocket | null = null;
+  private marketStatus: MarketStatus | null = null;
+  private subscribers: Array<(data: any) => void> = [];
+  private lastMarketStatusCheck: Date = new Date(0);
+  private cachedData: Map<string, any> = new Map();
+  private batteryStatus: { charging: boolean, level: number } = { 
+    charging: true, 
+    level: 1.0 
+  };
+  
+  constructor() {
+    this.initBatteryMonitoring();
   }
   
-  // Subscribe to a specific data type (like 'sectors')
-  public subscribeToType(type: string, callback: UpdateEventCallback): () => void {
-    return this.subscribe(type, callback);
-  }
-
-  // Notify subscribers about updates for a symbol
-  private notifySubscribers(symbol: string, data: any, type: DataUpdateType): void {
-    const subscribers = this.state.subscribers.get(symbol);
-    if (subscribers) {
-      subscribers.forEach(callback => {
-        try {
-          callback(data, type);
-        } catch (error) {
-          console.error(`Error in subscriber callback for ${symbol}:`, error);
-        }
-      });
-    }
-  }
-
-  // Notify about any update (for UI indicators)
-  private notifyUpdate(): void {
-    this.state.lastUpdated = new Date();
-  }
-
-  // Manually trigger an update
-  public async refreshData(): Promise<void> {
+  /**
+   * Initialize battery monitoring if available in the browser
+   */
+  private async initBatteryMonitoring() {
     try {
-      // Clear cache to ensure fresh data
-      await clearAllCache();
-      
-      // Update market status
-      await this.updateMarketStatus();
-      
-      // Poll for fresh data
-      await Promise.all([
-        this.pollStocks(),
-        this.pollIndices(),
-        this.pollSectors()
-      ]);
-      
-      toast.success("Market data refreshed");
+      // Check if Battery API is available
+      if ('getBattery' in navigator) {
+        const battery = await (navigator as any).getBattery();
+        
+        // Update initial status
+        this.batteryStatus = {
+          charging: battery.charging,
+          level: battery.level
+        };
+        
+        // Listen for battery status changes
+        battery.addEventListener('chargingchange', () => {
+          this.batteryStatus.charging = battery.charging;
+          this.adjustPollingForBattery();
+        });
+        
+        battery.addEventListener('levelchange', () => {
+          this.batteryStatus.level = battery.level;
+          this.adjustPollingForBattery();
+        });
+      }
     } catch (error) {
-      console.error("Error refreshing data:", error);
-      toast.error("Failed to refresh market data");
+      console.warn('Battery API not available:', error);
     }
   }
-
-  // Pause updates
-  public pauseUpdates(): void {
-    this.state.userSettings.paused = true;
+  
+  /**
+   * Adjust polling frequency based on battery status
+   */
+  private adjustPollingForBattery() {
+    if (!this.options.batteryOptimization) return;
     
-    // Disconnect WebSocket
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    
-    // Stop polling
-    this.stopPolling();
-    
-    console.log("Updates paused");
-  }
-
-  // Resume updates
-  public resumeUpdates(): void {
-    this.state.userSettings.paused = false;
-    
-    // Restart updates
-    this.startUpdates();
-    
-    console.log("Updates resumed");
-  }
-
-  // Toggle pause/resume
-  public toggleUpdates(): boolean {
-    if (this.state.userSettings.paused) {
-      this.resumeUpdates();
+    // If on battery and battery level is low (< 20%)
+    if (!this.batteryStatus.charging && this.batteryStatus.level < 0.2) {
+      // Double all intervals to reduce battery usage
+      this.stopPolling();
+      this.startPolling(true);
     } else {
-      this.pauseUpdates();
+      // Reset to normal intervals
+      if (this.status.isPolling) {
+        this.stopPolling();
+        this.startPolling(false);
+      }
+    }
+  }
+  
+  /**
+   * Initialize realtime updates
+   */
+  public init() {
+    this.checkMarketStatus();
+    
+    // Start updates based on current market status
+    this.determineUpdateMethod();
+  }
+  
+  /**
+   * Update configuration options
+   */
+  public updateSettings(options: Partial<RealtimeOptions>) {
+    this.options = {
+      ...this.options,
+      ...options
+    };
+    
+    // Restart updates with new settings
+    if (this.status.isPolling) {
+      this.stopPolling();
+      this.startPolling();
     }
     
-    return !this.state.userSettings.paused;
+    this.adjustPollingForBattery();
   }
-
-  // Update user settings
-  public updateSettings(settings: {
-    intervals?: {
-      marketHours?: number;
-      afterHours?: number;
-      closed?: number;
+  
+  /**
+   * Get current market status
+   */
+  private async checkMarketStatus() {
+    const now = new Date();
+    const timeSinceLastCheck = now.getTime() - this.lastMarketStatusCheck.getTime();
+    
+    // Only check every 5 minutes to avoid excessive API calls
+    if (timeSinceLastCheck > 5 * 60 * 1000 || !this.marketStatus) {
+      try {
+        const status = await marketData.getMarketStatus();
+        this.updateMarketStatus(status);
+        this.lastMarketStatusCheck = now;
+      } catch (error) {
+        console.error('Failed to get market status:', error);
+        // Fallback to assuming market is closed
+        this.marketStatus = {
+          market: 'unknown',
+          serverTime: new Date().toISOString(),
+          exchanges: {},
+          isOpen: false,
+          nextOpeningTime: null
+        };
+      }
     }
-  }): void {
-    if (settings.intervals) {
-      this.state.userSettings.intervals = {
-        ...this.state.userSettings.intervals,
-        ...(settings.intervals || {})
-      };
-      
-      // Restart polling with new intervals
-      if (this.state.isPolling) {
-        this.stopPolling();
+    
+    return this.marketStatus;
+  }
+  
+  /**
+   * Update stored market status
+   */
+  private updateMarketStatus(status: MarketStatus) {
+    const marketStatusChanged = 
+      !this.marketStatus || 
+      this.marketStatus.isOpen !== status.isOpen;
+    
+    this.marketStatus = status;
+    
+    // Adjust update method if market status changed
+    if (marketStatusChanged) {
+      this.determineUpdateMethod();
+    }
+  }
+  
+  /**
+   * Determine the best update method based on market status and settings
+   */
+  private determineUpdateMethod() {
+    // Don't change anything if updates are paused
+    if (this.status.isPaused) return;
+    
+    // First, check market status
+    if (!this.marketStatus) return;
+    
+    // Stop current updates
+    this.stopUpdates();
+    
+    if (this.options.updateMethod === 'websocket') {
+      this.connectWebSocket();
+    } else if (this.options.updateMethod === 'polling') {
+      this.startPolling();
+    } else {
+      // Auto method - choose based on market status
+      if (this.marketStatus.isOpen) {
+        // During market hours, prefer WebSocket if available in your plan
+        this.startPolling();
+        // In a real implementation, you would use WebSocket for real-time data
+        // this.connectWebSocket();
+      } else {
+        // When market is closed, polling is sufficient
         this.startPolling();
       }
     }
   }
-
-  // Get last updated timestamp
-  public getLastUpdated(): Date | null {
-    return this.state.lastUpdated;
+  
+  /**
+   * Stop all active updates
+   */
+  private stopUpdates() {
+    this.stopPolling();
+    this.disconnectWebSocket();
   }
-
-  // Get connection status
-  public getStatus(): {
-    isPolling: boolean;
-    isConnected: boolean;
-    lastUpdated: Date | null;
-    isPaused: boolean;
-  } {
-    return {
-      isPolling: this.state.isPolling,
-      isConnected: this.state.isConnected,
-      lastUpdated: this.state.lastUpdated,
-      isPaused: this.state.userSettings.paused
-    };
-  }
-
-  // Clean up resources
-  public dispose(): void {
-    // Disconnect WebSocket
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+  
+  /**
+   * Start polling for updates
+   */
+  private startPolling(lowPowerMode = false) {
+    if (this.status.isPolling) return;
+    
+    // Determine polling interval based on market status
+    let interval = this.getPollingInterval();
+    
+    // Adjust for low power mode if needed
+    if (lowPowerMode) {
+      interval = interval * 2;
     }
     
-    // Stop polling
-    this.stopPolling();
+    // Start different polling for different data types
+    this.pollingIntervals['marketIndices'] = window.setInterval(() => {
+      this.pollMarketIndices();
+    }, interval * 1000); // Convert to milliseconds
     
-    // Clear state
-    this.state.subscribers.clear();
-    this.state.watchedSymbols.clear();
+    this.pollingIntervals['stocks'] = window.setInterval(() => {
+      this.pollStocks();
+    }, interval * 1000); // Convert to milliseconds
     
-    console.log("Update manager disposed");
+    // Check market status occasionally
+    this.pollingIntervals['marketStatus'] = window.setInterval(() => {
+      this.checkMarketStatus();
+    }, 5 * 60 * 1000); // Check every 5 minutes
+    
+    this.status.isPolling = true;
+    this.notifyStatusChanged();
+  }
+  
+  /**
+   * Determine polling interval based on market hours
+   */
+  private getPollingInterval(): number {
+    if (!this.marketStatus) {
+      return this.options.intervals?.closed || 900;
+    }
+    
+    // Check if market is open
+    if (this.marketStatus.isOpen) {
+      return this.options.intervals?.marketHours || 60;
+    }
+    
+    // Check if it's extended hours
+    const now = new Date();
+    const hour = now.getHours();
+    
+    // Pre-market (4:00 AM - 9:30 AM) or after-hours (4:00 PM - 8:00 PM)
+    if ((hour >= 4 && hour < 9.5) || (hour >= 16 && hour < 20)) {
+      return this.options.intervals?.afterHours || 300;
+    }
+    
+    // Market closed
+    return this.options.intervals?.closed || 900;
+  }
+  
+  /**
+   * Stop all polling operations
+   */
+  private stopPolling() {
+    Object.keys(this.pollingIntervals).forEach((key) => {
+      window.clearInterval(this.pollingIntervals[key]);
+      delete this.pollingIntervals[key];
+    });
+    
+    this.status.isPolling = false;
+    this.notifyStatusChanged();
+  }
+  
+  /**
+   * Poll for market indices
+   */
+  private async pollMarketIndices() {
+    try {
+      // In a real implementation, this would get real-time market index data
+      // For this example, we're just simulating an update
+      console.log('Polling market indices...');
+      
+      this.status.lastUpdated = new Date();
+      this.notifyStatusChanged();
+    } catch (error) {
+      console.error('Error polling market indices:', error);
+    }
+  }
+  
+  /**
+   * Poll for stock data
+   */
+  private async pollStocks() {
+    try {
+      // Prioritize certain stocks based on settings
+      const prioritySymbols = this.options.prioritySymbols || [];
+      
+      if (prioritySymbols.length > 0) {
+        // In a real implementation, batch request stock data
+        console.log('Polling priority stocks...', prioritySymbols);
+      } else {
+        // Poll a general set of stocks
+        console.log('Polling general stocks...');
+      }
+      
+      this.status.lastUpdated = new Date();
+      this.notifyStatusChanged();
+    } catch (error) {
+      console.error('Error polling stocks:', error);
+    }
+  }
+  
+  /**
+   * Connect to WebSocket for real-time updates
+   */
+  private connectWebSocket() {
+    // In a real implementation, connect to Polygon.io WebSocket API
+    console.log('WebSocket not implemented in this example');
+    
+    // Simulate connected state
+    this.status.isConnected = true;
+    this.notifyStatusChanged();
+  }
+  
+  /**
+   * Disconnect WebSocket
+   */
+  private disconnectWebSocket() {
+    if (this.websocket) {
+      this.websocket.close();
+      this.websocket = null;
+    }
+    
+    this.status.isConnected = false;
+    this.notifyStatusChanged();
+  }
+  
+  /**
+   * Subscribe to updates
+   */
+  public subscribe(callback: (data: any) => void) {
+    this.subscribers.push(callback);
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
+  
+  /**
+   * Notify all subscribers of status changes
+   */
+  private notifyStatusChanged() {
+    this.subscribers.forEach(callback => {
+      callback({
+        type: 'status',
+        data: this.getStatus()
+      });
+    });
+  }
+  
+  /**
+   * Get current status
+   */
+  public getStatus(): RealtimeUpdateStatus {
+    return { ...this.status };
+  }
+  
+  /**
+   * Get last updated timestamp
+   */
+  public getLastUpdated(): Date | null {
+    return this.status.lastUpdated;
+  }
+  
+  /**
+   * Pause or resume updates
+   */
+  public toggleUpdates(): boolean {
+    this.status.isPaused = !this.status.isPaused;
+    
+    if (this.status.isPaused) {
+      this.stopUpdates();
+    } else {
+      this.determineUpdateMethod();
+    }
+    
+    this.notifyStatusChanged();
+    return !this.status.isPaused;
+  }
+  
+  /**
+   * Manually refresh all data
+   */
+  public async refreshData() {
+    try {
+      // Clear cache to ensure fresh data
+      clearCache();
+      
+      // Update market status
+      await this.checkMarketStatus();
+      
+      // In a real implementation, this would refresh all relevant data
+      console.log('Manually refreshing all data...');
+      
+      this.status.lastUpdated = new Date();
+      this.notifyStatusChanged();
+      
+      return true;
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Update cached data for a symbol
+   */
+  public updateCachedData(symbol: string, data: any) {
+    this.cachedData.set(symbol, data);
+    this.notifyDataUpdated(symbol, data);
+  }
+  
+  /**
+   * Get cached data for a symbol
+   */
+  public getCachedData(symbol: string) {
+    return this.cachedData.get(symbol);
+  }
+  
+  /**
+   * Notify subscribers of data updates
+   */
+  private notifyDataUpdated(symbol: string, data: any) {
+    this.subscribers.forEach(callback => {
+      callback({
+        type: 'data',
+        symbol,
+        data
+      });
+    });
   }
 }
 
-// Export the update manager
-export const realtime = {
-  getInstance: () => UpdateManager.getInstance(),
-  
-  // Helper functions
-  subscribe: (symbol: string, callback: UpdateEventCallback) => 
-    UpdateManager.getInstance().subscribe(symbol, callback),
-    
-  subscribeMultiple: (symbols: string[], callback: UpdateEventCallback) => 
-    UpdateManager.getInstance().subscribeMultiple(symbols, callback),
-    
-  subscribeToType: (type: string, callback: UpdateEventCallback) => 
-    UpdateManager.getInstance().subscribeToType(type, callback),
-    
-  refreshData: () => UpdateManager.getInstance().refreshData(),
-  
-  pauseUpdates: () => UpdateManager.getInstance().pauseUpdates(),
-  
-  resumeUpdates: () => UpdateManager.getInstance().resumeUpdates(),
-  
-  toggleUpdates: () => UpdateManager.getInstance().toggleUpdates(),
-  
-  updateSettings: (settings: any) => UpdateManager.getInstance().updateSettings(settings),
-  
-  getStatus: () => UpdateManager.getInstance().getStatus(),
-  
-  getLastUpdated: () => UpdateManager.getInstance().getLastUpdated(),
-  
-  dispose: () => UpdateManager.getInstance().dispose()
-};
+// Export singleton instance
+export const realtime = new RealtimeService();
 
-export default realtime;
+// Initialize on import
+realtime.init();

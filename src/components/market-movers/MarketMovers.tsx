@@ -7,6 +7,7 @@ import { StockData, MarketStatus } from "@/types/marketTypes";
 import apiService from "@/services/apiService";
 import { toast } from "sonner";
 import StockList from "./StockList";
+import { useMediaQuery } from "@/hooks/use-mobile";
 
 interface MarketMoversProps {
   gainers: StockData[];
@@ -15,6 +16,7 @@ interface MarketMoversProps {
   error: Error | null;
   marketStatus?: MarketStatus;
   refreshData: () => void;
+  compactMode?: boolean;
 }
 
 const MarketMovers = ({
@@ -24,10 +26,12 @@ const MarketMovers = ({
   error = null,
   marketStatus,
   refreshData,
+  compactMode = false,
 }: MarketMoversProps) => {
   const [sparklines, setSparklines] = useState<{ [key: string]: number[] }>({});
   const [activeTab, setActiveTab] = useState<string>("gainers");
   const [loadingSparklines, setLoadingSparklines] = useState<boolean>(false);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   // Load sparkline data for stocks
   useEffect(() => {
@@ -69,9 +73,9 @@ const MarketMovers = ({
 
   return (
     <Card className="animate-fade-in">
-      <CardHeader className="pb-3">
+      <CardHeader className={`pb-3 ${compactMode && isMobile ? 'py-3' : ''}`}>
         <div className="flex justify-between items-center">
-          <CardTitle>Market Movers</CardTitle>
+          <CardTitle className={compactMode && isMobile ? 'text-base' : ''}>Market Movers</CardTitle>
           {isMarketClosed && (
             <div className="text-xs font-medium bg-muted px-2 py-1 rounded-md">
               Market Closed
@@ -89,11 +93,11 @@ const MarketMovers = ({
           <TabsList className="w-full">
             <TabsTrigger value="gainers" className="flex-1">
               <TrendingUp className="h-4 w-4 mr-2" />
-              Top Gainers
+              <span className={isMobile && compactMode ? 'text-xs' : ''}>Top Gainers</span>
             </TabsTrigger>
             <TabsTrigger value="losers" className="flex-1">
               <TrendingDown className="h-4 w-4 mr-2" />
-              Top Losers
+              <span className={isMobile && compactMode ? 'text-xs' : ''}>Top Losers</span>
             </TabsTrigger>
           </TabsList>
           <TabsContent
@@ -107,6 +111,7 @@ const MarketMovers = ({
               refreshData={refreshData}
               sparklines={sparklines}
               loadingSparklines={loadingSparklines}
+              compactMode={compactMode && isMobile}
             />
           </TabsContent>
           <TabsContent
@@ -120,6 +125,7 @@ const MarketMovers = ({
               refreshData={refreshData}
               sparklines={sparklines}
               loadingSparklines={loadingSparklines}
+              compactMode={compactMode && isMobile}
             />
           </TabsContent>
         </Tabs>

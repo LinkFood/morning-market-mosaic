@@ -1,10 +1,13 @@
 
 import React from "react";
-import { AlertOctagon, RefreshCw } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { StockData } from "@/types/marketTypes";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import StockItem from "./StockItem";
+import { StockData } from "@/types/marketTypes";
 
 interface StockListProps {
   stocks: StockData[];
@@ -13,6 +16,7 @@ interface StockListProps {
   refreshData: () => void;
   sparklines: { [key: string]: number[] };
   loadingSparklines: boolean;
+  compactMode?: boolean;
 }
 
 const StockList: React.FC<StockListProps> = ({
@@ -22,72 +26,70 @@ const StockList: React.FC<StockListProps> = ({
   refreshData,
   sparklines,
   loadingSparklines,
+  compactMode = false
 }) => {
-  // Find max volume for relative bar sizing
-  const maxVolume = Math.max(
-    ...stocks.map((stock) => stock.volume || 0),
-    100000
-  );
-
+  // Render loading skeleton
   if (isLoading) {
     return (
-      <>
-        {Array(5)
-          .fill(0)
-          .map((_, idx) => (
-            <div key={idx} className="border-b border-border last:border-0 p-3">
-              <div className="flex justify-between items-start mb-2">
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="h-6 w-16" />
-              </div>
-              <div className="flex justify-between items-center">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-1/3" />
-              </div>
+      <div className="p-4 space-y-3">
+        {[...Array(5)].map((_, index) => (
+          <div key={index} className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-5 w-20 mb-1" />
+              <Skeleton className="h-4 w-24" />
             </div>
-          ))}
-      </>
+            <Skeleton className="h-10 w-20" />
+          </div>
+        ))}
+      </div>
     );
   }
 
+  // Render error state
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <AlertOctagon className="h-10 w-10 text-destructive mb-2" />
-        <p className="text-muted-foreground mb-4">Failed to load market data</p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          className="gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Try Again
+      <div className="p-4">
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4 mr-2" />
+          <AlertDescription>
+            Failed to load market movers
+          </AlertDescription>
+        </Alert>
+        <Button onClick={refreshData} className="w-full">
+          <ReloadIcon className="mr-2 h-4 w-4" /> Try Again
         </Button>
       </div>
     );
   }
 
-  if (stocks.length === 0) {
+  // Render empty state
+  if (!stocks || stocks.length === 0) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-muted-foreground">No data available</p>
+      <div className="p-4 text-center text-muted-foreground">
+        <p>No data available</p>
       </div>
     );
   }
 
+  // Calculate max height based on the number of items
+  // Fewer items on mobile to show the entire card without scrolling
+  const maxItems = compactMode ? 4 : 7;
+  const maxHeight = `${Math.min(stocks.length, maxItems) * (compactMode ? 60 : 72)}px`;
+
   return (
-    <div className="divide-y divide-border">
-      {stocks.map((stock) => (
-        <StockItem
-          key={stock.ticker}
-          stock={stock}
-          sparkline={sparklines[stock.ticker]}
-          loadingSparklines={loadingSparklines}
-          maxVolume={maxVolume}
-        />
-      ))}
-    </div>
+    <ScrollArea className={`max-h-[${maxHeight}]`} type="always">
+      <div className="space-y-1">
+        {stocks.map((stock) => (
+          <StockItem
+            key={stock.ticker}
+            stock={stock}
+            sparklineData={sparklines[stock.ticker]}
+            isLoadingSparkline={loadingSparklines}
+            compactMode={compactMode}
+          />
+        ))}
+      </div>
+    </ScrollArea>
   );
 };
 
