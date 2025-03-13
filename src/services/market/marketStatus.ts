@@ -3,29 +3,25 @@
  * Market Status Service
  * Provides information about current market status (open/closed)
  */
-import marketService from ".";
-import polygonService from "../polygon";
 import cacheUtils from "./cacheUtils";
 import mockData from "./mockData";
 import { MarketStatus } from "@/types/marketTypes";
+import { polygonRequest } from "../polygon/client";
 
 // Get current market status (open/closed)
 async function getMarketStatus(): Promise<MarketStatus> {
   return cacheUtils.fetchWithCache("market_status", async () => {
     try {
-      // Get API key from config
-      const status = await polygonService.getMarketStatus();
-      
-      // Add type assertion to help TypeScript understand the structure
-      const statusData = status as any;
+      // Direct API call to avoid circular dependency
+      const status = await polygonRequest("/v1/marketstatus/now");
       
       // Transform to our MarketStatus type
       const marketStatus: MarketStatus = {
-        market: statusData.market || "closed",
-        serverTime: statusData.serverTime || new Date().toISOString(),
-        exchanges: statusData.exchanges || {},
-        isOpen: statusData.isOpen || false,
-        nextOpeningTime: statusData.nextOpeningTime || null
+        market: status.market || "closed",
+        serverTime: status.timestamp || new Date().toISOString(),
+        exchanges: status.exchanges || {},
+        isOpen: !!status.market && status.market.toLowerCase() === "open",
+        nextOpeningTime: status.nextOpeningTime || null
       };
       
       return marketStatus;
