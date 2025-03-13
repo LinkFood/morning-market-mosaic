@@ -54,8 +54,9 @@ export async function initializeServices(): Promise<boolean> {
     
     // Test FRED API if you're using it
     try {
-      const fredApi = await import('./fred');
-      const fedData = await fredApi.testFredConnection();
+      // Import the testFredConnection function directly to avoid issues
+      const { testFredConnection } = await import('./fred');
+      const fedData = await testFredConnection();
       serviceStatus.fredApi = !!fedData;
       console.log("FRED API connection test:", fedData ? "Success" : "Failed");
     } catch (e) {
