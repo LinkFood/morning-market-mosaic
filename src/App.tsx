@@ -13,6 +13,7 @@ import { initializeFeatureFlags } from './services/features';
 const Index = lazy(() => import('./pages/Index'));
 const FedDashboard = lazy(() => import('./pages/FedDashboard'));
 const FredDebug = lazy(() => import('./components/FredDebug'));
+const ApiDiagnostics = lazy(() => import('./pages/ApiDiagnostics'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Initialize React Query client
@@ -119,12 +120,13 @@ function App() {
                   {featureFlags && featureFlags.useFredEconomicData && (
                     <Route path="/fred-debug" element={<FredDebug />} />
                   )}
+                  <Route path="/api-diagnostics" element={<ApiDiagnostics />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </Router>
             <div className="fixed top-0 left-0 right-0 bg-amber-400 text-black text-sm py-1 px-4 text-center z-50">
-              Limited functionality: Some services are unavailable
+              Limited functionality: Some services are unavailable. <a href="/api-diagnostics" className="underline font-medium">Run diagnostics</a>
             </div>
             <Toaster position="bottom-right" />
           </StockDetailProvider>
@@ -144,6 +146,7 @@ function App() {
                 <Route path="/" element={<Index />} />
                 <Route path="/fed-dashboard" element={<FedDashboard />} />
                 <Route path="/fred-debug" element={<FredDebug />} />
+                <Route path="/api-diagnostics" element={<ApiDiagnostics />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
