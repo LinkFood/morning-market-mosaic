@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { TimeFrame } from '@/components/chart/TimeFrameSelector';
 import { toast } from 'sonner';
 
@@ -40,23 +39,55 @@ export const useStockChart = (
   const [chartData, setChartData] = useState<StockChartData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const lastFetchRef = useRef<number>(0);
+  
+  // Cache for mock data to prevent regeneration
+  const mockDataCache = useRef<Record<string, StockChartData[]>>({});
+  
+  // Only fetch data when parameters that affect the query change
+  // This prevents unnecessary data fetches during renders
+  const fetchKey = useMemo(() => {
+    return `${symbol}_${timeFrame}_${options.includePreMarket}_${options.includeAfterHours}_${options.smoothing}`;
+  }, [symbol, timeFrame, options.includePreMarket, options.includeAfterHours, options.smoothing]);
 
   // Fetch mock data when parameters change
-  // In a real implementation, this would call your API service
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
-
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Throttle fetches to avoid UI flickering
+        const now = Date.now();
+        const timeSinceLastFetch = now - lastFetchRef.current;
+        
+        // If we fetched less than 500ms ago, delay this fetch
+        if (timeSinceLastFetch < 500) {
+          await new Promise(resolve => setTimeout(resolve, 500 - timeSinceLastFetch));
+        }
+        
+        lastFetchRef.current = Date.now();
+        
+        // Check cache first
+        if (mockDataCache.current[fetchKey]) {
+          setChartData(mockDataCache.current[fetchKey]);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Simulate API delay (reduced to minimize flickering)
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Generate mock data
         const data = generateMockSPYData(timeFrame);
         
         // Process data for chart display
         const processedData = processChartData(data, options, timeFrame);
+        
+        // Store in cache
+        mockDataCache.current[fetchKey] = processedData;
+        
+        // Update state
         setChartData(processedData);
       } catch (err) {
         console.error(`Error fetching chart data for ${symbol}:`, err);
@@ -68,9 +99,17 @@ export const useStockChart = (
     };
 
     fetchData();
-  }, [symbol, timeFrame, options]);
+    
+    // Cleanup function
+    return () => {
+      // If we have too many cache entries, clear some older ones
+      if (Object.keys(mockDataCache.current).length > 20) {
+        mockDataCache.current = {};
+      }
+    };
+  }, [fetchKey, symbol, timeFrame]);
 
-  // Get current price from latest data point
+  // Get current price from latest data point with memoization
   const currentPrice = useMemo(() => {
     if (chartData.length > 0) {
       return chartData[chartData.length - 1].close;
@@ -78,7 +117,7 @@ export const useStockChart = (
     return null;
   }, [chartData]);
 
-  // Calculate daily change and percentage
+  // Calculate daily change and percentage with memoization
   const priceChange = useMemo(() => {
     if (chartData.length < 2) return { change: 0, percentage: 0 };
 
@@ -141,6 +180,12 @@ function processChartData(
   if (options.smoothing && timeFrame !== '1D' && timeFrame !== '1W') {
     processedData = smoothData(processedData);
   }
+
+  // Ensure value property is set for EnhancedChart compatibility
+  processedData = processedData.map(item => ({
+    ...item,
+    value: item.close
+  }));
   
   return processedData;
 }
@@ -192,12 +237,24 @@ function smoothData(data: any[]): any[] {
   return smoothedData;
 }
 
-// Mock data generator for SPY
+// Mock data generator for SPY - stabilized for less flickering
 function generateMockSPYData(timeFrame: TimeFrame): StockChartData[] {
   const data: StockChartData[] = [];
   const now = new Date();
-  const baseValue = 500 + Math.random() * 20;
-  const trend = Math.random() > 0.5 ? 1 : -1;
+  
+  // Use a stable seed for base value based on the day
+  const dateSeed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  const pseudoRandom = (seed: number) => {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  };
+  
+  const baseValue = 500 + pseudoRandom(dateSeed) * 20;
+  
+  // Determine trend more consistently
+  const trendSeed = Math.floor(dateSeed / 7);
+  const trend = pseudoRandom(trendSeed) > 0.5 ? 1 : -1;
+  
   let startDate = new Date(now);
   let dataPoints = 30;
   let timeIncrement = 24 * 60 * 60 * 1000; // 1 day in milliseconds
@@ -253,7 +310,7 @@ function generateMockSPYData(timeFrame: TimeFrame): StockChartData[] {
       break;
   }
 
-  // Generate price data
+  // Generate price data with consistent volatility
   let currentValue = baseValue;
   let volatility = 0.5; // Base volatility
 
@@ -261,6 +318,11 @@ function generateMockSPYData(timeFrame: TimeFrame): StockChartData[] {
   if (timeFrame === '1D') volatility = 0.1;
   if (timeFrame === '1W') volatility = 0.2;
   if (timeFrame === '5Y' || timeFrame === 'MAX') volatility = 1.5;
+
+  // Use a more stable random generator with seed based on index
+  const stableRandom = (index: number, offset = 0) => {
+    return pseudoRandom(dateSeed + index + offset);
+  };
 
   for (let i = 0; i < dataPoints; i++) {
     const timestamp = startDate.getTime() + (i * timeIncrement);
@@ -272,14 +334,14 @@ function generateMockSPYData(timeFrame: TimeFrame): StockChartData[] {
     }
 
     // Random price movement with trend component
-    const changePercent = (Math.random() - 0.5) * volatility + (trend * 0.01);
+    const changePercent = (stableRandom(i, 1) - 0.5) * volatility + (trend * 0.01);
     currentValue = currentValue * (1 + changePercent);
 
     // Add some noise to other values
-    const open = currentValue * (1 + (Math.random() - 0.5) * 0.01);
+    const open = currentValue * (1 + (stableRandom(i, 2) - 0.5) * 0.01);
     const close = currentValue;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.01);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+    const high = Math.max(open, close) * (1 + stableRandom(i, 3) * 0.01);
+    const low = Math.min(open, close) * (1 - stableRandom(i, 4) * 0.01);
 
     // Format time display based on timeFrame
     let displayTime = '';
@@ -298,7 +360,7 @@ function generateMockSPYData(timeFrame: TimeFrame): StockChartData[] {
       high,
       low,
       close,
-      volume: Math.floor(Math.random() * 10000000) + 500000,
+      volume: Math.floor(stableRandom(i, 5) * 10000000) + 500000,
       vwap: (open + high + low + close) / 4,
       displayTime,
       value: close // For compatibility with EnhancedChart

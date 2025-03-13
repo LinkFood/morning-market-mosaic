@@ -1,9 +1,8 @@
-
 /**
  * EnhancedChart - A configurable chart component that adapts to different data frequencies
  * and provides consistent formatting and styling
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import TimeFrameSelector, { TimeFrame } from "./TimeFrameSelector";
 import ChartComponent from "./ChartComponent";
 import ChartEmptyState from "./ChartEmptyState";
@@ -46,13 +45,16 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   const timeFrame = externalTimeFrame || internalTimeFrame;
   const setTimeFrame = externalSetTimeFrame || setInternalTimeFrame;
   
+  // Memoize data to prevent unnecessary reprocessing
+  const memoizedData = useMemo(() => data, [JSON.stringify(data)]);
+  
   // Process chart data using our custom hook
   const { 
     filteredData, 
     normalizedData, 
     dataFrequency, 
     isEmpty 
-  } = useChartData(data, dataKeys, xAxisKey, timeFrame);
+  } = useChartData(memoizedData, dataKeys, xAxisKey, timeFrame);
   
   // Configure chart axes using our custom hook
   const { 
@@ -65,7 +67,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   // Get tooltip formatters
   const { enhancedTooltipFormatter } = useTooltipFormatter(title);
   
-  // Add debug logging to trace data flow issues
+  // Throttle debug logging to avoid console spam
   useEffect(() => {
     if (data && data.length > 0) {
       console.log(`EnhancedChart data for ${title || 'chart'}:`, {
@@ -76,7 +78,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         frequency: dataFrequency
       });
     }
-  }, [data, filteredData, title, xAxisKey, timeFrame, dataFrequency]);
+  }, [timeFrame, dataFrequency]); // Reduced dependencies to avoid excessive logging
   
   // Handle empty filtered data by falling back to all data
   useEffect(() => {
@@ -170,4 +172,5 @@ const ChartWrapper: React.FC<ChartWrapperProps> = ({
   );
 };
 
-export default EnhancedChart;
+// Export memoized component to prevent unnecessary re-renders
+export default React.memo(EnhancedChart);

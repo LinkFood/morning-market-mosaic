@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -7,6 +7,33 @@ import { Label } from "@/components/ui/label";
 import EnhancedChart from "@/components/chart/EnhancedChart";
 import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 import { useStockChart } from "@/hooks/useStockChart";
+
+// Memoized price display component to prevent re-renders
+const PriceDisplay = React.memo(({ 
+  currentPrice,
+  priceChange 
+}: { 
+  currentPrice: number | null,
+  priceChange: { change: number, percentage: number }
+}) => {
+  // Determine color class based on price change
+  const isPositive = priceChange?.change >= 0;
+  const tickerClass = isPositive ? 'text-positive' : 'text-negative';
+  
+  return (
+    <div className="flex flex-col items-end">
+      <span className="text-2xl font-bold">
+        {currentPrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </span>
+      <span className={`text-sm font-medium ${tickerClass}`}>
+        {priceChange?.change >= 0 ? '+' : ''}
+        {priceChange?.change.toFixed(2)} ({priceChange?.percentage.toFixed(2)}%)
+      </span>
+    </div>
+  );
+});
+
+PriceDisplay.displayName = 'PriceDisplay';
 
 /**
  * SPY Chart Component
@@ -16,26 +43,25 @@ const SPYChart: React.FC = () => {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('1D');
   const [showExtendedHours, setShowExtendedHours] = useState(true);
   
+  // Memoize chart options to prevent unnecessary hook re-execution
+  const chartOptions = useMemo(() => ({
+    includePreMarket: showExtendedHours,
+    includeAfterHours: showExtendedHours,
+    smoothing: false
+  }), [showExtendedHours]);
+  
   // Use the stock chart hook instead of manually generating data
   const {
     chartData,
     isLoading,
     currentPrice,
     priceChange
-  } = useStockChart('SPY', timeFrame, {
-    includePreMarket: showExtendedHours,
-    includeAfterHours: showExtendedHours,
-    smoothing: false
-  });
+  } = useStockChart('SPY', timeFrame, chartOptions);
   
   // Handle toggle for pre/after market data
   const handleExtendedHoursToggle = (checked: boolean) => {
     setShowExtendedHours(checked);
   };
-  
-  // Determine color class based on price change
-  const isPositive = priceChange?.change >= 0;
-  const tickerClass = isPositive ? 'text-positive' : 'text-negative';
   
   return (
     <Card className="shadow-md">
@@ -52,15 +78,10 @@ const SPYChart: React.FC = () => {
               <Skeleton className="h-4 w-16" />
             </div>
           ) : (
-            <div className="flex flex-col items-end">
-              <span className="text-2xl font-bold">
-                {currentPrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className={`text-sm font-medium ${tickerClass}`}>
-                {priceChange?.change >= 0 ? '+' : ''}
-                {priceChange?.change.toFixed(2)} ({priceChange?.percentage.toFixed(2)}%)
-              </span>
-            </div>
+            <PriceDisplay 
+              currentPrice={currentPrice} 
+              priceChange={priceChange} 
+            />
           )}
         </div>
       </CardHeader>
@@ -96,4 +117,4 @@ const SPYChart: React.FC = () => {
   );
 };
 
-export default SPYChart;
+export default React.memo(SPYChart);
