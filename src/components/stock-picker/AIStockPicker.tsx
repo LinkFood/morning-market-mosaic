@@ -12,6 +12,7 @@ import StockPickerLoading from './StockPickerLoading';
 import StockPickerEmpty from './StockPickerEmpty';
 import MarketInsight from './MarketInsight';
 import apiService from '@/services/apiService';
+import { isFeatureEnabled } from '@/services/features';
 
 const AIStockPicker = () => {
   const [loading, setLoading] = useState(true);
@@ -21,36 +22,61 @@ const AIStockPicker = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Check for AI analysis feature flag
+  const isAIEnabled = isFeatureEnabled('useAIStockAnalysis');
+  
   const loadData = async () => {
     setRefreshing(true);
     setError(null);
     
     try {
-      // Get market status
-      const status = await apiService.getMarketStatus();
+      console.log("Starting AI Stock Picker data load");
       
-      // Get top active stocks
-      const stocksData = await apiService.getMajorStocks([
+      // Get a mix of active stocks to analyze (more comprehensive than just major stocks)
+      const stockSymbols = [
         "AAPL", "MSFT", "AMZN", "GOOGL", "META", 
         "NVDA", "TSLA", "AMD", "NFLX", "DIS",
         "JPM", "BAC", "WMT", "PG", "JNJ", 
-        "XOM", "CVX", "PFE", "KO", "PEP"
-      ]);
+        "XOM", "CVX", "PFE", "KO", "PEP",
+        "FB", "INTC", "VZ", "T", "MCD",
+        "NKE", "IBM", "GS", "V", "PYPL"
+      ];
       
-      // Get top picks using the service
+      // Get stock data for the symbols
+      console.log("Fetching stock data for analysis...");
+      const stocksData = await apiService.getMajorStocks(stockSymbols);
+      
+      if (!stocksData || stocksData.length === 0) {
+        throw new Error("Failed to retrieve stock data");
+      }
+      
+      console.log(`Retrieved data for ${stocksData.length} stocks`);
+      
+      // Apply the algorithm to get top stock picks
+      console.log("Applying stock picker algorithm...");
       const scoredStocks = await apiService.getTopPicks(stocksData);
+      
+      if (!scoredStocks || scoredStocks.length === 0) {
+        throw new Error("No stocks met the algorithm criteria");
+      }
+      
+      console.log(`Algorithm selected ${scoredStocks.length} top stocks`);
       setTopStocks(scoredStocks);
       
-      // Get AI analysis for these stocks
-      if (scoredStocks.length > 0) {
+      // Get AI analysis if enabled
+      if (isAIEnabled && scoredStocks.length > 0) {
         try {
+          console.log("Requesting AI analysis for selected stocks...");
           const analysis = await apiService.getStockAnalysis(scoredStocks);
+          console.log("AI analysis received:", analysis ? "success" : "empty");
           setAiAnalysis(analysis);
         } catch (analysisError) {
           console.error('Error getting AI analysis:', analysisError);
           toast.error('Could not load AI analysis. Algorithm results still available.');
-          // Still show the stocks, just without AI analysis
         }
+      } else {
+        console.log("AI analysis is disabled or no stocks were selected");
+        setAiAnalysis(null);
       }
       
       setLastUpdated(new Date());
@@ -105,7 +131,7 @@ const AIStockPicker = () => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center">
             <Cpu className="mr-2 h-5 w-5" />
-            <span>AI-Enhanced Stock Picks</span>
+            <span>{isAIEnabled ? 'AI-Enhanced Stock Picks' : 'Algorithmic Stock Picks'}</span>
           </div>
           <div className="flex items-center text-sm font-normal">
             {lastUpdated && (
@@ -128,7 +154,9 @@ const AIStockPicker = () => {
           <div className="flex items-center rounded-md bg-secondary/50 p-2 mb-4">
             <Info className="h-4 w-4 mr-2 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              These picks are based on technical indicators and enhanced with AI analysis. For educational purposes only.
+              {isAIEnabled 
+                ? 'These picks are based on technical indicators and enhanced with AI analysis. For educational purposes only.'
+                : 'These picks are based on technical indicators. AI analysis is currently unavailable.'}
             </p>
           </div>
           
