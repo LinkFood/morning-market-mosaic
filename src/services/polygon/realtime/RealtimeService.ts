@@ -1,10 +1,11 @@
 
 import { RealtimeUpdateStatus, RealtimeOptions, MarketStatus, StockData } from '@/types/marketTypes';
-import { clearAllCache } from './cache';
-import marketData from './marketData';
-
-export type DataUpdateType = 'status' | 'data' | 'error';
-export type UpdateEventCallback = (data: any, type: DataUpdateType) => void;
+import { clearAllCache } from '../cache';
+import marketData from '../marketData';
+import { BatteryManager } from './BatteryManager';
+import { PollingManager } from './PollingManager';
+import { WebSocketManager } from './WebSocketManager';
+import { DataSubscriptionManager, DataUpdateType, UpdateEventCallback } from './DataSubscriptionManager';
 
 /**
  * Realtime data service for Polygon.io
@@ -29,68 +30,56 @@ class RealtimeService {
     }
   };
   
-  private pollingIntervals: Record<string, number> = {};
-  private websocket: WebSocket | null = null;
   private marketStatus: MarketStatus | null = null;
   private lastMarketStatusCheck: Date = new Date(0);
   private cachedData: Map<string, any> = new Map();
-  private batteryStatus: { charging: boolean, level: number } = { 
-    charging: true, 
-    level: 1.0 
-  };
   
-  // Add the subscribers property for event handling
-  private subscribers: Array<(data: any) => void> = [];
+  // Managers
+  private batteryManager: BatteryManager;
+  private pollingManager: PollingManager;
+  private webSocketManager: WebSocketManager;
+  private subscriptionManager: DataSubscriptionManager;
   
   constructor() {
-    this.initBatteryMonitoring();
+    this.batteryManager = new BatteryManager(this.handleBatteryStatusChange.bind(this));
+    this.pollingManager = new PollingManager(this.handlePollingUpdate.bind(this));
+    this.webSocketManager = new WebSocketManager(this.handleWebSocketUpdate.bind(this));
+    this.subscriptionManager = new DataSubscriptionManager();
+    
+    this.batteryManager.init();
   }
   
   /**
-   * Initialize battery monitoring for power-aware updates
-   * @private
+   * Handle battery status changes
    */
-  private async initBatteryMonitoring() {
-    try {
-      if ('getBattery' in navigator) {
-        const battery = await (navigator as any).getBattery();
-        
-        this.batteryStatus = {
-          charging: battery.charging,
-          level: battery.level
-        };
-        
-        battery.addEventListener('chargingchange', () => {
-          this.batteryStatus.charging = battery.charging;
-          this.adjustPollingForBattery();
-        });
-        
-        battery.addEventListener('levelchange', () => {
-          this.batteryStatus.level = battery.level;
-          this.adjustPollingForBattery();
-        });
-      }
-    } catch (error) {
-      console.warn('Battery API not available:', error);
-    }
-  }
-  
-  /**
-   * Adjust polling frequency based on device battery status
-   * @private
-   */
-  private adjustPollingForBattery() {
+  private handleBatteryStatusChange(charging: boolean, level: number): void {
     if (!this.options.batteryOptimization) return;
     
-    if (!this.batteryStatus.charging && this.batteryStatus.level < 0.2) {
-      this.stopPolling();
-      this.startPolling(true);
+    if (!charging && level < 0.2) {
+      this.pollingManager.stop();
+      this.pollingManager.start(this.getPollingInterval(), true);
     } else {
       if (this.status.isPolling) {
-        this.stopPolling();
-        this.startPolling(false);
+        this.pollingManager.stop();
+        this.pollingManager.start(this.getPollingInterval(), false);
       }
     }
+  }
+  
+  /**
+   * Handle polling updates
+   */
+  private handlePollingUpdate(type: string): void {
+    this.status.lastUpdated = new Date();
+    this.notifyStatusChanged();
+  }
+  
+  /**
+   * Handle WebSocket updates
+   */
+  private handleWebSocketUpdate(connected: boolean): void {
+    this.status.isConnected = connected;
+    this.notifyStatusChanged();
   }
   
   /**
@@ -114,11 +103,13 @@ class RealtimeService {
     };
     
     if (this.status.isPolling) {
-      this.stopPolling();
-      this.startPolling();
+      this.pollingManager.stop();
+      this.pollingManager.start(this.getPollingInterval());
     }
     
-    this.adjustPollingForBattery();
+    if (options.batteryOptimization !== undefined) {
+      this.batteryManager.toggleOptimization(options.batteryOptimization);
+    }
   }
   
   /**
@@ -181,14 +172,14 @@ class RealtimeService {
     this.stopUpdates();
     
     if (this.options.updateMethod === 'websocket') {
-      this.connectWebSocket();
+      this.webSocketManager.connect();
     } else if (this.options.updateMethod === 'polling') {
-      this.startPolling();
+      this.pollingManager.start(this.getPollingInterval());
     } else {
       if (this.marketStatus.isOpen) {
-        this.startPolling();
+        this.pollingManager.start(this.getPollingInterval());
       } else {
-        this.startPolling();
+        this.pollingManager.start(this.getPollingInterval());
       }
     }
   }
@@ -198,38 +189,8 @@ class RealtimeService {
    * @private
    */
   private stopUpdates() {
-    this.stopPolling();
-    this.disconnectWebSocket();
-  }
-  
-  /**
-   * Start polling for updates
-   * @param lowPowerMode - Whether to use low power mode (less frequent updates)
-   * @private
-   */
-  private startPolling(lowPowerMode = false) {
-    if (this.status.isPolling) return;
-    
-    let interval = this.getPollingInterval();
-    
-    if (lowPowerMode) {
-      interval = interval * 2;
-    }
-    
-    this.pollingIntervals['marketIndices'] = window.setInterval(() => {
-      this.pollMarketIndices();
-    }, interval * 1000);
-    
-    this.pollingIntervals['stocks'] = window.setInterval(() => {
-      this.pollStocks();
-    }, interval * 1000);
-    
-    this.pollingIntervals['marketStatus'] = window.setInterval(() => {
-      this.checkMarketStatus();
-    }, 5 * 60 * 1000);
-    
-    this.status.isPolling = true;
-    this.notifyStatusChanged();
+    this.pollingManager.stop();
+    this.webSocketManager.disconnect();
   }
   
   /**
@@ -257,78 +218,14 @@ class RealtimeService {
   }
   
   /**
-   * Stop all polling intervals
+   * Notify subscribers of status changes
    * @private
    */
-  private stopPolling() {
-    Object.keys(this.pollingIntervals).forEach((key) => {
-      window.clearInterval(this.pollingIntervals[key]);
-      delete this.pollingIntervals[key];
+  private notifyStatusChanged() {
+    this.subscriptionManager.notifySubscribers({
+      type: 'status',
+      data: this.getStatus()
     });
-    
-    this.status.isPolling = false;
-    this.notifyStatusChanged();
-  }
-  
-  /**
-   * Poll for market indices data
-   * @private
-   */
-  private pollMarketIndices() {
-    try {
-      console.log('Polling market indices...');
-      
-      this.status.lastUpdated = new Date();
-      this.notifyStatusChanged();
-    } catch (error) {
-      console.error('Error polling market indices:', error);
-    }
-  }
-  
-  /**
-   * Poll for stock data
-   * @private
-   */
-  private pollStocks() {
-    try {
-      const prioritySymbols = this.options.prioritySymbols || [];
-      
-      if (prioritySymbols.length > 0) {
-        console.log('Polling priority stocks...', prioritySymbols);
-      } else {
-        console.log('Polling general stocks...');
-      }
-      
-      this.status.lastUpdated = new Date();
-      this.notifyStatusChanged();
-    } catch (error) {
-      console.error('Error polling stocks:', error);
-    }
-  }
-  
-  /**
-   * Connect to WebSocket for realtime updates
-   * @private
-   */
-  private connectWebSocket() {
-    console.log('WebSocket not implemented in this example');
-    
-    this.status.isConnected = true;
-    this.notifyStatusChanged();
-  }
-  
-  /**
-   * Disconnect from WebSocket
-   * @private
-   */
-  private disconnectWebSocket() {
-    if (this.websocket) {
-      this.websocket.close();
-      this.websocket = null;
-    }
-    
-    this.status.isConnected = false;
-    this.notifyStatusChanged();
   }
   
   /**
@@ -338,10 +235,7 @@ class RealtimeService {
    * @returns Unsubscribe function
    */
   public subscribe(callback: (data: any) => void) {
-    this.subscribers.push(callback);
-    return () => {
-      this.subscribers = this.subscribers.filter(cb => cb !== callback);
-    };
+    return this.subscriptionManager.subscribe(callback);
   }
   
   /**
@@ -352,30 +246,7 @@ class RealtimeService {
    * @returns Unsubscribe function
    */
   public subscribeMultiple(symbols: string[], callback: UpdateEventCallback) {
-    // Create separate subscriptions for each symbol
-    const unsubscribes = symbols.map(symbol => this.subscribe((data) => {
-      if (data.symbol === symbol || data.type === 'status') {
-        callback(data.data, data.type as DataUpdateType);
-      }
-    }));
-    
-    // Return a function that unsubscribes all
-    return () => {
-      unsubscribes.forEach(unsubscribe => unsubscribe());
-    };
-  }
-  
-  /**
-   * Notify subscribers of status changes
-   * @private
-   */
-  private notifyStatusChanged() {
-    this.subscribers.forEach(callback => {
-      callback({
-        type: 'status',
-        data: this.getStatus()
-      });
-    });
+    return this.subscriptionManager.subscribeMultiple(symbols, callback);
   }
   
   /**
@@ -465,16 +336,12 @@ class RealtimeService {
    * @private
    */
   private notifyDataUpdated(symbol: string, data: any) {
-    this.subscribers.forEach(callback => {
-      callback({
-        type: 'data',
-        symbol,
-        data
-      });
+    this.subscriptionManager.notifySubscribers({
+      type: 'data',
+      symbol,
+      data
     });
   }
 }
 
-export const realtime = new RealtimeService();
-
-realtime.init();
+export default RealtimeService;
