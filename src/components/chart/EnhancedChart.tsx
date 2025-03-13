@@ -12,7 +12,7 @@ import {
   normalizeChartData,
   formatChartDates,
   formatYAxisTick
-} from "./utils";
+} from "./utils/index";
 import { EnhancedChartProps } from "./types";
 import { 
   formatDailyDate, 
