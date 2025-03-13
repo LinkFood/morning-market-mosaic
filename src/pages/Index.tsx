@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/DashboardHeader";
 import MarketOverview from "@/components/MarketOverview";
@@ -103,12 +104,12 @@ const Dashboard = () => {
       const sectorsData = await sectorPerformance.getSectorPerformance();
       setSectors(sectorsData);
       
-      // Load stocks based on user's watchlist
-      const stocksData = await stocks.getMajorStocks(settings.watchlist);
+      // Load stocks based on user's watchlist - FIX: Use the imported stocks service object
+      const stocksData = await marketService.getMajorStocks(settings.watchlist);
       setStocks(stocksData);
       
-      // Load market events
-      const eventsData = await events.getMarketEvents();
+      // Load market events - FIX: Use the imported events service object
+      const eventsData = await marketService.getMarketEvents();
       setEvents(eventsData);
       
       // Load economic indicators separately
