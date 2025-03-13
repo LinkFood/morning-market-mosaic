@@ -121,11 +121,11 @@ function identifySignals(stock: StockData): string[] {
  * Check if a stock meets minimum criteria for consideration
  */
 function meetsMinimumCriteria(stock: ScoredStock): boolean {
-  // Basic liquidity filter - reject stocks with very low volume
-  if (stock.volume && stock.volume < 100000) return false;
+  // Relaxed volume filter - to show more stocks
+  if (stock.volume && stock.volume < 50000) return false;
   
-  // Minimum composite score threshold
-  if (stock.scores.composite < 60) return false;
+  // Relaxed minimum composite score threshold
+  if (stock.scores.composite < 40) return false;
   
   return true;
 }
@@ -134,7 +134,10 @@ function meetsMinimumCriteria(stock: ScoredStock): boolean {
  * Main function to evaluate and rank stocks
  */
 export function evaluateStocks(stocksData: StockData[]): ScoredStock[] {
-  return stocksData
+  // Log the input data for debugging
+  console.log(`evaluateStocks called with ${stocksData.length} stocks`);
+  
+  const scoredStocks = stocksData
     .map(stock => {
       // Calculate individual scores
       const momentumScore = calculateMomentumScore(stock);
@@ -166,8 +169,13 @@ export function evaluateStocks(stocksData: StockData[]): ScoredStock[] {
       return scoredStock;
     })
     .filter(stock => meetsMinimumCriteria(stock))
-    .sort((a, b) => b.scores.composite - a.scores.composite)
-    .slice(0, 5); // Get top 5 stocks
+    .sort((a, b) => b.scores.composite - a.scores.composite);
+  
+  // Log how many stocks passed the criteria
+  console.log(`${scoredStocks.length} stocks passed minimum criteria`);
+  
+  // Return the top 5 stocks (or fewer if less available)
+  return scoredStocks.slice(0, 5);
 }
 
 export default {
