@@ -10,7 +10,7 @@ import MajorStocks from "@/components/major-stocks/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
-import ES1FuturesChart from "@/components/ES1FuturesChart";
+import TradingViewWidget from "@/components/TradingViewWidget";
 import StockPicks from "@/components/stock-picks/StockPicks";
 import AIStockPicker from "@/components/stock-picker/AIStockPicker";
 
@@ -38,14 +38,20 @@ const DashboardGrid: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* ES1 Futures Chart */}
+      {/* TradingView Widget */}
       {isComponentVisible('es1-futures') && (
         <div className={`${isComponentVisible('es1-futures') ? 'lg:col-span-2' : ''}`}>
           <CollapsibleComponent
             componentId="es1-futures"
             title="S&P 500 Futures"
           >
-            <ES1FuturesChart />
+            <TradingViewWidget 
+              symbol="ES1!" 
+              height={400} 
+              interval="D"
+              cardTitle="S&P 500 E-mini Futures"
+              cardDescription="Real-time market data powered by TradingView"
+            />
           </CollapsibleComponent>
         </div>
       )}
@@ -57,7 +63,6 @@ const DashboardGrid: React.FC = () => {
             componentId="market-overview"
             title="Market Overview"
           >
-            {/* Remove isLoading prop to match component definition */}
             <MarketOverview indices={indices} />
           </CollapsibleComponent>
         </div>
@@ -139,7 +144,6 @@ const DashboardGrid: React.FC = () => {
             componentId="market-events"
             title="Market Events"
           >
-            {/* Remove isLoading prop to match component definition */}
             <MarketEvents events={events} />
           </CollapsibleComponent>
         </div>
