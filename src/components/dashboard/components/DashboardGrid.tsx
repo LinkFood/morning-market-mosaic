@@ -57,7 +57,8 @@ const DashboardGrid: React.FC = () => {
             componentId="market-overview"
             title="Market Overview"
           >
-            <MarketOverview indices={indices} isLoading={isLoading} />
+            {/* Remove isLoading prop to match component definition */}
+            <MarketOverview indices={indices} />
           </CollapsibleComponent>
         </div>
       )}
@@ -138,7 +139,8 @@ const DashboardGrid: React.FC = () => {
             componentId="market-events"
             title="Market Events"
           >
-            <MarketEvents events={events} isLoading={isLoading} />
+            {/* Remove isLoading prop to match component definition */}
+            <MarketEvents events={events} />
           </CollapsibleComponent>
         </div>
       )}

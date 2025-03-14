@@ -4,177 +4,206 @@
  */
 import { toast } from "sonner";
 
-// Cache settings
-const DEFAULT_CACHE_TTL = 60 * 1000; // 1 minute default
-export const CACHE_TTL = {
-  MARKET_STATUS: 60 * 1000, // 1 minute
-  MARKET_INDICES: 2 * 60 * 1000, // 2 minutes
-  MARKET_SECTORS: 5 * 60 * 1000, // 5 minutes
-  MARKET_STOCKS: 2 * 60 * 1000, // 2 minutes
-  MARKET_EVENTS: 10 * 60 * 1000, // 10 minutes
-  MARKET_MOVERS: 3 * 60 * 1000, // 3 minutes
-  EXTENDED_CACHE: 24 * 60 * 60 * 1000, // 24 hours for emergency fallback
-};
+// Cache TTL defaults (in milliseconds)
+const DEFAULT_TTL = 300000; // 5 minutes
+const EXTENDED_TTL = 1800000; // 30 minutes
+const STALE_TTL = 86400000; // 24 hours (data considered stale but potentially usable)
 
-// Cache structure
-const inMemoryCache: Record<string, { data: any; timestamp: number }> = {};
-
-// Cache keys by service
-const cacheKeysByService: Record<string, string[]> = {};
-
-/**
- * Get data from cache
- * @param key Cache key
- * @param ttl Time to live (ms)
- * @param allowExpiredData Whether to return expired data with a warning
- * @returns Cached data or null
- */
-function getCachedData<T>(key: string, ttl = DEFAULT_CACHE_TTL, allowExpiredData = false): T | null {
-  const cachedItem = inMemoryCache[key];
-  
-  if (!cachedItem) {
-    return null;
-  }
-  
-  const now = Date.now();
-  const isExpired = now - cachedItem.timestamp > ttl;
-  
-  if (!isExpired) {
-    return cachedItem.data;
-  }
-  
-  // Return expired data if allowed
-  if (allowExpiredData) {
-    console.log(`Using expired cache for ${key} (${Math.round((now - cachedItem.timestamp) / 1000)}s old)`);
-    return cachedItem.data;
-  }
-  
-  return null;
-}
-
-/**
- * Store data in cache
- * @param key Cache key
- * @param data Data to cache
- * @param serviceName Optional service name for cache management
- */
-function cacheData(key: string, data: any, serviceName?: string): void {
-  inMemoryCache[key] = {
-    data,
-    timestamp: Date.now()
+// In-memory cache storage
+const cache: {
+  [key: string]: {
+    data: any;
+    timestamp: number;
+    service?: string;
   };
-  
-  // Track cache key by service if provided
-  if (serviceName) {
-    if (!cacheKeysByService[serviceName]) {
-      cacheKeysByService[serviceName] = [];
-    }
-    
-    if (!cacheKeysByService[serviceName].includes(key)) {
-      cacheKeysByService[serviceName].push(key);
-    }
-  }
-}
+} = {};
+
+// Cache service registry
+const serviceRegistry: { [service: string]: string[] } = {};
 
 /**
- * Clear cache for a specific service
- * @param serviceName Service name
- */
-function clearServiceCache(serviceName: string): void {
-  const keys = cacheKeysByService[serviceName] || [];
-  
-  keys.forEach(key => {
-    delete inMemoryCache[key];
-  });
-  
-  cacheKeysByService[serviceName] = [];
-}
-
-/**
- * Clear entire cache
- */
-function clearAllCache(): void {
-  for (const key in inMemoryCache) {
-    delete inMemoryCache[key];
-  }
-  
-  for (const service in cacheKeysByService) {
-    cacheKeysByService[service] = [];
-  }
-}
-
-/**
- * Get timestamp for cached data
+ * Fetch data with caching
  * @param key Cache key
- * @returns Date object or null
- */
-function getCacheTimestamp(key: string): Date | null {
-  const cachedItem = inMemoryCache[key];
-  
-  if (!cachedItem) {
-    return null;
-  }
-  
-  return new Date(cachedItem.timestamp);
-}
-
-/**
- * Fetch data with cache
- * @param cacheKey Cache key
- * @param fetchFn Function to fetch data if not cached
- * @param allowExpiredData Whether to return expired data with a warning
- * @param ttl Time to live (ms)
- * @returns Cached or fetched data
+ * @param fetcher Optional fetcher function
+ * @param allowExpiredData Whether to allow expired data
+ * @param ttl Time to live in milliseconds
  */
 async function fetchWithCache<T>(
-  cacheKey: string, 
-  fetchFn: (() => Promise<T>) | null,
+  key: string,
+  fetcher: (() => Promise<T>) | null = null,
   allowExpiredData = false,
-  ttl = DEFAULT_CACHE_TTL
+  ttl = DEFAULT_TTL
 ): Promise<T | null> {
-  // Check cache first
-  const cachedData = getCachedData<T>(cacheKey, ttl, allowExpiredData);
-  
-  if (cachedData) {
-    return cachedData;
+  const cachedItem = cache[key];
+  const now = Date.now();
+
+  // If we have valid cache, return it
+  if (cachedItem && now - cachedItem.timestamp < ttl) {
+    return cachedItem.data;
   }
-  
-  // If no fetch function provided, just return null
-  if (!fetchFn) {
+
+  // If we allow expired data and have it, return it
+  if (allowExpiredData && cachedItem) {
+    console.log(`Using stale data for ${key}, age: ${Math.round((now - cachedItem.timestamp) / 1000)}s`);
+    return cachedItem.data;
+  }
+
+  // If no fetcher provided, return null
+  if (!fetcher) {
     return null;
   }
-  
+
   try {
     // Fetch fresh data
-    const data = await fetchFn();
+    const freshData = await fetcher();
     
     // Cache the result
-    if (data) {
-      cacheData(cacheKey, data);
-    }
+    cacheData(key, freshData);
     
-    return data;
+    return freshData;
   } catch (error) {
-    console.error(`Error fetching data for cache key ${cacheKey}:`, error);
+    console.error(`Cache fetcher error for ${key}:`, error);
     
-    // On error, check if we can use expired data as fallback
-    if (allowExpiredData) {
-      const expiredData = getCachedData<T>(cacheKey, Infinity);
-      if (expiredData) {
-        console.log(`Using expired cache as fallback for ${cacheKey}`);
-        return expiredData;
-      }
+    // If we have expired data and an error occurred, return the expired data as fallback
+    if (cachedItem) {
+      console.log(`Using stale data as fallback for ${key} after error`);
+      return cachedItem.data;
     }
     
     throw error;
   }
 }
 
+/**
+ * Cache data with an optional service name
+ * @param key Cache key
+ * @param data Data to cache
+ * @param serviceName Optional service name for grouping
+ */
+function cacheData(key: string, data: any, serviceName?: string) {
+  cache[key] = {
+    data,
+    timestamp: Date.now(),
+    service: serviceName
+  };
+  
+  // Register in service registry if service name provided
+  if (serviceName) {
+    if (!serviceRegistry[serviceName]) {
+      serviceRegistry[serviceName] = [];
+    }
+    
+    if (!serviceRegistry[serviceName].includes(key)) {
+      serviceRegistry[serviceName].push(key);
+    }
+  }
+}
+
+/**
+ * Clear cache for a specific service
+ * @param serviceName Service name to clear
+ */
+function clearServiceCache(serviceName: string) {
+  const keys = serviceRegistry[serviceName] || [];
+  let count = 0;
+  
+  keys.forEach(key => {
+    if (cache[key]) {
+      delete cache[key];
+      count++;
+    }
+  });
+  
+  // Reset service registry
+  serviceRegistry[serviceName] = [];
+  
+  if (count > 0) {
+    console.log(`Cleared ${count} cache entries for service: ${serviceName}`);
+    toast.info(`Refreshed ${serviceName} data`);
+  }
+  
+  return count;
+}
+
+/**
+ * Get cache timestamp
+ * @param key Cache key
+ */
+function getCacheTimestamp(key: string): Date | null {
+  const cachedItem = cache[key];
+  if (cachedItem) {
+    return new Date(cachedItem.timestamp);
+  }
+  return null;
+}
+
+/**
+ * Get cache age in seconds
+ * @param key Cache key
+ */
+function getCacheAge(key: string): number | null {
+  const cachedItem = cache[key];
+  if (cachedItem) {
+    return Math.round((Date.now() - cachedItem.timestamp) / 1000);
+  }
+  return null;
+}
+
+/**
+ * Clear all cache data
+ */
+function clearAllCacheData() {
+  const keyCount = Object.keys(cache).length;
+  
+  // Clear the cache
+  for (const key in cache) {
+    delete cache[key];
+  }
+  
+  // Reset service registry
+  for (const service in serviceRegistry) {
+    serviceRegistry[service] = [];
+  }
+  
+  console.log(`Cleared all cache data (${keyCount} entries)`);
+  toast.info("All market data refreshed");
+  
+  return keyCount;
+}
+
+/**
+ * Get a summary of the cache
+ */
+function getCacheSummary() {
+  const services: { [service: string]: number } = {};
+  let uncategorized = 0;
+  
+  // Count items by service
+  for (const key in cache) {
+    const item = cache[key];
+    if (item.service) {
+      services[item.service] = (services[item.service] || 0) + 1;
+    } else {
+      uncategorized++;
+    }
+  }
+  
+  return {
+    totalItems: Object.keys(cache).length,
+    services,
+    uncategorized
+  };
+}
+
 export default {
-  getCachedData,
+  fetchWithCache,
   cacheData,
   clearServiceCache,
-  clearAllCache,
   getCacheTimestamp,
-  fetchWithCache
+  getCacheAge,
+  clearAllCacheData,
+  getCacheSummary,
+  DEFAULT_TTL,
+  EXTENDED_TTL,
+  STALE_TTL
 };

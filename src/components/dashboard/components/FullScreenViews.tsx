@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useDashboard } from "../DashboardContext";
 import FullScreenComponent from "../FullScreenComponent";
@@ -81,6 +82,7 @@ const FullScreenViews: React.FC = () => {
             analysis={stockAnalysis}
             isLoading={isLoadingStockPicks}
             isLoadingAnalysis={isLoadingAnalysis}
+            onRefresh={loadStockPicks}
           />
         </FullScreenComponent>
       )}

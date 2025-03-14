@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ interface StockFiltersProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   compactMode?: boolean;
+  disabled?: boolean; // Added this prop to fix TypeScript error
 }
 
 const StockFilters: React.FC<StockFiltersProps> = ({
@@ -17,7 +19,8 @@ const StockFilters: React.FC<StockFiltersProps> = ({
   setActiveFilter,
   searchQuery,
   setSearchQuery,
-  compactMode = false
+  compactMode = false,
+  disabled = false // Added default value
 }) => {
   
   const FILTERS = [
@@ -42,9 +45,10 @@ const StockFilters: React.FC<StockFiltersProps> = ({
             variant={activeFilter === filter.id ? "default" : "outline"}
             className={cn(
               "cursor-pointer transition-colors",
-              compactMode ? "px-2 py-1 text-xs" : ""
+              compactMode ? "px-2 py-1 text-xs" : "",
+              disabled ? "opacity-50 pointer-events-none" : ""
             )}
-            onClick={() => setActiveFilter(filter.id)}
+            onClick={() => !disabled && setActiveFilter(filter.id)}
           >
             {filter.label}
           </Badge>
@@ -57,11 +61,13 @@ const StockFilters: React.FC<StockFiltersProps> = ({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className={compactMode ? "h-8 text-sm pl-3 pr-8" : "pr-8"}
+          disabled={disabled}
         />
-        {searchQuery && (
+        {searchQuery && !disabled && (
           <button
             onClick={handleSearchClear}
             className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            disabled={disabled}
           >
             <X className={compactMode ? "h-4 w-4" : "h-5 w-5"} />
             <span className="sr-only">Clear search</span>

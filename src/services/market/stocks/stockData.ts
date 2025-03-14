@@ -65,9 +65,9 @@ async function getMajorStocks(tickers: string[] = ["AAPL", "MSFT", "AMZN", "GOOG
       
       // Get batch stock snapshots with retries
       console.log("Fetching stock data for", tickers.length, "stocks");
-      const stockData = await polygonService.polygonRequestWithRetry(
+      const stockData = await polygonService.request(
         `/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(',')}`,
-        3 // Use 3 retries
+        { retries: 3 } // Use 3 retries
       ).then(response => {
         // Map response data to StockData format
         return (response.tickers || []).map((item: any) => ({
@@ -145,9 +145,9 @@ async function getStockSparkline(ticker: string): Promise<number[]> {
       const toDate = now.toISOString().split('T')[0];
       
       // Get candle data for the ticker with retry
-      const candles = await polygonService.polygonRequestWithRetry(
+      const candles = await polygonService.request(
         `/v2/aggs/ticker/${ticker}/range/1/day/${fromDate}/${toDate}`,
-        2 // 2 retries
+        { retries: 2 } // 2 retries
       ).then(response => {
         if (response.results && Array.isArray(response.results)) {
           return response.results.map((candle: any) => ({
