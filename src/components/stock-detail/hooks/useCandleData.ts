@@ -12,10 +12,18 @@ export const useCandleData = (
 ) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [lastRequestTimestamp, setLastRequestTimestamp] = useState(0);
   
   const loadCandleData = useCallback(async (ticker: string, timeFrame: TimeFrame) => {
+    // Prevent duplicate requests within a short time period
+    const now = Date.now();
+    if (now - lastRequestTimestamp < 500) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
     setIsLoading(true);
     setError(null);
+    setLastRequestTimestamp(Date.now());
     
     try {
       const endDate = new Date();
@@ -62,9 +70,33 @@ export const useCandleData = (
       const fromDate = startDate.toISOString().split('T')[0];
       const toDate = endDate.toISOString().split('T')[0];
       
-      // Request candle data from API
       console.log(`Fetching ${ticker} data from ${fromDate} to ${toDate} with timespan ${timespan}`);
-      const candles = await stocks.getStockCandles(ticker, timespan, fromDate, toDate);
+      
+      // Request candle data from API with retry logic
+      let retryCount = 0;
+      let candles: CandleData[] = [];
+      
+      while (retryCount < 3) {
+        try {
+          candles = await stocks.getStockCandles(ticker, timespan, fromDate, toDate);
+          if (candles && candles.length > 0) {
+            break; // Successful request with data
+          }
+          retryCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        } catch (err) {
+          console.warn(`Retry ${retryCount + 1} failed for ${ticker} candle data`);
+          retryCount++;
+          if (retryCount >= 3) throw err;
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
+      
+      if (!candles || candles.length === 0) {
+        console.warn(`No candle data returned for ${ticker}`);
+        setCandleData([]);
+        return [];
+      }
       
       // Ensure data is sorted by timestamp
       const sortedCandles = [...candles].sort((a, b) => a.timestamp - b.timestamp);
@@ -75,13 +107,12 @@ export const useCandleData = (
     } catch (err) {
       console.error('Error loading candle data:', err);
       setError(err instanceof Error ? err : new Error('Failed to load chart data'));
-      toast.error('Failed to load chart data');
       setCandleData([]);
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, [setCandleData]);
+  }, [setCandleData, lastRequestTimestamp]);
   
   useEffect(() => {
     if (ticker) {

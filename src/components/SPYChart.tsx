@@ -9,7 +9,8 @@ import StockCandlestickChart from "@/components/chart/StockCandlestickChart";
 import { CandleData } from "@/types/marketTypes";
 import { useCandleData } from "@/components/stock-detail/hooks/useCandleData";
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Memoized price display component to prevent re-renders
 const PriceDisplay = React.memo(({ 
@@ -57,10 +58,11 @@ const SPYChart: React.FC = () => {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("1D");
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [showExtendedHours, setShowExtendedHours] = useState(true);
   
   // Use the candleData hook to fetch real data
-  const { loadCandleData } = useCandleData("SPY", timeFrame, setCandleData);
+  const { loadCandleData, isLoading: isLoadingCandles, error: candleError } = useCandleData("SPY", timeFrame, setCandleData);
   
   // Calculate current price and change
   const currentPrice = candleData.length > 0 ? candleData[candleData.length - 1].close : null;
@@ -87,12 +89,26 @@ const SPYChart: React.FC = () => {
     });
   }, [candleData, showExtendedHours, timeFrame]);
   
-  // Handle manual refresh
+  // Handle manual refresh with debouncing to prevent multiple rapid calls
   const handleRefresh = () => {
+    if (isLoading) return;
+    
     setIsLoading(true);
-    loadCandleData("SPY", timeFrame).finally(() => {
-      setIsLoading(false);
-    });
+    setError(null);
+    toast.info("Refreshing SPY data...");
+    
+    loadCandleData("SPY", timeFrame)
+      .then(() => {
+        toast.success("SPY data refreshed");
+      })
+      .catch((err) => {
+        console.error("Error refreshing SPY data:", err);
+        toast.error("Failed to refresh SPY data");
+        setError(err instanceof Error ? err : new Error("Failed to refresh data"));
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
   
   // Handle toggle for extended hours
@@ -100,20 +116,29 @@ const SPYChart: React.FC = () => {
     setShowExtendedHours(checked);
   };
   
-  // Set loading state based on data
+  // Update loading state based on hook
   useEffect(() => {
-    if (candleData.length > 0) {
-      setIsLoading(false);
+    setIsLoading(isLoadingCandles);
+  }, [isLoadingCandles]);
+  
+  // Update error state based on hook
+  useEffect(() => {
+    if (candleError) {
+      setError(candleError);
     }
-  }, [candleData]);
+  }, [candleError]);
   
   // Load data on component mount or when timeframe changes
   useEffect(() => {
     setIsLoading(true);
-    loadCandleData("SPY", timeFrame).finally(() => {
-      setIsLoading(false);
-    });
-  }, [timeFrame]);
+    setError(null);
+    
+    loadCandleData("SPY", timeFrame)
+      .catch((err) => {
+        console.error("Error loading SPY candle data:", err);
+        setError(err instanceof Error ? err : new Error("Failed to load data"));
+      });
+  }, [timeFrame, loadCandleData]);
   
   return (
     <Card className="shadow-md">
@@ -148,6 +173,21 @@ const SPYChart: React.FC = () => {
       <CardContent className="pb-4">
         {isLoading ? (
           <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-[300px] bg-muted/20 rounded-md space-y-4">
+            <AlertTriangle className="h-8 w-8 text-amber-500" />
+            <div className="text-center">
+              <p className="text-muted-foreground">Failed to load SPY data</p>
+              <p className="text-xs text-muted-foreground/70">{error.message}</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+            >
+              Try Again
+            </Button>
+          </div>
         ) : (
           <div className="space-y-2">
             {filteredData.length > 0 ? (
