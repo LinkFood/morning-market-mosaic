@@ -8,6 +8,9 @@ import { toast } from "sonner";
 // API configuration for Polygon.io
 export const POLYGON_BASE_URL = "https://api.polygon.io";
 
+// Hardcoded API key for development (temporarily using a real key for testing)
+const POLYGON_DEV_KEY = "kCopX5axh7_aHzSDUWQ4PXMvH9HrXWev"; // Free tier key with limited usage
+
 // Demo key for fallback (very limited functionality)
 const DEMO_KEY = "DEMO_API_KEY";
 
@@ -15,8 +18,17 @@ const DEMO_KEY = "DEMO_API_KEY";
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
 
+// Flag to use the dev key directly (for faster development)
+const USE_DEV_KEY = true;
+
 // Get API key from Supabase with retries
 export async function getPolygonApiKey(): Promise<string> {
+  // During development, use the dev key directly to avoid delays
+  if (USE_DEV_KEY) {
+    console.log("Using development Polygon API key");
+    return POLYGON_DEV_KEY;
+  }
+  
   console.log("Attempting to retrieve Polygon API key from Supabase");
   
   // Try multiple times if needed
