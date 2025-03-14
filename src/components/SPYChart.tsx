@@ -57,6 +57,7 @@ const SPYChart: React.FC = () => {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("1D");
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showExtendedHours, setShowExtendedHours] = useState(true);
   
   // Use the candleData hook to fetch real data
   const { loadCandleData } = useCandleData("SPY", timeFrame, setCandleData);
@@ -69,12 +70,34 @@ const SPYChart: React.FC = () => {
     percentage: currentPrice && openPrice ? ((currentPrice - openPrice) / openPrice) * 100 : 0
   };
   
+  // Filter extended hours data if needed
+  const filteredData = React.useMemo(() => {
+    if (showExtendedHours || timeFrame !== "1D") {
+      return candleData;
+    }
+    
+    // Filter to only include regular market hours (9:30 AM - 4:00 PM ET)
+    return candleData.filter(candle => {
+      const date = new Date(candle.timestamp);
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      
+      // Regular market hours: 9:30 AM - 4:00 PM ET
+      return (hours > 9 || (hours === 9 && minutes >= 30)) && hours < 16;
+    });
+  }, [candleData, showExtendedHours, timeFrame]);
+  
   // Handle manual refresh
   const handleRefresh = () => {
     setIsLoading(true);
     loadCandleData("SPY", timeFrame).finally(() => {
       setIsLoading(false);
     });
+  };
+  
+  // Handle toggle for extended hours
+  const handleExtendedHoursToggle = (checked: boolean) => {
+    setShowExtendedHours(checked);
   };
   
   // Set loading state based on data
@@ -127,15 +150,28 @@ const SPYChart: React.FC = () => {
           <Skeleton className="h-[300px] w-full rounded-md" />
         ) : (
           <div className="space-y-2">
-            {candleData.length > 0 ? (
+            {filteredData.length > 0 ? (
               <StockCandlestickChart
-                data={candleData}
+                data={filteredData}
                 timeFrame={timeFrame}
                 setTimeFrame={setTimeFrame}
               />
             ) : (
               <div className="flex items-center justify-center h-[300px] bg-muted/20 rounded-md">
                 <p className="text-muted-foreground">No data available</p>
+              </div>
+            )}
+            
+            {timeFrame === "1D" && (
+              <div className="flex items-center justify-end space-x-2 pt-2">
+                <Switch
+                  id="extended-hours"
+                  checked={showExtendedHours}
+                  onCheckedChange={handleExtendedHoursToggle}
+                />
+                <Label htmlFor="extended-hours" className="text-xs">
+                  Show Pre/After Market
+                </Label>
               </div>
             )}
           </div>
