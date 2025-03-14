@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useId } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,16 +13,10 @@ interface TradingViewWidgetProps {
   className?: string;
 }
 
-interface TradingViewWidgetInstance {
-  options: any;
-  iframe?: HTMLIFrameElement;
-  remove: () => void;
-}
-
 declare global {
   interface Window {
     TradingView?: {
-      widget: new (config: any) => TradingViewWidgetInstance;
+      widget: new (config: any) => any;
     };
   }
 }
@@ -35,112 +29,123 @@ const TradingViewWidget = ({
   cardDescription = "Real-time market data",
   className = "",
 }: TradingViewWidgetProps) => {
+  // Use React's useId hook for a truly stable ID
+  const uniqueId = useId();
+  const containerId = `tradingview_${symbol.replace(/[^a-zA-Z0-9]/g, '_')}_${uniqueId.replace(/:/g, '')}`;
+  
   const containerRef = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<TradingViewWidgetInstance | null>(null);
-  const scriptLoadedRef = useRef<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const { theme } = useTheme();
   
-  // Generate a stable container ID based only on the symbol
-  const containerId = useMemo(() => `tradingview_${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`, [symbol]);
+  // Track if component is mounted to prevent state updates after unmounting
+  const isMounted = useRef(true);
   
-  // Function to initialize or update the widget
-  const initializeWidget = () => {
-    if (!containerRef.current || !window.TradingView) {
-      console.log("Cannot initialize widget: container or TradingView not available");
-      return;
-    }
-    
-    // Set loading state while we initialize
-    setIsLoading(true);
-    
-    try {
-      // Clean up previous widget instance if it exists
-      if (widgetRef.current) {
-        console.log("Removing previous widget instance");
-        widgetRef.current.remove();
-        widgetRef.current = null;
-      }
-      
-      // Short timeout to ensure the DOM is ready after removing the previous widget
-      setTimeout(() => {
-        try {
-          if (!containerRef.current || !window.TradingView) return;
-          
-          console.log(`Initializing TradingView widget for ${symbol} with ${theme} theme`);
-          
-          // Create new widget instance
-          widgetRef.current = new window.TradingView.widget({
-            width: "100%",
-            height: height - 40, // Adjust for card padding
-            symbol: symbol,
-            interval: interval,
-            timezone: "exchange",
-            theme: theme === "dark" ? "dark" : "light",
-            style: "1", // Candles
-            toolbar_bg: theme === "dark" ? "#1a1a1a" : "#f1f3f6",
-            enable_publishing: false,
-            hide_side_toolbar: true,
-            allow_symbol_change: true,
-            container_id: containerId,
-            save_image: false,
-          });
-          
-          setIsLoading(false);
-          setHasError(false);
-        } catch (error) {
-          console.error("Error creating TradingView widget:", error);
-          setHasError(true);
-          setIsLoading(false);
-        }
-      }, 100); // Small timeout to ensure DOM is ready
-    } catch (error) {
-      console.error("Error during widget initialization:", error);
-      setHasError(true);
-      setIsLoading(false);
-    }
-  };
-  
-  // Consolidated effect to handle script loading, widget initialization and cleanup
   useEffect(() => {
-    // Load the TradingView script if not already loaded
-    if (!scriptLoadedRef.current && !document.getElementById('tradingview-widget-script') && !window.TradingView) {
-      console.log("Loading TradingView script");
-      setIsLoading(true);
-      
-      const script = document.createElement('script');
-      script.src = 'https://s3.tradingview.com/tv.js';
-      script.async = true;
-      script.id = 'tradingview-widget-script';
-      
-      script.onload = () => {
-        console.log("TradingView script loaded");
-        scriptLoadedRef.current = true;
-        initializeWidget();
-      };
-      
-      script.onerror = (error) => {
-        console.error("Failed to load TradingView script:", error);
-        setHasError(true);
-        setIsLoading(false);
-      };
-      
-      document.head.appendChild(script);
-    } else if (window.TradingView) {
-      // Script already loaded, initialize widget with current props
-      initializeWidget();
-    }
+    isMounted.current = true;
     
-    // Cleanup function to remove widget when component unmounts or props change
-    return () => {
-      if (widgetRef.current) {
-        console.log("Cleaning up widget on unmount/props change");
-        widgetRef.current.remove();
-        widgetRef.current = null;
+    // Function to safely update state only if component is mounted
+    const safeSetState = (loadingState: boolean, errorState: boolean) => {
+      if (isMounted.current) {
+        setIsLoading(loadingState);
+        setHasError(errorState);
       }
     };
-  }, [symbol, interval, theme]); // Re-run when these props change
+    
+    // Load the TradingView script
+    const loadScript = () => {
+      return new Promise<void>((resolve, reject) => {
+        if (window.TradingView) {
+          resolve();
+          return;
+        }
+        
+        const scriptId = 'tradingview-widget-script';
+        const existingScript = document.getElementById(scriptId);
+        
+        if (existingScript) {
+          // If script is loading but not ready, wait for it
+          if (!window.TradingView) {
+            existingScript.addEventListener('load', () => resolve());
+            existingScript.addEventListener('error', (e) => reject(e));
+          } else {
+            resolve();
+          }
+          return;
+        }
+        
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = 'https://s3.tradingview.com/tv.js';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = (e) => reject(e);
+        document.head.appendChild(script);
+      });
+    };
+    
+    // Initialize the widget
+    const createWidget = () => {
+      if (!containerRef.current || !window.TradingView) return;
+      
+      // Clear previous content if any
+      containerRef.current.innerHTML = '';
+      
+      try {
+        // Create new widget instance
+        new window.TradingView.widget({
+          autosize: false,
+          width: "100%",
+          height: height - 40,
+          symbol: symbol,
+          interval: interval,
+          timezone: "exchange",
+          theme: theme === "dark" ? "dark" : "light",
+          style: "1", // Candles
+          toolbar_bg: theme === "dark" ? "#1a1a1a" : "#f1f3f6",
+          enable_publishing: false,
+          hide_side_toolbar: false,
+          allow_symbol_change: true,
+          container_id: containerId,
+          save_image: false,
+          studies: ["RSI@tv-basicstudies"],
+          locale: "en",
+          disabled_features: ["use_localstorage_for_settings"],
+        });
+        
+        safeSetState(false, false);
+      } catch (error) {
+        console.error("Error creating TradingView widget:", error);
+        safeSetState(false, true);
+      }
+    };
+    
+    // Main initialization function
+    const init = async () => {
+      safeSetState(true, false);
+      
+      try {
+        await loadScript();
+        
+        // Ensure DOM is ready with a small delay
+        setTimeout(() => {
+          if (isMounted.current) {
+            createWidget();
+          }
+        }, 100);
+      } catch (error) {
+        console.error("Failed to load TradingView widget:", error);
+        safeSetState(false, true);
+      }
+    };
+    
+    init();
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, [symbol, interval, theme, height, containerId]);
   
   return (
     <Card className={`shadow-md transition-all duration-300 hover:shadow-lg ${className}`}>
