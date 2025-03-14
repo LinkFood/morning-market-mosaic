@@ -132,7 +132,8 @@ export async function getBatchIndexData(
     return indexData;
   } catch (error) {
     console.error('Error fetching batch index data:', error);
-    return {}; // Fix: Return empty object with the correct type
+    // Fix: Return empty object with the correct type annotation
+    return {} as Record<string, CandleData[]>;
   }
 }
 
