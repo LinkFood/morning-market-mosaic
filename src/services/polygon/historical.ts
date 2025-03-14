@@ -67,7 +67,7 @@ export async function getAggregates(
     return candles;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);
-    throw error; // Let the caller handle this
+    return []; // Return empty array instead of throwing to prevent UI errors
   }
 }
 
@@ -132,7 +132,7 @@ export async function getBatchIndexData(
     return indexData;
   } catch (error) {
     console.error('Error fetching batch index data:', error);
-    return {};
+    return {}; // Fix: Return empty object with the correct type
   }
 }
 
