@@ -1,54 +1,17 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 import StockCandlestickChart from "@/components/chart/StockCandlestickChart";
 import { CandleData } from "@/types/marketTypes";
-import { useCandleData } from "@/components/stock-detail/hooks/useCandleData";
-import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
-
-// Memoized price display component to prevent re-renders
-const PriceDisplay = React.memo(({ 
-  currentPrice,
-  priceChange,
-  isLoading
-}: { 
-  currentPrice: number | null,
-  priceChange: { change: number, percentage: number },
-  isLoading: boolean
-}) => {
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-4 w-16" />
-      </div>
-    );
-  }
-  
-  // Determine color class based on price change
-  const isPositive = priceChange?.change >= 0;
-  const tickerClass = isPositive ? 'text-positive' : 'text-negative';
-  
-  return (
-    <div className="flex flex-col items-end">
-      <span className="text-2xl font-bold">
-        {currentPrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-      </span>
-      <span className={`text-sm font-medium ${tickerClass}`}>
-        {priceChange?.change >= 0 ? '+' : ''}
-        {priceChange?.change.toFixed(2)} ({priceChange?.percentage.toFixed(2)}%)
-      </span>
-    </div>
-  );
-});
-
-PriceDisplay.displayName = 'PriceDisplay';
+import { initializeApiKey } from '@/services/market/config';
+import { stocks } from "@/services/market";
 
 /**
  * SPY Chart Component
@@ -58,12 +21,8 @@ const SPYChart: React.FC = () => {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("1D");
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [showExtendedHours, setShowExtendedHours] = useState(true);
-  const [refreshCounter, setRefreshCounter] = useState(0);
-  
-  // Use the candleData hook to fetch real data
-  const { loadCandleData, isLoading: isLoadingCandles, error: candleError } = useCandleData("SPY", timeFrame, setCandleData);
+  const [error, setError] = useState<string | null>(null);
   
   // Calculate current price and change
   const currentPrice = candleData.length > 0 ? candleData[candleData.length - 1].close : null;
@@ -90,83 +49,107 @@ const SPYChart: React.FC = () => {
     });
   }, [candleData, showExtendedHours, timeFrame]);
   
-  // Handle manual refresh with debouncing and recovery mechanism
-  const handleRefresh = useCallback(() => {
-    if (isLoading) return;
-    
+  // Load data function
+  const loadSPYData = async () => {
     setIsLoading(true);
     setError(null);
-    toast.info("Refreshing SPY data...");
     
-    // Force a new data load by incrementing counter
-    setRefreshCounter(prev => prev + 1);
-    
-    // Create a timeout to recover from stuck loading state
-    const loadingTimeout = setTimeout(() => {
-      if (isLoading) {
-        setIsLoading(false);
-        toast.error("Refresh timed out - please try again");
+    try {
+      // Ensure API key is initialized
+      await initializeApiKey();
+      
+      const endDate = new Date();
+      let startDate = new Date();
+      let timespan = 'day';
+      
+      // Determine appropriate timespan and start date based on timeFrame
+      switch (timeFrame) {
+        case "1D":
+          startDate.setDate(endDate.getDate() - 1);
+          timespan = 'minute';
+          break;
+        case "1W":
+          startDate.setDate(endDate.getDate() - 7);
+          timespan = 'hour';
+          break;
+        case "1M":
+          startDate.setMonth(endDate.getMonth() - 1);
+          timespan = 'day';
+          break;
+        case "3M":
+          startDate.setMonth(endDate.getMonth() - 3);
+          timespan = 'day';
+          break;
+        case "6M":
+          startDate.setMonth(endDate.getMonth() - 6);
+          timespan = 'day';
+          break;
+        case "1Y":
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          timespan = 'day';
+          break;
+        case "5Y":
+          startDate.setFullYear(endDate.getFullYear() - 5);
+          timespan = 'week';
+          break;
+        case "MAX":
+          startDate.setFullYear(endDate.getFullYear() - 20);
+          timespan = 'month';
+          break;
       }
-    }, 10000); // 10 second timeout
-    
-    loadCandleData("SPY", timeFrame)
-      .then(() => {
-        toast.success("SPY data refreshed");
-      })
-      .catch((err) => {
-        console.error("Error refreshing SPY data:", err);
-        toast.error("Failed to refresh SPY data");
-        setError(err instanceof Error ? err : new Error("Failed to refresh data"));
-      })
-      .finally(() => {
-        setIsLoading(false);
-        clearTimeout(loadingTimeout);
-      });
-  }, [isLoading, loadCandleData, timeFrame]);
+      
+      // Format dates for API
+      const fromDate = startDate.toISOString().split('T')[0];
+      const toDate = endDate.toISOString().split('T')[0];
+      
+      console.log(`Loading SPY data from ${fromDate} to ${toDate} with timespan ${timespan}`);
+      
+      // Fetch data with proper error handling
+      try {
+        const data = await stocks.getStockCandles("SPY", timespan, fromDate, toDate);
+        
+        if (!data || data.length === 0) {
+          console.warn('No SPY data returned from API');
+          setError('No data available for the selected time period');
+          setCandleData([]);
+          return;
+        }
+        
+        // Sort by timestamp ascending
+        const sortedData = [...data].sort((a, b) => a.timestamp - b.timestamp);
+        console.log(`Loaded ${sortedData.length} SPY data points`);
+        
+        setCandleData(sortedData);
+      } catch (apiError) {
+        console.error('API error:', apiError);
+        setError('Failed to load SPY data from API');
+      }
+    } catch (err) {
+      console.error('Error in loadSPYData:', err);
+      setError('An error occurred while loading chart data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle manual refresh
+  const handleRefresh = () => {
+    loadSPYData();
+  };
   
   // Handle toggle for extended hours
   const handleExtendedHoursToggle = (checked: boolean) => {
     setShowExtendedHours(checked);
   };
   
-  // Update loading state based on hook
+  // Load data on component mount or when timeframe changes
   useEffect(() => {
-    setIsLoading(isLoadingCandles);
-  }, [isLoadingCandles]);
+    loadSPYData();
+  }, [timeFrame]);
   
-  // Update error state based on hook
-  useEffect(() => {
-    if (candleError) {
-      setError(candleError);
-    }
-  }, [candleError]);
-  
-  // Load data on component mount or when timeframe or refresh counter changes
-  useEffect(() => {
-    setIsLoading(true);
-    setError(null);
-    
-    // Create a timeout to recover from stuck loading state
-    const loadingTimeout = setTimeout(() => {
-      if (isLoading) {
-        console.warn("Loading state stuck - recovering");
-        setIsLoading(false);
-      }
-    }, 10000); // 10 second timeout
-    
-    loadCandleData("SPY", timeFrame)
-      .catch((err) => {
-        console.error("Error loading SPY candle data:", err);
-        setError(err instanceof Error ? err : new Error("Failed to load data"));
-      })
-      .finally(() => {
-        clearTimeout(loadingTimeout);
-      });
-      
-    return () => {
-      clearTimeout(loadingTimeout);
-    };
-  }, [timeFrame, refreshCounter, loadCandleData]);
+  // Determine color class based on price change
+  const isPositive = priceChange.change >= 0;
+  const tickerClass = isPositive ? 'text-positive' : 'text-negative';
   
   return (
     <Card className="shadow-md">
@@ -189,11 +172,27 @@ const SPYChart: React.FC = () => {
               <span className="sr-only">Refresh</span>
             </Button>
             
-            <PriceDisplay 
-              currentPrice={currentPrice} 
-              priceChange={priceChange} 
-              isLoading={isLoading}
-            />
+            {isLoading ? (
+              <div className="flex flex-col items-end gap-1">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ) : currentPrice ? (
+              <div className="flex flex-col items-end">
+                <span className="text-2xl font-bold">
+                  {currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className={`text-sm font-medium ${tickerClass}`}>
+                  {priceChange.change >= 0 ? '+' : ''}
+                  {priceChange.change.toFixed(2)} ({priceChange.percentage.toFixed(2)}%)
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-end">
+                <span className="text-2xl font-bold text-muted">---.--</span>
+                <span className="text-sm font-medium text-muted">no data</span>
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -202,33 +201,17 @@ const SPYChart: React.FC = () => {
         {isLoading ? (
           <Skeleton className="h-[300px] w-full rounded-md" />
         ) : error ? (
-          <div className="flex flex-col items-center justify-center h-[300px] bg-muted/20 rounded-md space-y-4">
-            <AlertTriangle className="h-8 w-8 text-amber-500" />
-            <div className="text-center">
-              <p className="text-muted-foreground">Failed to load SPY data</p>
-              <p className="text-xs text-muted-foreground/70">{error.message}</p>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleRefresh}
-            >
-              Try Again
-            </Button>
-          </div>
-        ) : (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : filteredData.length > 0 ? (
           <div className="space-y-2">
-            {filteredData && filteredData.length > 0 ? (
-              <StockCandlestickChart
-                data={filteredData}
-                timeFrame={timeFrame}
-                setTimeFrame={setTimeFrame}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-[300px] bg-muted/20 rounded-md">
-                <p className="text-muted-foreground">No data available</p>
-              </div>
-            )}
+            <StockCandlestickChart
+              data={filteredData}
+              timeFrame={timeFrame}
+              setTimeFrame={setTimeFrame}
+            />
             
             {timeFrame === "1D" && (
               <div className="flex items-center justify-end space-x-2 pt-2">
@@ -242,6 +225,10 @@ const SPYChart: React.FC = () => {
                 </Label>
               </div>
             )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-[300px] bg-muted/20 rounded-md">
+            <p className="text-muted-foreground">No data available for the selected period</p>
           </div>
         )}
       </CardContent>
