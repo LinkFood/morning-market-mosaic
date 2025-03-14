@@ -3,7 +3,7 @@
  * Polygon.io Market Breadth Service
  * Provides information about market breadth (advancers, decliners, etc.)
  */
-import { polygonRequest } from '../client';
+import client from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { MarketBreadthData } from '@/types/marketTypes';
 
@@ -21,12 +21,12 @@ export async function getMarketBreadth(): Promise<MarketBreadthData> {
   
   try {
     // For advancers/decliners
-    const snapshotResponse = await polygonRequest('/v2/snapshot/locale/us/markets/stocks/tickers');
+    const snapshotResponse = await client.get('/v2/snapshot/locale/us/markets/stocks/tickers');
     
     // For new highs/lows we would ideally use a dedicated endpoint
     // Since Polygon doesn't have a direct endpoint for this, we'll use:
-    const highsResponse = await polygonRequest('/v2/snapshot/locale/us/markets/stocks/gainers?limit=50');
-    const lowsResponse = await polygonRequest('/v2/snapshot/locale/us/markets/stocks/losers?limit=50');
+    const highsResponse = await client.get('/v2/snapshot/locale/us/markets/stocks/gainers?limit=50');
+    const lowsResponse = await client.get('/v2/snapshot/locale/us/markets/stocks/losers?limit=50');
     
     // Process the data
     let advancers = 0;

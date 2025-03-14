@@ -3,7 +3,7 @@
  * Polygon.io Historical Index Data
  * Provides access to historical stock index data
  */
-import { polygonRequest } from '../client';
+import client from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { CandleData } from '@/types/marketTypes';
 
@@ -36,9 +36,9 @@ export async function getIndexData(
   try {
     console.log(`Fetching index data for ${formattedTicker}`);
     
-    const response = await polygonRequest(
+    const response = await client.get(
       `/v2/aggs/ticker/${formattedTicker}/range/${multiplier}/${timespan}/${from}/${to}`,
-      { adjusted: 'true', sort: 'asc', limit: 5000 }
+      { adjusted: 'true', sort: 'asc', limit: '5000' }
     );
     
     if (!response.results || !Array.isArray(response.results)) {

@@ -1,4 +1,3 @@
-
 /**
  * Polygon.io Historical Stock Candles
  * Provides historical candle (OHLC) data for stocks

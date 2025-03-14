@@ -4,7 +4,7 @@
  * Provides access to historical price data for stocks, indices, and more
  */
 import client from './client';
-import { addToCache, getFromCache } from './cache';
+import { getCachedData, cacheData } from './cache';
 import { CandleData } from '@/types/marketTypes';
 
 /**
@@ -24,7 +24,7 @@ export async function getAggregates(
   const cacheKey = `aggregates_${ticker}_${multiplier}_${timespan}_${from}_${to}_${adjusted}_${includeOtc}`;
   
   // Check cache first
-  const cachedData = getFromCache(cacheKey);
+  const cachedData = getCachedData(cacheKey);
   if (cachedData) {
     console.log(`Using cached data for ${ticker} ${timespan}`);
     return cachedData;
@@ -62,7 +62,7 @@ export async function getAggregates(
     }));
     
     // Cache results
-    addToCache(cacheKey, candles, 60 * 5); // Cache for 5 minutes
+    cacheData(cacheKey, candles, 60 * 5); // Cache for 5 minutes
     
     return candles;
   } catch (error) {

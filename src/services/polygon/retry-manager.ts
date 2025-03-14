@@ -3,7 +3,7 @@
  * Polygon.io Retry Manager
  * Handles retries for failed API calls
  */
-import { polygonRequest } from "./client";
+import client from "./client";
 
 /**
  * Make an API request with retry logic
@@ -19,7 +19,7 @@ export async function polygonRequestWithRetry(
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await polygonRequest(endpoint);
+      return await client.polygonRequest(endpoint);
     } catch (error) {
       console.warn(`API call failed (attempt ${attempt + 1}/${retries}):`, error);
       lastError = error as Error;

@@ -3,7 +3,7 @@
  * Polygon.io Market Holidays Service
  * Provides information about market holidays
  */
-import { polygonRequest } from '../client';
+import client from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 
 /**
@@ -21,7 +21,7 @@ export async function getMarketHolidays(year?: number) {
   }
   
   try {
-    const response = await polygonRequest(`/v1/marketstatus/upcoming`);
+    const response = await client.get(`/v1/marketstatus/upcoming`);
     
     // Filter for the requested year
     const holidays = response

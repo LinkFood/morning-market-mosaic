@@ -3,7 +3,7 @@
  * Polygon.io Sector Performance Service
  * Provides performance data for market sectors
  */
-import { polygonRequest } from '../client';
+import client from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { SectorPerformance } from '@/types/marketTypes';
 
@@ -36,7 +36,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
     
     const tickersParam = sectors.map(s => s.ticker).join(',');
     
-    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
+    const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
     
     // Map the response to our data format
     const sectorData: SectorPerformance[] = response.tickers.map((item: any) => {

@@ -3,7 +3,7 @@
  * Polygon.io Stock Snapshot Service
  * Provides real-time stock snapshot data
  */
-import { polygonRequest } from '../client';
+import client from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { StockData } from '@/types/marketTypes';
 
@@ -21,7 +21,7 @@ export async function getStockSnapshot(ticker: string): Promise<StockData> {
   }
   
   try {
-    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`);
+    const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`);
     
     // Transform the response into our StockData format
     const stockData: StockData = {
@@ -67,7 +67,7 @@ export async function getBatchStockSnapshots(
     
     try {
       // Use movers endpoint
-      const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/${type}?limit=${limit}`);
+      const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/${type}?limit=${limit}`);
       
       // Transform the response data
       const stocksData: StockData[] = response.tickers.map((item: any) => {
@@ -126,7 +126,7 @@ export async function getBatchStockSnapshots(
     // Format tickers for the API request
     const tickersParam = tickersToFetch.join(',');
     
-    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
+    const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
     
     // Transform the response data
     const stocksData: StockData[] = response.tickers.map((item: any) => {

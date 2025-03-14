@@ -3,7 +3,7 @@
  * Polygon.io Historical Aggregates Data
  * Provides aggregated market data
  */
-import { polygonRequest } from '../client';
+import client from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { CandleData } from '@/types/marketTypes';
 
@@ -33,9 +33,9 @@ export async function getAggregates(
   try {
     console.log(`Fetching aggregates for ${ticker} (${multiplier}/${timespan}) from ${from} to ${to}`);
     
-    const response = await polygonRequest(
+    const response = await client.get(
       `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`,
-      { adjusted: 'true', sort: 'asc', limit: 5000 }
+      { adjusted: 'true', sort: 'asc', limit: '5000' }
     );
     
     if (!response.results || !Array.isArray(response.results)) {
