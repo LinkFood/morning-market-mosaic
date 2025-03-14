@@ -12,6 +12,7 @@ import StockCandlestickChart from "@/components/chart/StockCandlestickChart";
 import { CandleData } from "@/types/marketTypes";
 import { initializeApiKey } from '@/services/market/config';
 import { stocks } from "@/services/market";
+import { toast } from 'sonner';
 
 /**
  * SPY Chart Component
@@ -59,7 +60,12 @@ const SPYChart: React.FC = () => {
       await initializeApiKey();
       
       const endDate = new Date();
-      let startDate = new Date();
+      // Make sure we're using correct year (not 2025 from console logs)
+      if (endDate.getFullYear() > 2024) {
+        endDate.setFullYear(2024);
+      }
+      
+      let startDate = new Date(endDate);
       let timespan = 'day';
       
       // Determine appropriate timespan and start date based on timeFrame
@@ -122,11 +128,18 @@ const SPYChart: React.FC = () => {
         setCandleData(sortedData);
       } catch (apiError) {
         console.error('API error:', apiError);
-        setError('Failed to load SPY data from API');
+        if (apiError instanceof Error) {
+          setError(`Failed to load SPY data: ${apiError.message}`);
+          toast.error(`API Error: ${apiError.message}`);
+        } else {
+          setError('Failed to load SPY data from API');
+          toast.error('API Error: Unable to load SPY data');
+        }
       }
     } catch (err) {
       console.error('Error in loadSPYData:', err);
       setError('An error occurred while loading chart data');
+      toast.error('Failed to load SPY chart data');
     } finally {
       setIsLoading(false);
     }

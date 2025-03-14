@@ -27,6 +27,7 @@ export async function polygonRequestWithRetry(
       // Don't retry certain errors (like authentication)
       if (error instanceof Error && 
          (error.message.includes("401") || error.message.includes("403"))) {
+        console.error("Authentication error, not retrying:", error.message);
         break;
       }
       

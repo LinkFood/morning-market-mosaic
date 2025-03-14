@@ -1,3 +1,4 @@
+
 /**
  * Polygon.io Historical Stock Candles
  * Provides historical candle (OHLC) data for stocks
@@ -5,6 +6,7 @@
 import client from '../client';
 import { getCachedData, cacheData } from '../cache';
 import { CandleData } from '@/types/marketTypes';
+import { toast } from 'sonner';
 
 // Cache time-to-live in seconds
 const CACHE_TTL = {
@@ -27,6 +29,14 @@ export async function getStockCandles(
   from: string,
   to: string
 ): Promise<CandleData[]> {
+  // Validate dates to prevent future dates
+  const now = new Date();
+  const toDate = new Date(to);
+  if (toDate > now) {
+    console.warn(`Future date requested (${to}), using current date instead`);
+    to = now.toISOString().split('T')[0];
+  }
+
   // Determine appropriate multiplier and timespan format
   const { multiplier, timespanFormat } = getTimespanParams(timespan);
   
@@ -63,6 +73,12 @@ export async function getStockCandles(
       return [];
     }
     
+    // Handle empty results
+    if (response.results.length === 0) {
+      console.warn(`No data returned for ${ticker} in the specified date range`);
+      return [];
+    }
+    
     // Transform the data into our format
     const candleData: CandleData[] = response.results.map(item => ({
       timestamp: item.t,
@@ -82,6 +98,12 @@ export async function getStockCandles(
     return candleData;
   } catch (error) {
     console.error(`Error fetching candle data for ${ticker}:`, error);
+    
+    // Show error toast for user feedback
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to load ${ticker} data: ${errorMessage}`);
+    
+    // Return empty array to prevent UI errors
     return [];
   }
 }

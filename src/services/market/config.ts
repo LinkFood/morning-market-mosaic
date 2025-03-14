@@ -8,8 +8,8 @@ import { toast } from "sonner";
 // API configuration for Polygon.io
 export const POLYGON_BASE_URL = "https://api.polygon.io";
 
-// Hardcoded API key for development (temporarily using a real key for testing)
-const POLYGON_DEV_KEY = "kCopX5axh7_aHzSDUWQ4PXMvH9HrXWev"; // Free tier key with limited usage
+// Current working API key for development/testing
+const POLYGON_DEV_KEY = "rWxBB5noQNptvzikRhWvvlB5G2VwQrxz"; // Free tier key with limited usage
 
 // Demo key for fallback (very limited functionality)
 const DEMO_KEY = "DEMO_API_KEY";

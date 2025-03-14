@@ -29,33 +29,38 @@ export async function polygonRequest(endpoint: string, params: Record<string, an
   
   console.log(`Making Polygon API request to: ${endpoint}`);
   
-  // Make request
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json'
+  try {
+    // Make request
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    // Handle HTTP errors
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Polygon API error (${response.status}): ${errorText} - URL: ${url.toString().replace(apiKey, 'API_KEY_HIDDEN')}`);
+      throw new Error(`Polygon API error (${response.status}): ${errorText}`);
     }
-  });
-  
-  // Handle HTTP errors
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Polygon API error (${response.status}): ${errorText} - URL: ${url.toString().replace(apiKey, 'API_KEY_HIDDEN')}`);
-    throw new Error(`Polygon API error (${response.status}): ${errorText}`);
+    
+    // Parse JSON response
+    const data = await response.json();
+    
+    // Check for API errors
+    if (data.status === 'ERROR') {
+      console.error(`Polygon API error: ${data.error || 'Unknown error'}`);
+      throw new Error(`Polygon API error: ${data.error || 'Unknown error'}`);
+    }
+    
+    // Debug success
+    console.log(`Successfully received data from Polygon API for ${endpoint}`);
+    
+    return data;
+  } catch (error) {
+    console.error(`Polygon API request failed for ${endpoint}:`, error);
+    throw error;
   }
-  
-  // Parse JSON response
-  const data = await response.json();
-  
-  // Check for API errors
-  if (data.status === 'ERROR') {
-    console.error(`Polygon API error: ${data.error || 'Unknown error'}`);
-    throw new Error(`Polygon API error: ${data.error || 'Unknown error'}`);
-  }
-  
-  // Debug success
-  console.log(`Successfully received data from Polygon API for ${endpoint}`);
-  
-  return data;
 }
 
 /**

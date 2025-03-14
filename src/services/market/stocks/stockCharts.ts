@@ -7,6 +7,7 @@ import cacheUtils from "../cacheUtils";
 import { getPolygonApiKey } from "../config";
 import { getStockCandles as polygonGetStockCandles } from "../../polygon/historical";
 import { CandleData } from "@/types/marketTypes";
+import { toast } from "sonner";
 
 // Get candlestick data for charts
 async function getStockCandles(
@@ -38,12 +39,18 @@ async function getStockCandles(
         return candles;
       } catch (apiError) {
         console.error(`API error for ${ticker}:`, apiError);
-        throw apiError;
+        
+        // Show error toast for better feedback
+        if (apiError instanceof Error) {
+          toast.error(`Error fetching ${ticker} data: ${apiError.message}`);
+        }
+        
+        // Return empty array instead of throwing to prevent UI errors
+        return [];
       }
     } catch (error) {
       console.error(`Error fetching candles for ${ticker}:`, error);
-      
-      // Generate empty array on error - UI should handle this
+      // Return empty array on error - UI should handle this
       return [];
     }
   });
