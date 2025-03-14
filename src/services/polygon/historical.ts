@@ -42,7 +42,7 @@ export async function getAggregates(
     // Check if results field exists and is an array
     if (!response || !response.results || !Array.isArray(response.results)) {
       console.warn(`Invalid response from Polygon for ${ticker} aggregates:`, response);
-      return [];
+      return [] as CandleData[];
     }
     
     // Log successful receipt
@@ -67,7 +67,7 @@ export async function getAggregates(
     return candles;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);
-    return []; // Return empty array instead of throwing to prevent UI errors
+    return [] as CandleData[]; // Return empty array instead of throwing to prevent UI errors
   }
 }
 

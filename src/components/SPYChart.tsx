@@ -9,9 +9,8 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 import StockCandlestickChart from "@/components/chart/StockCandlestickChart";
 import { CandleData } from "@/types/marketTypes";
-import { initializeApiKey } from '@/services/market/config';
-import { stocks } from "@/services/market";
 import { toast } from 'sonner';
+import { stocks } from "@/services/market";
 
 /**
  * SPY Chart Component
@@ -55,10 +54,8 @@ const SPYChart: React.FC = () => {
     setError(null);
     
     try {
-      // Ensure API key is initialized
-      await initializeApiKey();
-      
       const endDate = new Date();
+      
       // Make sure we're using correct year (not 2025 from console logs)
       if (endDate.getFullYear() > 2024) {
         endDate.setFullYear(2024);
