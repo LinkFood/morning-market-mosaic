@@ -69,6 +69,11 @@ async function getMajorStocks(tickers: string[] = ["AAPL", "MSFT", "AMZN", "GOOG
         `/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(',')}`
       ).then(response => {
         // Map response data to StockData format
+        if (!response.tickers || !Array.isArray(response.tickers)) {
+          console.warn("No tickers data in API response, returning empty array");
+          return [] as StockData[]; // Ensure we return an empty array, not an object
+        }
+        
         return (response.tickers || []).map((item: any) => ({
           ticker: item.ticker,
           name: item.name || item.ticker,

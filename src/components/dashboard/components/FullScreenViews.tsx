@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useDashboard } from "../DashboardContext";
 import FullScreenComponent from "../FullScreenComponent";
@@ -10,7 +9,7 @@ import MajorStocks from "@/components/major-stocks/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
-import ES1FuturesChart from "@/components/ES1FuturesChart";
+import TradingViewWidget from "@/components/TradingViewWidget";
 import StockPicks from "@/components/stock-picks/StockPicks";
 
 const FullScreenViews: React.FC = () => {
@@ -56,7 +55,13 @@ const FullScreenViews: React.FC = () => {
           title="S&P 500 Futures"
         >
           <div className="h-[80vh]">
-            <ES1FuturesChart />
+            <TradingViewWidget 
+              symbol="ES1!" 
+              height={600}
+              interval="D"
+              cardTitle="S&P 500 E-mini Futures"
+              cardDescription="Real-time market data powered by TradingView"
+            />
           </div>
         </FullScreenComponent>
       )}
