@@ -71,7 +71,7 @@ async function getMajorStocks(tickers: string[] = ["AAPL", "MSFT", "AMZN", "GOOG
         // Map response data to StockData format
         if (!response.tickers || !Array.isArray(response.tickers)) {
           console.warn("No tickers data in API response, returning empty array");
-          return [] as StockData[]; // Ensure we return an empty array, not an object
+          return [] as StockData[]; // Explicitly return empty array with correct type
         }
         
         return (response.tickers || []).map((item: any) => ({
