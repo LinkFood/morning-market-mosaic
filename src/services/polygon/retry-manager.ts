@@ -13,13 +13,15 @@ import client from "./client";
  */
 export async function polygonRequestWithRetry(
   endpoint: string, 
+  params: Record<string, any> = {},
   retries: number = 3
 ): Promise<any> {
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await client.polygonRequest(endpoint);
+      // Use the correct method from the client
+      return await client.get(endpoint, params);
     } catch (error) {
       console.warn(`API call failed (attempt ${attempt + 1}/${retries}):`, error);
       lastError = error as Error;
