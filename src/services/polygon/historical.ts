@@ -5,6 +5,7 @@
  */
 import client from './client';
 import { addToCache, getFromCache } from './cache';
+import { CandleData } from '@/types/marketTypes';
 
 /**
  * Get aggregated (candle) data for a stock
@@ -18,13 +19,14 @@ export async function getAggregates(
   adjusted: boolean = true,
   limit: number = 5000,
   includeOtc: boolean = false
-) {
+): Promise<CandleData[]> {
   // Cache key based on parameters
   const cacheKey = `aggregates_${ticker}_${multiplier}_${timespan}_${from}_${to}_${adjusted}_${includeOtc}`;
   
   // Check cache first
   const cachedData = getFromCache(cacheKey);
   if (cachedData) {
+    console.log(`Using cached data for ${ticker} ${timespan}`);
     return cachedData;
   }
   
@@ -33,18 +35,21 @@ export async function getAggregates(
     const response = await client.get(`/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`, {
       adjusted: adjusted.toString(),
       sort: 'asc',
-      limit,
+      limit: limit.toString(),
       ...(includeOtc && { include_otc: 'true' })
     });
     
-    // Validate response
-    if (!response.results || !Array.isArray(response.results)) {
+    // Check if results field exists and is an array
+    if (!response || !response.results || !Array.isArray(response.results)) {
       console.warn(`Invalid response from Polygon for ${ticker} aggregates:`, response);
       return [];
     }
     
+    // Log successful receipt
+    console.log(`Polygon API returned ${response.results.length} results for ${ticker}`);
+    
     // Transform data to standard format
-    const candles = response.results.map((candle: any) => ({
+    const candles: CandleData[] = response.results.map((candle: any) => ({
       date: new Date(candle.t).toISOString(),
       timestamp: candle.t,
       open: candle.o,
@@ -62,7 +67,7 @@ export async function getAggregates(
     return candles;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);
-    return [];
+    throw error; // Let the caller handle this
   }
 }
 
@@ -74,7 +79,7 @@ export async function getStockCandles(
   timeframe: string = 'day',
   fromDate: string,
   toDate: string
-) {
+): Promise<CandleData[]> {
   // Map timeframe to Polygon parameters
   const { multiplier, timespan } = mapTimeframeToParams(timeframe);
   
@@ -90,7 +95,7 @@ export async function getIndexData(
   timeframe: string = 'day',
   fromDate: string,
   toDate: string
-) {
+): Promise<CandleData[]> {
   // Map timeframe to Polygon parameters
   const { multiplier, timespan } = mapTimeframeToParams(timeframe);
   
@@ -109,7 +114,7 @@ export async function getBatchIndexData(
   timeframe: string = 'day',
   fromDate: string,
   toDate: string
-) {
+): Promise<Record<string, CandleData[]>> {
   // Get data for each index
   const promises = indexTickers.map(ticker => getIndexData(ticker, timeframe, fromDate, toDate));
   
@@ -117,7 +122,7 @@ export async function getBatchIndexData(
     const results = await Promise.all(promises);
     
     // Map results to index tickers
-    const indexData: Record<string, any[]> = {};
+    const indexData: Record<string, CandleData[]> = {};
     indexTickers.forEach((ticker, i) => {
       // Remove I: prefix for cleaner keys
       const cleanTicker = ticker.replace('I:', '');
@@ -148,6 +153,10 @@ function mapTimeframeToParams(timeframe: string): { multiplier: number; timespan
       return { multiplier: 1, timespan: 'hour' };
     case '4hour':
       return { multiplier: 4, timespan: 'hour' };
+    case 'minute':
+      return { multiplier: 1, timespan: 'minute' };
+    case 'hour':
+      return { multiplier: 1, timespan: 'hour' };
     case 'day':
     case '1D':
       return { multiplier: 1, timespan: 'day' };
@@ -161,3 +170,11 @@ function mapTimeframeToParams(timeframe: string): { multiplier: number; timespan
       return { multiplier: 1, timespan: 'day' };
   }
 }
+
+// Export all the services
+export default {
+  getAggregates,
+  getStockCandles,
+  getIndexData,
+  getBatchIndexData
+};
