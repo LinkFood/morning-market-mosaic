@@ -26,6 +26,16 @@ import {
 import { realtime } from './realtime';
 import { clearAllCache, getCacheTimestamp } from './cache';
 
+// Import enhanced APIs
+import enhancedAPI, {
+  getStockFundamentals,
+  getStockEarnings,
+  getEnhancedMarketMovers,
+  getOptionsData,
+  getStockNews,
+  getInsiderTransactions
+} from './enhanced';
+
 // Export all functions
 export default {
   // Market data
@@ -52,7 +62,16 @@ export default {
   
   // Cache management
   clearCache: clearAllCache,
-  getCacheTimestamp
+  getCacheTimestamp,
+  
+  // Enhanced APIs
+  enhanced: enhancedAPI,
+  getStockFundamentals,
+  getStockEarnings,
+  getEnhancedMarketMovers,
+  getOptionsData,
+  getStockNews,
+  getInsiderTransactions
 };
 
 // Export for named imports
@@ -81,5 +100,14 @@ export {
   
   // Cache management
   clearAllCache as clearCache,
-  getCacheTimestamp
+  getCacheTimestamp,
+  
+  // Enhanced APIs
+  enhancedAPI as enhanced,
+  getStockFundamentals,
+  getStockEarnings,
+  getEnhancedMarketMovers,
+  getOptionsData,
+  getStockNews,
+  getInsiderTransactions
 };
