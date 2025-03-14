@@ -151,6 +151,13 @@ const ApiDiagnostics = () => {
         };
       }
       
+      if (data.fromFallback) {
+        return {
+          geminiResult: true,
+          geminiError: "Connected, but using fallback mechanism (AI may be unavailable)"
+        };
+      }
+      
       console.log("Gemini function test successful");
       return { geminiResult: true, geminiError: null };
     } catch (error) {

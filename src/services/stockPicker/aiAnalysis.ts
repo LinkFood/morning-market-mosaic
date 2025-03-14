@@ -13,6 +13,7 @@ export interface StockAnalysis {
   stockAnalyses: { [ticker: string]: string };
   marketInsight: string;
   generatedAt: string;
+  fromFallback?: boolean;
 }
 
 // Edge function response error interface
@@ -32,6 +33,9 @@ const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 2000; // 2 seconds
 
+// Maximum time to consider cache valid even if expired when API fails
+const EXTENDED_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
  * Main function to get AI analysis for stock picks
  */
@@ -44,7 +48,7 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
     return createFallbackAnalysis(stocks, "AI stock analysis is currently disabled.");
   }
   
-  // Check cache first
+  // Check cache first with normal TTL
   if (cachedAnalysis && (Date.now() - cacheTimestamp < CACHE_TTL)) {
     console.log("Using cached AI analysis from", new Date(cacheTimestamp).toISOString());
     return cachedAnalysis;
@@ -57,6 +61,12 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
       
       // Try to get AI analysis
       const analysis = await fetchAIAnalysis(stocks);
+      
+      // Check if this is a fallback response from the edge function
+      if (analysis.fromFallback) {
+        console.log("Edge function returned fallback analysis");
+        toast.warning("AI-powered analysis is limited right now. Using algorithmic analysis instead.");
+      }
       
       // Cache successful result
       cachedAnalysis = analysis;
@@ -71,6 +81,14 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       } else {
         console.log("All retry attempts failed");
+        
+        // Check if we have a stale cache that's still usable in emergency
+        if (cachedAnalysis && (Date.now() - cacheTimestamp < EXTENDED_CACHE_TTL)) {
+          console.log("Using stale cache as fallback");
+          toast.warning("Using cached analysis due to connection issues.");
+          return cachedAnalysis;
+        }
+        
         // Show error toast only after all retries fail
         toast.error("AI analysis unavailable. Showing algorithmic picks only.");
         return createFallbackAnalysis(stocks);
@@ -92,14 +110,23 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   const payload = { stocks };
   console.log("Request payload:", JSON.stringify(payload).substring(0, 200) + "...");
   
+  // Set timeout for the function call
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error("Function invocation timed out")), 20000); // 20s timeout
+  });
+  
   // Call the Supabase Edge Function
   console.log("Invoking gemini-stock-analysis function");
   const startTime = performance.now();
   
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
+    // Use Promise.race to implement timeout
+    const functionCallPromise = supabase.functions.invoke('gemini-stock-analysis', {
       body: payload
     });
+    
+    const result = await Promise.race([functionCallPromise, timeoutPromise]);
+    const { data, error } = result;
     
     const endTime = performance.now();
     console.log(`Edge function response time: ${Math.round(endTime - startTime)}ms`);
@@ -134,7 +161,8 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
     const analysis: StockAnalysis = {
       stockAnalyses: data.stockAnalyses,
       marketInsight: data.marketInsight,
-      generatedAt: data.generatedAt || new Date().toISOString()
+      generatedAt: data.generatedAt || new Date().toISOString(),
+      fromFallback: data.fromFallback || false
     };
     
     console.log("Successfully parsed AI analysis for", Object.keys(analysis.stockAnalyses).length, "stocks");
@@ -154,13 +182,42 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
  * Create a fallback analysis when the API is unavailable
  */
 function createFallbackAnalysis(stocks: ScoredStock[], reason: string = "AI analysis currently unavailable."): StockAnalysis {
+  console.log("Creating fallback analysis with reason:", reason);
+  
+  const stockAnalyses: { [ticker: string]: string } = {};
+  
+  // Generate better fallback analyses based on available data
+  stocks.forEach(stock => {
+    let analysis = `${stock.ticker} was selected by our algorithm based on `;
+    
+    if (stock.signals && stock.signals.length > 0) {
+      analysis += `technical indicators including: ${stock.signals.join(', ')}. `;
+    } else {
+      analysis += `technical analysis. `;
+    }
+    
+    // Add score-based commentary
+    if (stock.scores?.composite !== undefined) {
+      if (stock.scores.composite > 80) {
+        analysis += `It shows strong potential with a composite score of ${stock.scores.composite}/100. `;
+      } else if (stock.scores.composite > 60) {
+        analysis += `It shows good potential with a composite score of ${stock.scores.composite}/100. `;
+      } else {
+        analysis += `It has a moderate composite score of ${stock.scores.composite}/100. `;
+      }
+    }
+    
+    // Add closing remarks
+    analysis += "Consider further research before making investment decisions.";
+    
+    stockAnalyses[stock.ticker] = analysis;
+  });
+  
   return {
-    stockAnalyses: stocks.reduce((acc, stock) => {
-      acc[stock.ticker] = reason;
-      return acc;
-    }, {} as { [ticker: string]: string }),
-    marketInsight: "Market insight unavailable. Please try again later.",
-    generatedAt: new Date().toISOString()
+    stockAnalyses,
+    marketInsight: "Market insight unavailable. The selected stocks were chosen based on technical indicators and algorithmic screening.",
+    generatedAt: new Date().toISOString(),
+    fromFallback: true
   };
 }
 

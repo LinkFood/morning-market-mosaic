@@ -21,6 +21,11 @@ interface RequestBody {
   }>;
 }
 
+// Configurable retry settings
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 2000; // 2 seconds
+const API_TIMEOUT = 15000; // 15 seconds
+
 serve(async (req) => {
   // Add detailed logging for debugging
   console.log("gemini-stock-analysis function called");
@@ -106,74 +111,112 @@ serve(async (req) => {
 
     console.log("Calling Gemini API with prompt...");
     
-    // Google Gemini API endpoint
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
+    // Implement the fetch API call with retries
+    let response = null;
+    let apiError = null;
     
-    console.log(`Using Gemini API endpoint: ${endpoint}`);
-    console.log(`API key exists: ${!!GEMINI_API_KEY}`);
-    
-    try {
-      const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 2048,
-          }
-        }),
-      });
-      
-      // Check response status
-      if (!response.ok) {
-        const errorText = await response.text();
-        const status = response.status;
-        console.error(`Gemini API Error (${status}):`, errorText);
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        console.log(`API call attempt ${attempt + 1} of ${MAX_RETRIES}`);
         
-        // Return a more detailed error response
-        return new Response(
-          JSON.stringify({ 
-            error: `Gemini API Error: ${response.statusText}`,
-            status: response.status,
-            details: errorText
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        // Google Gemini API endpoint  
+        const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
+        
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+        
+        try {
+          response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: prompt }
+                  ]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.2,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 2048,
+              }
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
           }
-        );
+          
+          break; // Success, exit retry loop
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          
+          // Check if this was a timeout error
+          if (fetchError.name === 'AbortError') {
+            console.error(`Request timed out after ${API_TIMEOUT/1000}s`);
+            apiError = new Error("Request timed out");
+          } else {
+            console.error(`Fetch error on attempt ${attempt + 1}:`, fetchError);
+            apiError = fetchError;
+          }
+          
+          // If this is not the last attempt, wait before retrying
+          if (attempt < MAX_RETRIES - 1) {
+            console.log(`Retrying in ${RETRY_DELAY/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          }
+        }
+      } catch (retryError) {
+        console.error(`Error during retry logic:`, retryError);
+        apiError = retryError;
       }
+    }
+    
+    // If all attempts failed, provide a fallback response
+    if (!response || !response.ok) {
+      console.error("All API attempts failed, using fallback");
       
+      // Generate fallback analysis based on algorithmic scores
+      const fallbackAnalyses = stocks.reduce((acc, stock) => {
+        acc[stock.ticker] = generateFallbackAnalysis(stock);
+        return acc;
+      }, {} as { [ticker: string]: string });
+      
+      const fallbackResponse = {
+        stockAnalyses: fallbackAnalyses,
+        marketInsight: "Market analysis is currently unavailable. The selected stocks were chosen based on technical indicators and algorithmic screening. Please check back later for detailed market insights.",
+        generatedAt: new Date().toISOString(),
+        fromFallback: true
+      };
+      
+      return new Response(
+        JSON.stringify(fallbackResponse),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    // Process successful response
+    try {
       console.log("Received successful response from Gemini API");
       
-      // Process successful response
       const data = await response.json();
       
       // Validate response structure
       if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
         console.error("Invalid response format from Gemini API:", data);
-        return new Response(
-          JSON.stringify({ 
-            error: "Invalid API response format", 
-            details: "The Gemini API returned an unexpected response format",
-            data: data
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
+        throw new Error("Invalid API response format");
       }
       
       const aiResponse = data.candidates[0].content.parts[0].text;
@@ -181,16 +224,7 @@ serve(async (req) => {
       // Validate AI response isn't empty
       if (!aiResponse) {
         console.error("Empty response from Gemini API");
-        return new Response(
-          JSON.stringify({ 
-            error: "Empty API response", 
-            details: "The Gemini API returned an empty response"
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
+        throw new Error("Empty API response");
       }
 
       console.log("Successfully received response from Gemini API");
@@ -214,20 +248,25 @@ serve(async (req) => {
         JSON.stringify(analysis),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } catch (fetchError) {
-      console.error("Error making API request:", fetchError);
+    } catch (parseError) {
+      console.error("Error parsing Gemini API response:", parseError);
+      
+      // Generate fallback for parse errors
+      const fallbackAnalyses = stocks.reduce((acc, stock) => {
+        acc[stock.ticker] = generateFallbackAnalysis(stock);
+        return acc;
+      }, {} as { [ticker: string]: string });
+      
       return new Response(
-        JSON.stringify({ 
-          error: "API request failed", 
-          details: fetchError.message
+        JSON.stringify({
+          stockAnalyses: fallbackAnalyses,
+          marketInsight: "Analysis could not be processed. Using algorithmic results instead.",
+          generatedAt: new Date().toISOString(),
+          fromFallback: true
         }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
   } catch (error) {
     // Log the full error
     console.error("Error in gemini-stock-analysis function:", error);
@@ -305,7 +344,7 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
   for (const ticker of expectedTickers) {
     if (!stockAnalyses[ticker]) {
       console.log(`No analysis found for ${ticker}, adding fallback`);
-      stockAnalyses[ticker] = `Analysis for ${ticker} could not be properly extracted. This stock was selected based on technical indicators showing potential strength in current market conditions.`;
+      stockAnalyses[ticker] = generateFallbackAnalysis({ ticker } as any);
     }
   }
   
@@ -326,4 +365,46 @@ function extractMarketInsight(response: string): string {
   // Fallback: take the last paragraph if no explicit section
   const paragraphs = response.split('\n\n');
   return paragraphs[paragraphs.length - 1].trim();
+}
+
+/**
+ * Generate fallback analysis when the API is unavailable
+ */
+function generateFallbackAnalysis(stock: RequestBody['stocks'][0]): string {
+  // Check if we have enough data to generate a meaningful fallback
+  if (!stock.signals || !stock.scores) {
+    return `${stock.ticker} was selected by our algorithm as having potential based on technical indicators.`;
+  }
+  
+  let analysis = `${stock.ticker} shows `;
+  
+  // Add sentiment based on score
+  if (stock.scores.composite > 80) {
+    analysis += "strong potential based on our algorithm. ";
+  } else if (stock.scores.composite > 60) {
+    analysis += "good potential based on our algorithm. ";
+  } else {
+    analysis += "some potential based on our algorithm. ";
+  }
+  
+  // Add information about signals if available
+  if (stock.signals.length > 0) {
+    analysis += `Technical indicators that triggered include: ${stock.signals.join(', ')}. `;
+  }
+  
+  // Add price action comment if available
+  if (stock.changePercent !== undefined) {
+    if (stock.changePercent > 0) {
+      analysis += `The stock is up ${stock.changePercent.toFixed(2)}% today, showing positive momentum. `;
+    } else if (stock.changePercent < 0) {
+      analysis += `Despite being down ${Math.abs(stock.changePercent).toFixed(2)}% today, our algorithm sees potential. `;
+    } else {
+      analysis += `The stock is flat today. `;
+    }
+  }
+  
+  // Add final recommendation
+  analysis += "Consider doing additional research before making any investment decisions.";
+  
+  return analysis;
 }
