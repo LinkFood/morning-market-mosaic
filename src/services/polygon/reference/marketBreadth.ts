@@ -5,15 +5,7 @@
  */
 import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
-
-export interface MarketBreadthData {
-  advancers: number;
-  decliners: number;
-  unchanged: number;
-  newHighs: number;
-  newLows: number;
-  timestamp: string;
-}
+import { MarketBreadthData } from '@/types/marketTypes';
 
 /**
  * Get market breadth data (advancers/decliners, new highs/lows)
@@ -24,7 +16,7 @@ export async function getMarketBreadth(): Promise<MarketBreadthData> {
   const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_STATUS);
   
   if (cachedData) {
-    return cachedData;
+    return cachedData as MarketBreadthData;
   }
   
   try {

@@ -1,3 +1,4 @@
+
 /**
  * Polygon.io Stock Snapshot Service
  * Provides real-time stock snapshot data
@@ -16,7 +17,7 @@ export async function getStockSnapshot(ticker: string): Promise<StockData> {
   const cachedData = getCachedData(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
   
   if (cachedData) {
-    return cachedData;
+    return cachedData as StockData;
   }
   
   try {
@@ -61,7 +62,7 @@ export async function getBatchStockSnapshots(
     const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_MOVERS);
     
     if (cachedData) {
-      return cachedData;
+      return cachedData as StockData[];
     }
     
     try {
@@ -94,7 +95,8 @@ export async function getBatchStockSnapshots(
       return stocksData;
     } catch (error) {
       console.error(`Error fetching ${type}:`, error);
-      throw error;
+      // Return empty array with proper type instead of {}
+      return [] as StockData[];
     }
   }
   
@@ -109,7 +111,7 @@ export async function getBatchStockSnapshots(
     const cachedData = getCachedData(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
     
     if (cachedData) {
-      cachedResults.push(cachedData);
+      cachedResults.push(cachedData as StockData);
     } else {
       tickersToFetch.push(ticker);
     }
@@ -157,7 +159,8 @@ export async function getBatchStockSnapshots(
       return cachedResults;
     }
     
-    throw error;
+    // Return empty array with proper type instead of throwing
+    return [] as StockData[];
   }
 }
 

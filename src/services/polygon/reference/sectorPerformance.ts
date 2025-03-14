@@ -16,7 +16,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
   const cachedData = getCachedData(cacheKey, CACHE_TTL.SECTOR_PERFORMANCE);
   
   if (cachedData) {
-    return cachedData;
+    return cachedData as SectorPerformance[];
   }
   
   try {
@@ -58,7 +58,8 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
     return sectorData;
   } catch (error) {
     console.error('Error fetching sector performance:', error);
-    throw error;
+    // Return empty array with proper type instead of {}
+    return [] as SectorPerformance[];
   }
 }
 

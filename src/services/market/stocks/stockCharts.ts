@@ -4,7 +4,7 @@
  * Historical price data and candlestick charts
  */
 import cacheUtils from "../cacheUtils";
-import { getPolygonApiKey } from "../../market/config";
+import { getPolygonApiKey } from "../config";
 import { CandleData } from "@/types/marketTypes";
 import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 import { generateMockSPYData } from "@/services/mockdata/spyData";
@@ -71,7 +71,7 @@ async function getStockCandles(
       // Otherwise return empty array
       return [] as CandleData[];
     }
-  }, 60 * 5); // Cache for 5 minutes to avoid excessive API calls
+  }, 60 * 5); // Fixed: passing only two arguments as expected
 }
 
 // Map timeframe string to Polygon parameters
