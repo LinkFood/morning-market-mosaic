@@ -13,6 +13,7 @@ export const useCandleData = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [lastRequestTimestamp, setLastRequestTimestamp] = useState(0);
+  const [requestInProgress, setRequestInProgress] = useState(false);
   
   const loadCandleData = useCallback(async (ticker: string, timeFrame: TimeFrame) => {
     // Prevent duplicate requests within a short time period
@@ -21,9 +22,16 @@ export const useCandleData = (
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
+    // Prevent multiple concurrent requests for the same data
+    if (requestInProgress) {
+      console.log('Request already in progress, skipping duplicate request');
+      return [];
+    }
+    
     setIsLoading(true);
     setError(null);
-    setLastRequestTimestamp(Date.now());
+    setLastRequestTimestamp(now);
+    setRequestInProgress(true);
     
     try {
       const endDate = new Date();
@@ -111,8 +119,9 @@ export const useCandleData = (
       return [];
     } finally {
       setIsLoading(false);
+      setRequestInProgress(false);
     }
-  }, [setCandleData, lastRequestTimestamp]);
+  }, [setCandleData, lastRequestTimestamp, requestInProgress]);
   
   useEffect(() => {
     if (ticker) {

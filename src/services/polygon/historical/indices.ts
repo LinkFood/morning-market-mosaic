@@ -1,116 +1,117 @@
 
 /**
  * Polygon.io Historical Index Data
- * Provides data for market indices
+ * Provides access to historical stock index data
  */
 import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
-import { MarketIndex } from '@/types/marketTypes';
+import { CandleData } from '@/types/marketTypes';
 
 /**
- * Get historical data for a market index
+ * Get historical data for a stock index
  * @param indexTicker Index ticker symbol
+ * @param multiplier The size of the timespan multiplier
+ * @param timespan The timespan to get data for (day, hour, minute, etc.)
+ * @param from Start date (YYYY-MM-DD)
+ * @param to End date (YYYY-MM-DD)
  * @returns Promise with index data
  */
-export async function getIndexData(indexTicker: string): Promise<MarketIndex> {
-  const cacheKey = `index_${indexTicker}`;
-  const cachedData = getCachedData<MarketIndex>(cacheKey, CACHE_TTL.INDEX_DATA);
+export async function getIndexData(
+  indexTicker: string,
+  multiplier: number = 1,
+  timespan: string = 'day',
+  from: string,
+  to: string
+): Promise<CandleData[]> {
+  // Index tickers need to be prefixed with I: for Polygon
+  const formattedTicker = indexTicker.startsWith('I:') ? indexTicker : `I:${indexTicker}`;
+  
+  const cacheKey = `index_${formattedTicker}_${multiplier}_${timespan}_${from}_${to}`;
+  const cachedData = getCachedData(cacheKey, CACHE_TTL.INDEX_DATA);
   
   if (cachedData) {
-    return cachedData;
+    return cachedData as CandleData[];
   }
   
   try {
-    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/indices/tickers/${indexTicker}`);
+    console.log(`Fetching index data for ${formattedTicker}`);
     
-    // Format the response
-    const indexData: MarketIndex = {
-      ticker: response.ticker.ticker,
-      name: response.ticker.name || response.ticker.ticker,
-      close: response.ticker.day.c,
-      open: response.ticker.day.o,
-      high: response.ticker.day.h,
-      low: response.ticker.day.l,
-      change: response.ticker.todaysChange,
-      changePercent: response.ticker.todaysChangePerc,
-      volume: response.ticker.day.v,
-    };
+    const response = await polygonRequest(
+      `/v2/aggs/ticker/${formattedTicker}/range/${multiplier}/${timespan}/${from}/${to}`,
+      { adjusted: 'true', sort: 'asc', limit: 5000 }
+    );
+    
+    if (!response.results || !Array.isArray(response.results)) {
+      console.warn(`Invalid response for ${formattedTicker} index data:`, response);
+      return [] as CandleData[];
+    }
+    
+    // Format the data
+    const formattedData: CandleData[] = response.results.map((item: any) => ({
+      date: new Date(item.t).toISOString().split('T')[0],
+      timestamp: item.t,
+      open: item.o,
+      high: item.h,
+      low: item.l,
+      close: item.c,
+      volume: item.v,
+      vwap: item.vw || null
+    }));
     
     // Cache the result
-    cacheData(cacheKey, indexData);
+    cacheData(cacheKey, formattedData, CACHE_TTL.INDEX_DATA);
     
-    return indexData;
+    return formattedData;
   } catch (error) {
     console.error(`Error fetching index data for ${indexTicker}:`, error);
-    throw error;
+    return [] as CandleData[];
   }
 }
 
 /**
- * Get historical data for multiple market indices
- * @param indexTickers Array of index tickers
- * @returns Promise with array of index data
+ * Get batch index data for multiple indices
+ * @param indexTickers Array of index ticker symbols
+ * @param multiplier The size of the timespan multiplier
+ * @param timespan The timespan to get data for (day, hour, minute, etc.)
+ * @param from Start date (YYYY-MM-DD)
+ * @param to End date (YYYY-MM-DD)
+ * @returns Promise with object mapping tickers to data
  */
-export async function getBatchIndexData(indexTickers: string[]): Promise<MarketIndex[]> {
-  // Check cache first
-  const cachedResults: MarketIndex[] = [];
-  const tickersToFetch: string[] = [];
-  
-  // Check each ticker in the cache
-  indexTickers.forEach(ticker => {
-    const cacheKey = `index_${ticker}`;
-    const cachedData = getCachedData<MarketIndex>(cacheKey, CACHE_TTL.INDEX_DATA);
-    
-    if (cachedData) {
-      cachedResults.push(cachedData);
-    } else {
-      tickersToFetch.push(ticker);
-    }
-  });
-  
-  // If all tickers were in cache, return them
-  if (tickersToFetch.length === 0) {
-    return cachedResults;
-  }
+export async function getBatchIndexData(
+  indexTickers: string[],
+  multiplier: number = 1,
+  timespan: string = 'day',
+  from: string,
+  to: string
+): Promise<Record<string, CandleData[]>> {
+  // Get data for each index
+  const promises = indexTickers.map(ticker => 
+    getIndexData(ticker, multiplier, timespan, from, to)
+  );
   
   try {
-    // Format tickers for the API request
-    const tickersParam = tickersToFetch.join(',');
+    const results = await Promise.all(promises);
     
-    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/indices/tickers?tickers=${tickersParam}`);
-    
-    // Format the response
-    const indicesData: MarketIndex[] = response.tickers.map((item: any) => {
-      const indexData: MarketIndex = {
-        ticker: item.ticker,
-        name: item.name || item.ticker,
-        close: item.day.c,
-        open: item.day.o,
-        high: item.day.h,
-        low: item.day.l,
-        change: item.todaysChange,
-        changePercent: item.todaysChangePerc,
-        volume: item.day.v,
-      };
-      
-      // Cache individual index data
-      cacheData(`index_${item.ticker}`, indexData);
-      
-      return indexData;
+    // Map results to index tickers
+    const indexData: Record<string, CandleData[]> = {};
+    indexTickers.forEach((ticker, i) => {
+      // Remove I: prefix for cleaner keys
+      const cleanTicker = ticker.replace('I:', '');
+      indexData[cleanTicker] = results[i] || [];
     });
     
-    // Combine cached and fresh results
-    return [...cachedResults, ...indicesData];
+    return indexData;
   } catch (error) {
-    console.error(`Error fetching batch index data:`, error);
+    console.error('Error fetching batch index data:', error);
     
-    // If we have some cached results, return those instead of failing
-    if (cachedResults.length > 0) {
-      console.log(`Returning ${cachedResults.length} cached results due to API error`);
-      return cachedResults;
-    }
+    // Return empty data sets for all requested indices
+    const emptyResults: Record<string, CandleData[]> = {};
+    indexTickers.forEach(ticker => {
+      const cleanTicker = ticker.replace('I:', '');
+      emptyResults[cleanTicker] = [];
+    });
     
-    throw error;
+    return emptyResults;
   }
 }
 

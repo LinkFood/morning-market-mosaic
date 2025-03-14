@@ -1,14 +1,13 @@
-
 /**
  * Stock Charts Service
  * Historical price data and candlestick charts
  */
 import cacheUtils from "../cacheUtils";
-import { getPolygonApiKey } from "../config";
+import { getPolygonApiKey } from "../market/config";
 import { CandleData } from "@/types/marketTypes";
 import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 import { generateMockSPYData } from "@/services/mockdata/spyData";
-import { getAggregates } from "@/services/polygon/historical";
+import { getAggregates } from "@/services/polygon/historical/aggregates";
 
 // Get candlestick data for charts
 async function getStockCandles(
@@ -23,9 +22,6 @@ async function getStockCandles(
     try {
       // Map timeframe to Polygon parameters
       const { multiplier, timespan } = mapTimeframeToParams(timeframe);
-      
-      // Get API key from Supabase
-      const apiKey = await getPolygonApiKey();
       
       console.log(`Requesting candle data for ${ticker} from Polygon API`);
       // Use direct import from the historical module
@@ -48,20 +44,11 @@ async function getStockCandles(
           return generateMockSPYData(timeFrameMap[timespan] || "1M");
         }
         
-        return [];
+        return [] as CandleData[];
       }
       
-      // Transform response to CandleData format
-      return data.map((candle: any) => ({
-        date: new Date(candle.timestamp).toISOString().split('T')[0],
-        timestamp: candle.timestamp,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-        volume: candle.volume,
-        vwap: candle.vwap
-      }));
+      // Data is already in the correct format from getAggregates
+      return data;
     } catch (error) {
       console.error(`Error fetching candles for ${ticker}:`, error);
       
@@ -81,7 +68,7 @@ async function getStockCandles(
       }
       
       // Otherwise return empty array
-      return [];
+      return [] as CandleData[];
     }
   }, 60 * 5); // Cache for 5 minutes to avoid excessive API calls
 }

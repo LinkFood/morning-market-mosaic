@@ -26,12 +26,14 @@ export async function getStockCandles(
   
   if (cachedData) {
     console.log(`Using cached candle data for ${ticker}`);
-    return cachedData;
+    return cachedData as CandleData[];
   }
   
   try {
+    console.log(`Fetching candle data for ${ticker} (${timespan}) from ${from} to ${to}`);
+    
     // Request candles from Polygon API
-    const endpoint = `/v2/aggs/ticker/${ticker}/range/1/${timespan}/${from}/${to}?adjusted=true&sort=asc&limit=5000`;
+    const endpoint = `/v2/aggs/ticker/${ticker}/range/1/${timespan}/${from}/${to}`;
     const response = await makeApiCall(endpoint);
     
     // Validate response
@@ -49,11 +51,13 @@ export async function getStockCandles(
       low: item.l,
       close: item.c,
       volume: item.v,
+      vwap: item.vw || null
     }));
     
     // Cache the result
-    cacheData(cacheKey, formattedData);
+    cacheData(cacheKey, formattedData, CACHE_TTL.INDEX_DATA);
     
+    console.log(`Successfully fetched ${formattedData.length} candles for ${ticker}`);
     return formattedData;
   } catch (error) {
     console.error(`Error fetching candles for ${ticker}:`, error);

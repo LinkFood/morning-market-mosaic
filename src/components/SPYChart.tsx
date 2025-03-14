@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -60,6 +60,7 @@ const SPYChart: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [showExtendedHours, setShowExtendedHours] = useState(true);
+  const [refreshCounter, setRefreshCounter] = useState(0);
   
   // Use the candleData hook to fetch real data
   const { loadCandleData, isLoading: isLoadingCandles, error: candleError } = useCandleData("SPY", timeFrame, setCandleData);
@@ -89,13 +90,24 @@ const SPYChart: React.FC = () => {
     });
   }, [candleData, showExtendedHours, timeFrame]);
   
-  // Handle manual refresh with debouncing to prevent multiple rapid calls
-  const handleRefresh = () => {
+  // Handle manual refresh with debouncing and recovery mechanism
+  const handleRefresh = useCallback(() => {
     if (isLoading) return;
     
     setIsLoading(true);
     setError(null);
     toast.info("Refreshing SPY data...");
+    
+    // Force a new data load by incrementing counter
+    setRefreshCounter(prev => prev + 1);
+    
+    // Create a timeout to recover from stuck loading state
+    const loadingTimeout = setTimeout(() => {
+      if (isLoading) {
+        setIsLoading(false);
+        toast.error("Refresh timed out - please try again");
+      }
+    }, 10000); // 10 second timeout
     
     loadCandleData("SPY", timeFrame)
       .then(() => {
@@ -108,8 +120,9 @@ const SPYChart: React.FC = () => {
       })
       .finally(() => {
         setIsLoading(false);
+        clearTimeout(loadingTimeout);
       });
-  };
+  }, [isLoading, loadCandleData, timeFrame]);
   
   // Handle toggle for extended hours
   const handleExtendedHoursToggle = (checked: boolean) => {
@@ -128,17 +141,32 @@ const SPYChart: React.FC = () => {
     }
   }, [candleError]);
   
-  // Load data on component mount or when timeframe changes
+  // Load data on component mount or when timeframe or refresh counter changes
   useEffect(() => {
     setIsLoading(true);
     setError(null);
+    
+    // Create a timeout to recover from stuck loading state
+    const loadingTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn("Loading state stuck - recovering");
+        setIsLoading(false);
+      }
+    }, 10000); // 10 second timeout
     
     loadCandleData("SPY", timeFrame)
       .catch((err) => {
         console.error("Error loading SPY candle data:", err);
         setError(err instanceof Error ? err : new Error("Failed to load data"));
+      })
+      .finally(() => {
+        clearTimeout(loadingTimeout);
       });
-  }, [timeFrame, loadCandleData]);
+      
+    return () => {
+      clearTimeout(loadingTimeout);
+    };
+  }, [timeFrame, refreshCounter, loadCandleData]);
   
   return (
     <Card className="shadow-md">
@@ -190,7 +218,7 @@ const SPYChart: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredData.length > 0 ? (
+            {filteredData && filteredData.length > 0 ? (
               <StockCandlestickChart
                 data={filteredData}
                 timeFrame={timeFrame}

@@ -27,12 +27,15 @@ export async function getAggregates(
   const cachedData = getCachedData(cacheKey, CACHE_TTL.INDEX_DATA);
   
   if (cachedData) {
-    return cachedData;
+    return cachedData as CandleData[];
   }
   
   try {
+    console.log(`Fetching aggregates for ${ticker} (${multiplier}/${timespan}) from ${from} to ${to}`);
+    
     const response = await polygonRequest(
-      `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`
+      `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`,
+      { adjusted: 'true', sort: 'asc', limit: 5000 }
     );
     
     if (!response.results || !Array.isArray(response.results)) {
@@ -41,7 +44,7 @@ export async function getAggregates(
     }
     
     // Format the data
-    const formattedData = response.results.map((item: any) => ({
+    const formattedData: CandleData[] = response.results.map((item: any) => ({
       date: new Date(item.t).toISOString().split('T')[0],
       timestamp: item.t,
       open: item.o,
@@ -49,12 +52,13 @@ export async function getAggregates(
       low: item.l,
       close: item.c,
       volume: item.v,
-      vwap: item.vw
+      vwap: item.vw || null
     }));
     
     // Cache the result
-    cacheData(cacheKey, formattedData);
+    cacheData(cacheKey, formattedData, CACHE_TTL.INDEX_DATA);
     
+    console.log(`Successfully fetched ${formattedData.length} data points for ${ticker}`);
     return formattedData;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);

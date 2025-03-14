@@ -15,13 +15,20 @@ export async function makeApiCall(endpoint: string) {
   try {
     const apiKey = await getPolygonApiKey();
     
-    // Build URL and add API key
-    const url = `${BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${apiKey}`;
+    // Build URL without including API key in the URL
+    const url = `${BASE_URL}${endpoint}`;
     
     if (DEBUG_MODE) console.log(`📡 API Request: ${endpoint}`);
     const startTime = performance.now();
     
-    const response = await fetch(url);
+    // Use Authorization header instead of query parameter
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
     const endTime = performance.now();
     
     if (DEBUG_MODE) {
