@@ -8,12 +8,9 @@ import { getPolygonApiKey } from "../market/config";
 const BASE_URL = 'https://api.polygon.io';
 
 /**
- * Make a request to the Polygon API with proper authentication
- * @param endpoint API endpoint path (starting with /)
- * @param params Optional query parameters
- * @returns Promise with API response
+ * Make a GET request to the Polygon API with authentication
  */
-export async function polygonRequest(endpoint: string, params: Record<string, any> = {}) {
+async function get(endpoint: string, params: Record<string, any> = {}) {
   try {
     // Get API key
     const apiKey = await getPolygonApiKey();
@@ -21,39 +18,43 @@ export async function polygonRequest(endpoint: string, params: Record<string, an
     // Build URL with query parameters
     const url = new URL(`${BASE_URL}${endpoint}`);
     
-    // Add all parameters to URL but NOT the API key
+    // Add all parameters to URL
     Object.keys(params).forEach(key => {
       if (params[key] !== undefined && params[key] !== null) {
         url.searchParams.append(key, params[key]);
       }
     });
     
-    // Log request for debugging
-    console.log(`Polygon API request: ${endpoint}`);
+    // Add API key as query parameter (this is how Polygon.io expects it)
+    url.searchParams.append('apiKey', apiKey);
     
-    // Make request with Authorization header instead of query parameter
+    console.log(`Making Polygon API request to: ${endpoint}`);
+    
+    // Make request
     const response = await fetch(url.toString(), {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Accept': 'application/json'
       }
     });
     
     // Handle HTTP errors
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Polygon API error (${response.status}): ${errorText}`);
+      console.error(`Polygon API error (${response.status}): ${errorText} - URL: ${url.toString().replace(apiKey, 'API_KEY_HIDDEN')}`);
       throw new Error(`Polygon API error (${response.status}): ${errorText}`);
     }
     
     // Parse JSON response
     const data = await response.json();
     
-    // Check for API-level errors
+    // Check for API errors
     if (data.status === 'ERROR') {
-      console.error(`Polygon API returned error: ${data.error}`);
-      throw new Error(`Polygon API error: ${data.error}`);
+      console.error(`Polygon API error: ${data.error || 'Unknown error'}`);
+      throw new Error(`Polygon API error: ${data.error || 'Unknown error'}`);
     }
+    
+    // Debug success
+    console.log(`Successfully received data from Polygon API for ${endpoint}`);
     
     return data;
   } catch (error) {
@@ -63,5 +64,5 @@ export async function polygonRequest(endpoint: string, params: Record<string, an
 }
 
 export default {
-  polygonRequest
+  get
 };
