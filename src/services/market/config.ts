@@ -9,7 +9,8 @@ import { toast } from "sonner";
 export const POLYGON_BASE_URL = "https://api.polygon.io";
 
 // Current working API key for development/testing
-const POLYGON_DEV_KEY = "rWxBB5noQNptvzikRhWvvlB5G2VwQrxz"; // Free tier key with limited usage
+// Your free tier API key
+const POLYGON_DEV_KEY = "kCopX5axh7_aHzSDUWQ4PXMvH9HrXWev";
 
 // Demo key for fallback (very limited functionality)
 const DEMO_KEY = "DEMO_API_KEY";
@@ -42,8 +43,8 @@ export async function getPolygonApiKey(): Promise<string> {
         console.error(`Error fetching Polygon API key (attempt ${attempt}):`, error);
         
         if (attempt === MAX_RETRIES) {
-          console.warn("Maximum retries reached, falling back to demo key");
-          return DEMO_KEY;
+          console.warn("Maximum retries reached, falling back to dev key");
+          return POLYGON_DEV_KEY; // Fall back to dev key instead of demo key
         }
         
         // Wait before retrying
@@ -56,8 +57,8 @@ export async function getPolygonApiKey(): Promise<string> {
         console.error(`Invalid response format (attempt ${attempt}):`, data);
         
         if (attempt === MAX_RETRIES) {
-          console.warn("Maximum retries reached, falling back to demo key");
-          return DEMO_KEY;
+          console.warn("Maximum retries reached, falling back to dev key");
+          return POLYGON_DEV_KEY; // Fall back to dev key instead of demo key
         }
         
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
@@ -70,17 +71,16 @@ export async function getPolygonApiKey(): Promise<string> {
       console.error(`Unexpected error during API key retrieval (attempt ${attempt}):`, error);
       
       if (attempt === MAX_RETRIES) {
-        console.warn("Maximum retries reached due to unexpected error, falling back to demo key");
-        return DEMO_KEY;
+        console.warn("Maximum retries reached due to unexpected error, falling back to dev key");
+        return POLYGON_DEV_KEY; // Fall back to dev key instead of demo key
       }
       
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
     }
   }
   
-  // This should never happen as we have a return in the last retry,
-  // but TypeScript wants a return statement here
-  return DEMO_KEY;
+  // Fall back to dev key instead of demo key
+  return POLYGON_DEV_KEY;
 }
 
 // Store API key once fetched
@@ -115,8 +115,8 @@ export const initializeApiKey = async (): Promise<string> => {
     return POLYGON_API_KEY;
   } catch (error) {
     console.error("Failed to initialize API key:", error);
-    toast.error("Failed to retrieve API key. Using limited demo mode.");
-    return DEMO_KEY;
+    toast.error("Failed to retrieve API key. Using dev mode.");
+    return POLYGON_DEV_KEY; // Fall back to dev key instead of demo key
   } finally {
     keyRetrievalInProgress = false;
     keyRetrievalPromise = null;
