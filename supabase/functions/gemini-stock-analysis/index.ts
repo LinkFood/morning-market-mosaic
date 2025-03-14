@@ -22,9 +22,39 @@ interface RequestBody {
 }
 
 // Configurable retry settings
-const MAX_RETRIES = 2;
-const RETRY_DELAY = 2000; // 2 seconds
-const API_TIMEOUT = 15000; // 15 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2500; // 2.5 seconds
+const API_TIMEOUT = 20000; // 20 seconds
+
+// Placeholder in-memory cache
+type CacheEntry = {
+  data: any;
+  timestamp: number;
+  requestHash: string;
+};
+
+const cache: Record<string, CacheEntry> = {};
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+// Simple function to hash request body for cache key
+function hashRequest(stocks: any[]): string {
+  // Use ticker + timestamp as a simple hash
+  return stocks.map(s => s.ticker).sort().join(',');
+}
+
+// Function to get from cache
+function getCachedResponse(requestHash: string): any | null {
+  const entry = cache[requestHash];
+  if (!entry) return null;
+  
+  const now = Date.now();
+  if (now - entry.timestamp > CACHE_TTL) {
+    delete cache[requestHash];
+    return null;
+  }
+  
+  return entry.data;
+}
 
 serve(async (req) => {
   // Add detailed logging for debugging
@@ -76,12 +106,28 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    // Generate request hash for caching
+    const requestHash = hashRequest(stocks);
+    
+    // Check cache first
+    const cachedResponse = getCachedResponse(requestHash);
+    if (cachedResponse) {
+      console.log("Returning cached response");
+      return new Response(
+        JSON.stringify(cachedResponse),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`Analyzing ${stocks.length} stocks`);
     
+    // Limit number of stocks to analyze for performance
+    const stocksToAnalyze = stocks.slice(0, Math.min(stocks.length, 8));
+    
     // Format the stock data for the AI
-    const stocksContext = stocks.map(s => {
-      const signals = s.signals.join(', ');
+    const stocksContext = stocksToAnalyze.map(s => {
+      const signals = s.signals?.join(', ') || 'No signals';
       const volumeInfo = s.volume && s.avgVolume 
         ? `Volume: ${s.volume.toLocaleString()} (${(s.volume / s.avgVolume).toFixed(1)}x avg)` 
         : '';
@@ -89,7 +135,7 @@ serve(async (req) => {
       return `${s.ticker}: Price $${s.close.toFixed(2)}, ${s.changePercent.toFixed(2)}% today, ` +
         `${volumeInfo}, ` +
         `Signals: ${signals}, ` +
-        `Composite Score: ${s.scores.composite}/100`;
+        `Composite Score: ${s.scores?.composite || 'N/A'}/100`;
     }).join('\n');
     
     // Create the prompt
@@ -109,7 +155,7 @@ serve(async (req) => {
       Keep your analysis concise and data-driven.
     `;
 
-    console.log("Calling Gemini API with prompt...");
+    console.log("Calling Gemini API...");
     
     // Implement the fetch API call with retries
     let response = null;
@@ -199,6 +245,13 @@ serve(async (req) => {
         fromFallback: true
       };
       
+      // Cache fallback response (short TTL)
+      cache[requestHash] = {
+        data: fallbackResponse,
+        timestamp: Date.now(),
+        requestHash
+      };
+      
       return new Response(
         JSON.stringify(fallbackResponse),
         { 
@@ -244,6 +297,13 @@ serve(async (req) => {
         generatedAt: new Date().toISOString()
       };
       
+      // Cache successful response
+      cache[requestHash] = {
+        data: analysis,
+        timestamp: Date.now(),
+        requestHash
+      };
+      
       return new Response(
         JSON.stringify(analysis),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -257,13 +317,15 @@ serve(async (req) => {
         return acc;
       }, {} as { [ticker: string]: string });
       
+      const fallbackResponse = {
+        stockAnalyses: fallbackAnalyses,
+        marketInsight: "Analysis could not be processed. Using algorithmic results instead.",
+        generatedAt: new Date().toISOString(),
+        fromFallback: true
+      };
+      
       return new Response(
-        JSON.stringify({
-          stockAnalyses: fallbackAnalyses,
-          marketInsight: "Analysis could not be processed. Using algorithmic results instead.",
-          generatedAt: new Date().toISOString(),
-          fromFallback: true
-        }),
+        JSON.stringify(fallbackResponse),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -321,7 +383,7 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
       
       if (tickerMatch) {
         // If we were building an analysis for another ticker, save it
-        if (currentTicker && currentAnalysis) {
+        if (currentTicker && currentAnalysis && !stockAnalyses[currentTicker]) {
           stockAnalyses[currentTicker] = currentAnalysis.trim();
         }
         
@@ -344,7 +406,7 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
   for (const ticker of expectedTickers) {
     if (!stockAnalyses[ticker]) {
       console.log(`No analysis found for ${ticker}, adding fallback`);
-      stockAnalyses[ticker] = generateFallbackAnalysis({ ticker } as any);
+      stockAnalyses[ticker] = `Analysis for ${ticker} is not available at this moment. This stock was selected by our algorithm based on technical indicators and scoring algorithms.`;
     }
   }
   

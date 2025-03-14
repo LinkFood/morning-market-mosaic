@@ -24,14 +24,17 @@ interface EdgeFunctionError {
   stack?: string;
 }
 
-// Mock cache to avoid repeated API calls
+// Improved cache with TTL and timestamp tracking
 let cachedAnalysis: StockAnalysis | null = null;
 let cacheTimestamp: number = 0;
+let lastRequestTimestamp: number = 0;
 const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
+const REQUEST_DEBOUNCE = 10 * 1000; // 10 seconds
 
 // Maximum retries for API calls
-const MAX_RETRIES = 2;
-const RETRY_DELAY = 2000; // 2 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 3000; // 3 seconds
+const RETRY_BACKOFF_FACTOR = 1.5; // Increase delay by 50% for each retry
 
 // Maximum time to consider cache valid even if expired when API fails
 const EXTENDED_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -41,6 +44,14 @@ const EXTENDED_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
  */
 export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   console.log("getAIAnalysis called with", stocks.length, "stocks");
+  
+  // Debounce requests to prevent excessive API calls
+  const now = Date.now();
+  if (now - lastRequestTimestamp < REQUEST_DEBOUNCE && cachedAnalysis) {
+    console.log("Debouncing API request, returning cached data");
+    return cachedAnalysis;
+  }
+  lastRequestTimestamp = now;
   
   // First, check if AI analysis is enabled
   if (!isFeatureEnabled('useAIStockAnalysis')) {
@@ -54,7 +65,8 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
     return cachedAnalysis;
   }
   
-  // Implement retry logic
+  // Implement retry logic with exponential backoff
+  let lastError = null;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       console.log(`AI analysis attempt ${attempt} of ${MAX_RETRIES}`);
@@ -65,7 +77,9 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
       // Check if this is a fallback response from the edge function
       if (analysis.fromFallback) {
         console.log("Edge function returned fallback analysis");
-        toast.warning("AI-powered analysis is limited right now. Using algorithmic analysis instead.");
+        if (attempt === MAX_RETRIES) {
+          toast.warning("AI-powered analysis is limited right now. Using algorithmic analysis instead.");
+        }
       }
       
       // Cache successful result
@@ -74,11 +88,14 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
       
       return analysis;
     } catch (error) {
+      lastError = error;
       console.error(`AI analysis attempt ${attempt} failed:`, error);
       
       if (attempt < MAX_RETRIES) {
-        console.log(`Retrying in ${RETRY_DELAY}ms...`);
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        // Calculate backoff with exponential factor
+        const backoffDelay = RETRY_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt - 1);
+        console.log(`Retrying in ${Math.round(backoffDelay/1000)}s...`);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
       } else {
         console.log("All retry attempts failed");
         
@@ -91,13 +108,14 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
         
         // Show error toast only after all retries fail
         toast.error("AI analysis unavailable. Showing algorithmic picks only.");
-        return createFallbackAnalysis(stocks);
+        return createFallbackAnalysis(stocks, "Failed to connect to analysis service.");
       }
     }
   }
   
-  // This should not be reached due to the retry logic, but TypeScript needs a return
-  return createFallbackAnalysis(stocks);
+  // This should not be reached due to the retry logic, but just in case
+  console.error("Unexpected error in getAIAnalysis", lastError);
+  return createFallbackAnalysis(stocks, "An unexpected error occurred while fetching analysis.");
 }
 
 /**
@@ -107,12 +125,12 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   console.log("Calling Supabase Edge Function for stock analysis");
   
   // Prepare request payload
-  const payload = { stocks };
-  console.log("Request payload:", JSON.stringify(payload).substring(0, 200) + "...");
+  const payload = { stocks: stocks.slice(0, 10) }; // Limit to 10 stocks to reduce payload size
+  console.log("Request payload prepared with", payload.stocks.length, "stocks");
   
   // Set timeout for the function call
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("Function invocation timed out")), 20000); // 20s timeout
+    setTimeout(() => reject(new Error("Function invocation timed out")), 25000); // 25s timeout
   });
   
   // Call the Supabase Edge Function
@@ -122,7 +140,12 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   try {
     // Use Promise.race to implement timeout
     const functionCallPromise = supabase.functions.invoke('gemini-stock-analysis', {
-      body: payload
+      body: payload,
+      // Add headers to avoid caching issues
+      headers: {
+        'Cache-Control': 'no-cache',
+        'x-request-id': `stock-analysis-${Date.now()}`
+      }
     });
     
     const result = await Promise.race([functionCallPromise, timeoutPromise]);
@@ -136,9 +159,6 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
       throw new Error(`Function invocation error: ${error.message}`);
     }
     
-    console.log("Edge function response received:", data ? "success" : "empty");
-    
-    // Validate response structure
     if (!data) {
       console.error("Empty response from function");
       throw new Error("Empty response from analysis function");
@@ -215,7 +235,7 @@ function createFallbackAnalysis(stocks: ScoredStock[], reason: string = "AI anal
   
   return {
     stockAnalyses,
-    marketInsight: "Market insight unavailable. The selected stocks were chosen based on technical indicators and algorithmic screening.",
+    marketInsight: `${reason} The selected stocks were chosen based on technical indicators and algorithmic screening.`,
     generatedAt: new Date().toISOString(),
     fromFallback: true
   };

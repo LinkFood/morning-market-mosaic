@@ -25,12 +25,14 @@ const DashboardGrid: React.FC = () => {
     stockPicks,
     stockAnalysis,
     marketStatusData, 
+    isLoading,
+    isLoadingEcon,
     isLoadingMovers,
     isLoadingStockPicks,
     isLoadingAnalysis,
-    isLoadingEcon, 
     moversError,
     loadMarketMovers,
+    loadStockPicks,
     isComponentVisible
   } = useDashboard();
 
@@ -55,7 +57,7 @@ const DashboardGrid: React.FC = () => {
             componentId="market-overview"
             title="Market Overview"
           >
-            <MarketOverview indices={indices} />
+            <MarketOverview indices={indices} isLoading={isLoading} />
           </CollapsibleComponent>
         </div>
       )}
@@ -84,6 +86,7 @@ const DashboardGrid: React.FC = () => {
               analysis={stockAnalysis}
               isLoading={isLoadingStockPicks}
               isLoadingAnalysis={isLoadingAnalysis}
+              onRefresh={loadStockPicks}
             />
           </CollapsibleComponent>
         </div>
@@ -108,7 +111,7 @@ const DashboardGrid: React.FC = () => {
             componentId="major-stocks"
             title="Watchlist"
           >
-            <MajorStocks stocks={stocks} />
+            <MajorStocks stocks={stocks} isLoading={isLoading} />
           </CollapsibleComponent>
         </div>
       )}
@@ -120,7 +123,10 @@ const DashboardGrid: React.FC = () => {
             componentId="sector-performance"
             title="Sector Performance"
           >
-            <SectorPerformance sectors={sectors} />
+            <SectorPerformance 
+              sectors={sectors} 
+              isLoading={isLoading} 
+            />
           </CollapsibleComponent>
         </div>
       )}
@@ -132,7 +138,7 @@ const DashboardGrid: React.FC = () => {
             componentId="market-events"
             title="Market Events"
           >
-            <MarketEvents events={events} />
+            <MarketEvents events={events} isLoading={isLoading} />
           </CollapsibleComponent>
         </div>
       )}

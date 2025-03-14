@@ -1,132 +1,180 @@
 
 /**
- * Cache utilities for market data
- * Implements intelligent caching to reduce API calls
+ * Cache utilities for market data services
  */
+import { toast } from "sonner";
 
-// Cache TTL (Time To Live) settings
-const CACHE_TTL = {
-  SHORT: 60 * 1000, // 1 minute
-  MEDIUM: 5 * 60 * 1000, // 5 minutes
-  LONG: 60 * 60 * 1000, // 1 hour
-  EXTENDED: 24 * 60 * 60 * 1000 // 24 hours
+// Cache settings
+const DEFAULT_CACHE_TTL = 60 * 1000; // 1 minute default
+export const CACHE_TTL = {
+  MARKET_STATUS: 60 * 1000, // 1 minute
+  MARKET_INDICES: 2 * 60 * 1000, // 2 minutes
+  MARKET_SECTORS: 5 * 60 * 1000, // 5 minutes
+  MARKET_STOCKS: 2 * 60 * 1000, // 2 minutes
+  MARKET_EVENTS: 10 * 60 * 1000, // 10 minutes
+  MARKET_MOVERS: 3 * 60 * 1000, // 3 minutes
+  EXTENDED_CACHE: 24 * 60 * 60 * 1000, // 24 hours for emergency fallback
 };
 
-// Cache keys
-const CACHE_KEYS = {
-  MARKET_INDICES: "market_indices",
-  MARKET_SECTORS: "market_sectors",
-  MARKET_STOCKS: "market_stocks_",
-  STOCK_SPARKLINE: "market_sparkline_",
-  MARKET_STATUS: "market_status",
-  MARKET_MOVERS: "market_movers_",
-  STOCK_DETAILS: "stock_details_",
-  MARKET_EVENTS: "market_events",
-  STOCK_CANDLES: "stock_candles_"
-};
+// Cache structure
+const inMemoryCache: Record<string, { data: any; timestamp: number }> = {};
+
+// Cache keys by service
+const cacheKeysByService: Record<string, string[]> = {};
 
 /**
- * Fetch data with cache support
- * @param cacheKey The key to store/retrieve cache
- * @param fetcher Function to fetch fresh data if cache is invalid
- * @returns Promise with data (from cache or freshly fetched)
+ * Get data from cache
+ * @param key Cache key
+ * @param ttl Time to live (ms)
+ * @param allowExpiredData Whether to return expired data with a warning
+ * @returns Cached data or null
  */
-async function fetchWithCache<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
-  try {
-    // Check if data is in cache
-    const cachedData = localStorage.getItem(cacheKey);
-    
-    if (cachedData) {
-      const { data, timestamp } = JSON.parse(cachedData);
-      const now = Date.now();
-      
-      // Determine TTL based on cache key
-      let ttl = CACHE_TTL.MEDIUM; // Default TTL
-      
-      if (cacheKey.startsWith(CACHE_KEYS.MARKET_MOVERS)) {
-        ttl = CACHE_TTL.SHORT;
-      } else if (
-        cacheKey.startsWith(CACHE_KEYS.MARKET_INDICES) ||
-        cacheKey.startsWith(CACHE_KEYS.MARKET_STATUS)
-      ) {
-        ttl = CACHE_TTL.MEDIUM;
-      } else if (
-        cacheKey.startsWith(CACHE_KEYS.MARKET_SECTORS) ||
-        cacheKey.startsWith(CACHE_KEYS.MARKET_STOCKS)
-      ) {
-        ttl = CACHE_TTL.LONG;
-      } else if (cacheKey.startsWith(CACHE_KEYS.STOCK_DETAILS)) {
-        ttl = CACHE_TTL.EXTENDED;
-      }
-      
-      // Check if cache is still valid
-      if (now - timestamp < ttl) {
-        console.log(`Using cached data for ${cacheKey}`);
-        return data;
-      }
-      
-      console.log(`Cache expired for ${cacheKey}`);
-    }
-    
-    // Fetch fresh data
-    const freshData = await fetcher();
-    
-    // Save to cache
-    localStorage.setItem(
-      cacheKey,
-      JSON.stringify({
-        data: freshData,
-        timestamp: Date.now()
-      })
-    );
-    
-    return freshData;
-  } catch (error) {
-    console.error(`Error in fetchWithCache for ${cacheKey}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Clear all cache data
- */
-function clearAllCacheData(): void {
-  Object.keys(localStorage).forEach(key => {
-    if (
-      key.startsWith(CACHE_KEYS.MARKET_INDICES) ||
-      key.startsWith(CACHE_KEYS.MARKET_SECTORS) ||
-      key.startsWith(CACHE_KEYS.MARKET_STOCKS) ||
-      key.startsWith(CACHE_KEYS.STOCK_SPARKLINE) ||
-      key.startsWith(CACHE_KEYS.MARKET_STATUS) ||
-      key.startsWith(CACHE_KEYS.MARKET_MOVERS) ||
-      key.startsWith(CACHE_KEYS.STOCK_DETAILS) ||
-      key.startsWith(CACHE_KEYS.MARKET_EVENTS) ||
-      key.startsWith(CACHE_KEYS.STOCK_CANDLES)
-    ) {
-      localStorage.removeItem(key);
-    }
-  });
-}
-
-/**
- * Get the timestamp of when data was cached
- * @param cacheKey The cache key to check
- * @returns Date object or null if not cached
- */
-function getCacheTimestamp(cacheKey: string): Date | null {
-  const cachedData = localStorage.getItem(cacheKey);
+function getCachedData<T>(key: string, ttl = DEFAULT_CACHE_TTL, allowExpiredData = false): T | null {
+  const cachedItem = inMemoryCache[key];
   
-  if (cachedData) {
-    const { timestamp } = JSON.parse(cachedData);
-    return new Date(timestamp);
+  if (!cachedItem) {
+    return null;
+  }
+  
+  const now = Date.now();
+  const isExpired = now - cachedItem.timestamp > ttl;
+  
+  if (!isExpired) {
+    return cachedItem.data;
+  }
+  
+  // Return expired data if allowed
+  if (allowExpiredData) {
+    console.log(`Using expired cache for ${key} (${Math.round((now - cachedItem.timestamp) / 1000)}s old)`);
+    return cachedItem.data;
   }
   
   return null;
 }
 
+/**
+ * Store data in cache
+ * @param key Cache key
+ * @param data Data to cache
+ * @param serviceName Optional service name for cache management
+ */
+function cacheData(key: string, data: any, serviceName?: string): void {
+  inMemoryCache[key] = {
+    data,
+    timestamp: Date.now()
+  };
+  
+  // Track cache key by service if provided
+  if (serviceName) {
+    if (!cacheKeysByService[serviceName]) {
+      cacheKeysByService[serviceName] = [];
+    }
+    
+    if (!cacheKeysByService[serviceName].includes(key)) {
+      cacheKeysByService[serviceName].push(key);
+    }
+  }
+}
+
+/**
+ * Clear cache for a specific service
+ * @param serviceName Service name
+ */
+function clearServiceCache(serviceName: string): void {
+  const keys = cacheKeysByService[serviceName] || [];
+  
+  keys.forEach(key => {
+    delete inMemoryCache[key];
+  });
+  
+  cacheKeysByService[serviceName] = [];
+}
+
+/**
+ * Clear entire cache
+ */
+function clearAllCache(): void {
+  for (const key in inMemoryCache) {
+    delete inMemoryCache[key];
+  }
+  
+  for (const service in cacheKeysByService) {
+    cacheKeysByService[service] = [];
+  }
+}
+
+/**
+ * Get timestamp for cached data
+ * @param key Cache key
+ * @returns Date object or null
+ */
+function getCacheTimestamp(key: string): Date | null {
+  const cachedItem = inMemoryCache[key];
+  
+  if (!cachedItem) {
+    return null;
+  }
+  
+  return new Date(cachedItem.timestamp);
+}
+
+/**
+ * Fetch data with cache
+ * @param cacheKey Cache key
+ * @param fetchFn Function to fetch data if not cached
+ * @param allowExpiredData Whether to return expired data with a warning
+ * @param ttl Time to live (ms)
+ * @returns Cached or fetched data
+ */
+async function fetchWithCache<T>(
+  cacheKey: string, 
+  fetchFn: (() => Promise<T>) | null,
+  allowExpiredData = false,
+  ttl = DEFAULT_CACHE_TTL
+): Promise<T | null> {
+  // Check cache first
+  const cachedData = getCachedData<T>(cacheKey, ttl, allowExpiredData);
+  
+  if (cachedData) {
+    return cachedData;
+  }
+  
+  // If no fetch function provided, just return null
+  if (!fetchFn) {
+    return null;
+  }
+  
+  try {
+    // Fetch fresh data
+    const data = await fetchFn();
+    
+    // Cache the result
+    if (data) {
+      cacheData(cacheKey, data);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`Error fetching data for cache key ${cacheKey}:`, error);
+    
+    // On error, check if we can use expired data as fallback
+    if (allowExpiredData) {
+      const expiredData = getCachedData<T>(cacheKey, Infinity);
+      if (expiredData) {
+        console.log(`Using expired cache as fallback for ${cacheKey}`);
+        return expiredData;
+      }
+    }
+    
+    throw error;
+  }
+}
+
 export default {
-  fetchWithCache,
-  clearAllCacheData,
+  getCachedData,
+  cacheData,
+  clearServiceCache,
+  clearAllCache,
   getCacheTimestamp,
-  CACHE_KEYS
+  fetchWithCache
 };
