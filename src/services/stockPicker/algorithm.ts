@@ -1,4 +1,3 @@
-
 /**
  * Stock Picker Algorithm Service
  * Implements rule-based scoring system for stock selection
@@ -12,9 +11,12 @@ export interface ScoredStock extends StockData {
     volume: number;
     trend: number;
     volatility: number;
+    liquidity: number; // New score for liquidity
+    quality: number;   // New score for stock quality
     composite: number;
   };
   signals: string[];
+  marketCap?: number;  // Add market cap if available
 }
 
 /**
@@ -88,6 +90,52 @@ function calculateVolatilityScore(stock: StockData): number {
 }
 
 /**
+ * NEW: Calculate liquidity score based on dollar volume and price
+ */
+function calculateLiquidityScore(stock: StockData): number {
+  // No volume or price data
+  if (!stock.volume || !stock.close) return 0;
+  
+  // Calculate dollar volume (rough estimate of liquidity)
+  const dollarVolume = stock.volume * stock.close;
+  
+  // Score based on dollar volume tiers
+  if (dollarVolume > 100000000) return 100;      // >$100M - very liquid
+  else if (dollarVolume > 50000000) return 90;   // >$50M
+  else if (dollarVolume > 20000000) return 80;   // >$20M
+  else if (dollarVolume > 10000000) return 70;   // >$10M
+  else if (dollarVolume > 5000000) return 60;    // >$5M
+  else if (dollarVolume > 1000000) return 50;    // >$1M 
+  else if (dollarVolume > 500000) return 30;     // >$500K
+  else return 10;                                // Low liquidity
+}
+
+/**
+ * NEW: Calculate quality score based on price and estimated market cap
+ */
+function calculateQualityScore(stock: StockData): number {
+  let score = 50; // Start with neutral score
+  
+  // Price-based component (higher prices often indicate more established companies)
+  if (stock.close >= 100) score += 20;       // >$100 stocks are often quality companies
+  else if (stock.close >= 50) score += 15;   // >$50
+  else if (stock.close >= 25) score += 10;   // >$25
+  else if (stock.close >= 15) score += 5;    // >$15
+  else if (stock.close < 10) score -= 5;     // <$10 (small penalty)
+  else if (stock.close < 5) score -= 15;     // <$5 (larger penalty for penny stocks)
+  
+  // Volume-based quality component
+  if (stock.volume && stock.volume > 5000000) score += 10;    // High volume stocks
+  else if (stock.volume && stock.volume < 100000) score -= 10; // Very low volume stocks
+  
+  // Average volume based quality component (consistent interest)
+  if (stock.avgVolume && stock.avgVolume > 1000000) score += 10;
+  
+  // Cap the score
+  return Math.min(Math.max(score, 0), 100);
+}
+
+/**
  * Identify notable signals for a stock
  */
 function identifySignals(stock: StockData): string[] {
@@ -114,28 +162,57 @@ function identifySignals(stock: StockData): string[] {
     if (dayRange > 5) signals.push("High Volatility");
   }
   
+  // NEW: Quality signals
+  if (stock.close >= 50 && stock.volume && stock.volume > 1000000) {
+    signals.push("High Quality");
+  }
+  
+  // NEW: Liquidity signals
+  if (stock.volume && stock.close && stock.volume * stock.close > 50000000) {
+    signals.push("High Liquidity");
+  }
+  
   return signals;
 }
 
 /**
  * Check if a stock meets minimum criteria for consideration
- * Filters out penny stocks and ensures adequate liquidity
+ * IMPROVED: Stronger filters to avoid penny and low-quality stocks
  */
 function meetsMinimumCriteria(stock: ScoredStock): boolean {
-  // Filter out penny stocks (price < $5)
-  if (stock.close < 5) {
-    console.log(`${stock.ticker} filtered out: penny stock (price $${stock.close.toFixed(2)})`);
+  // Filter out penny stocks (price < $10 instead of previous $5)
+  if (stock.close < 10) {
+    console.log(`${stock.ticker} filtered out: low price stock (price $${stock.close.toFixed(2)})`);
     return false;
   }
   
-  // Require sufficient volume for liquidity
-  if (!stock.volume || stock.volume < 500000) {
+  // Require sufficient volume for liquidity (increased from 500,000)
+  if (!stock.volume || stock.volume < 1000000) {
     console.log(`${stock.ticker} filtered out: insufficient volume (${stock.volume?.toLocaleString() || 'unknown'})`);
     return false;
   }
   
+  // NEW: Filter based on dollar volume (price * volume) for better liquidity
+  const dollarVolume = stock.volume * stock.close;
+  if (dollarVolume < 10000000) { // At least $10M in dollar volume
+    console.log(`${stock.ticker} filtered out: low dollar volume ($${(dollarVolume/1000000).toFixed(2)}M)`);
+    return false;
+  }
+  
+  // NEW: Filter based on quality score
+  if (stock.scores.quality < 50) {
+    console.log(`${stock.ticker} filtered out: low quality score (${stock.scores.quality})`);
+    return false;
+  }
+  
+  // NEW: Filter based on liquidity score
+  if (stock.scores.liquidity < 60) {
+    console.log(`${stock.ticker} filtered out: low liquidity score (${stock.scores.liquidity})`);
+    return false;
+  }
+  
   // Minimum composite score threshold
-  if (stock.scores.composite < 40) {
+  if (stock.scores.composite < 50) { // Increased from 40
     console.log(`${stock.ticker} filtered out: low composite score (${stock.scores.composite})`);
     return false;
   }
@@ -147,25 +224,39 @@ function meetsMinimumCriteria(stock: ScoredStock): boolean {
 
 /**
  * Main function to evaluate and rank stocks
+ * IMPROVED: Now applies pre-filtering and adds new quality metrics
  */
 export function evaluateStocks(stocksData: StockData[]): ScoredStock[] {
   // Log the input data for debugging
   console.log(`evaluateStocks called with ${stocksData.length} stocks`);
   
-  const scoredStocks = stocksData
+  // IMPROVEMENT: Pre-filter to remove obvious penny stocks and low volume stocks
+  // This prevents wasting computation on stocks that will be filtered later
+  const preFilteredStocks = stocksData.filter(stock => 
+    stock.close >= 10 && // Min price $10
+    stock.volume >= 1000000 // Min volume 1M shares
+  );
+  
+  console.log(`Pre-filtered stocks: ${preFilteredStocks.length} of ${stocksData.length} passed`);
+  
+  const scoredStocks = preFilteredStocks
     .map(stock => {
       // Calculate individual scores
       const momentumScore = calculateMomentumScore(stock);
       const volumeScore = calculateVolumeScore(stock);
       const trendScore = calculateTrendScore(stock);
       const volatilityScore = calculateVolatilityScore(stock);
+      const liquidityScore = calculateLiquidityScore(stock);
+      const qualityScore = calculateQualityScore(stock);
       
-      // Calculate composite score with weightings
+      // Calculate composite score with new weightings
       const compositeScore = Math.round(
-        momentumScore * 0.35 + 
-        volumeScore * 0.25 + 
-        trendScore * 0.25 + 
-        volatilityScore * 0.15
+        momentumScore * 0.25 + 
+        volumeScore * 0.15 + 
+        trendScore * 0.20 + 
+        volatilityScore * 0.10 +
+        liquidityScore * 0.15 +  // New factor
+        qualityScore * 0.15      // New factor
       );
       
       // Create scored stock object with all metrics
@@ -176,6 +267,8 @@ export function evaluateStocks(stocksData: StockData[]): ScoredStock[] {
           volume: volumeScore,
           trend: trendScore,
           volatility: volatilityScore,
+          liquidity: liquidityScore, // New score
+          quality: qualityScore,     // New score
           composite: compositeScore
         },
         signals: identifySignals(stock)
