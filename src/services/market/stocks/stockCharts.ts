@@ -4,10 +4,11 @@
  * Historical price data and candlestick charts
  */
 import cacheUtils from "../cacheUtils";
-import mockData from "../mockData";
 import { getPolygonApiKey } from "../config";
 import polygonService from "../../polygon";
 import { CandleData } from "@/types/marketTypes";
+import { generateMockSPYData } from "@/services/mockdata/spyData";
+import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 
 // Get candlestick data for charts
 async function getStockCandles(
@@ -20,6 +21,22 @@ async function getStockCandles(
   
   return cacheUtils.fetchWithCache(cacheKey, async () => {
     try {
+      // Special case for SPY - use mock data if needed
+      if (ticker === "SPY") {
+        console.log("Using enhanced SPY data");
+        // Convert timeframe to TimeFrame enum type
+        const timeFrameMap: Record<string, TimeFrame> = {
+          "minute": "1D",
+          "hour": "1W",
+          "day": "1M",
+          "week": "1Y",
+          "month": "5Y"
+        };
+        
+        // Use built-in mock data for SPY
+        return generateMockSPYData(timeFrameMap[timeframe] || "1M");
+      }
+      
       // Get API key from Supabase
       const apiKey = await getPolygonApiKey();
 
@@ -29,8 +46,22 @@ async function getStockCandles(
     } catch (error) {
       console.error(`Error fetching candles for ${ticker}:`, error);
       
-      // If we can't get real data, return empty array instead of mock data
-      // so the UI can properly handle the error state
+      // If we can't get real data and it's SPY, return mock data
+      if (ticker === "SPY") {
+        console.log("Falling back to enhanced SPY mock data");
+        // Convert timeframe to TimeFrame enum type
+        const timeFrameMap: Record<string, TimeFrame> = {
+          "minute": "1D",
+          "hour": "1W",
+          "day": "1M",
+          "week": "1Y",
+          "month": "5Y"
+        };
+        
+        return generateMockSPYData(timeFrameMap[timeframe] || "1M");
+      }
+      
+      // Otherwise return empty array
       return [];
     }
   }, 60 * 5); // Cache for 5 minutes to avoid excessive API calls
