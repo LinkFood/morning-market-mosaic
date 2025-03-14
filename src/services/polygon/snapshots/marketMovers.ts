@@ -3,7 +3,7 @@
  * Polygon.io Market Movers Service
  * Provides data on top gainers and losers
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { StockData } from '@/types/marketTypes';
 
@@ -22,10 +22,10 @@ export async function getMarketMovers(limit: number = 5) {
   
   try {
     // Get top gainers
-    const gainersResponse = await client.get(`/v2/snapshot/locale/us/markets/stocks/gainers?limit=${limit}`);
+    const gainersResponse = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/gainers?limit=${limit}`);
     
     // Get top losers
-    const losersResponse = await client.get(`/v2/snapshot/locale/us/markets/stocks/losers?limit=${limit}`);
+    const losersResponse = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/losers?limit=${limit}`);
     
     // Format the responses
     const gainers: StockData[] = gainersResponse.tickers.map((item: any) => ({

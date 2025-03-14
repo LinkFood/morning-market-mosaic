@@ -1,6 +1,6 @@
 
 import { RealtimeUpdateStatus, RealtimeOptions, MarketStatus, StockData } from '@/types/marketTypes';
-import { clearCache } from '../cache';
+import { clearAllCache } from '../cache';
 import marketData from '../marketData';
 import { BatteryManager } from './BatteryManager';
 import { PollingManager } from './PollingManager';
@@ -292,7 +292,7 @@ class RealtimeService {
    */
   public async refreshData() {
     try {
-      clearCache();
+      clearAllCache();
       
       await this.checkMarketStatus();
       

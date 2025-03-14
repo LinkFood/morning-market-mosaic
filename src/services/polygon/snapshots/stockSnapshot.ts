@@ -1,9 +1,8 @@
-
 /**
  * Polygon.io Stock Snapshot Service
  * Provides real-time stock snapshot data
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { StockData } from '@/types/marketTypes';
 
@@ -14,14 +13,14 @@ import { StockData } from '@/types/marketTypes';
  */
 export async function getStockSnapshot(ticker: string): Promise<StockData> {
   const cacheKey = `snapshot_${ticker}`;
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
+  const cachedData = getCachedData<StockData>(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
   
   if (cachedData) {
-    return cachedData as StockData;
+    return cachedData;
   }
   
   try {
-    const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`);
+    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`);
     
     // Transform the response into our StockData format
     const stockData: StockData = {
@@ -59,15 +58,15 @@ export async function getBatchStockSnapshots(
   // For gainers/losers, use separate endpoint
   if (type) {
     const cacheKey = `market_${type}_${limit}`;
-    const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_MOVERS);
+    const cachedData = getCachedData<StockData[]>(cacheKey, CACHE_TTL.MARKET_MOVERS);
     
     if (cachedData) {
-      return cachedData as StockData[];
+      return cachedData;
     }
     
     try {
       // Use movers endpoint
-      const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/${type}?limit=${limit}`);
+      const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/${type}?limit=${limit}`);
       
       // Transform the response data
       const stocksData: StockData[] = response.tickers.map((item: any) => {
@@ -95,8 +94,7 @@ export async function getBatchStockSnapshots(
       return stocksData;
     } catch (error) {
       console.error(`Error fetching ${type}:`, error);
-      // Return empty array with proper type instead of {}
-      return [] as StockData[];
+      throw error;
     }
   }
   
@@ -108,10 +106,10 @@ export async function getBatchStockSnapshots(
   // Check each ticker in the cache
   tickers.forEach(ticker => {
     const cacheKey = `snapshot_${ticker}`;
-    const cachedData = getCachedData(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
+    const cachedData = getCachedData<StockData>(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
     
     if (cachedData) {
-      cachedResults.push(cachedData as StockData);
+      cachedResults.push(cachedData);
     } else {
       tickersToFetch.push(ticker);
     }
@@ -126,7 +124,7 @@ export async function getBatchStockSnapshots(
     // Format tickers for the API request
     const tickersParam = tickersToFetch.join(',');
     
-    const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
+    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
     
     // Transform the response data
     const stocksData: StockData[] = response.tickers.map((item: any) => {
@@ -159,8 +157,7 @@ export async function getBatchStockSnapshots(
       return cachedResults;
     }
     
-    // Return empty array with proper type instead of throwing
-    return [] as StockData[];
+    throw error;
   }
 }
 

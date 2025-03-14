@@ -3,7 +3,7 @@
  * Polygon.io Ticker Details Service
  * Provides detailed information about stock tickers
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 
 /**
@@ -20,7 +20,7 @@ export async function getTickerDetails(ticker: string) {
   }
   
   try {
-    const response = await client.get(`/v3/reference/tickers/${ticker}`);
+    const response = await polygonRequest(`/v3/reference/tickers/${ticker}`);
     
     // Transform to a more useful format
     const tickerDetails = {

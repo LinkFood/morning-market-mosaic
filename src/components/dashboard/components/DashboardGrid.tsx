@@ -10,7 +10,7 @@ import MajorStocks from "@/components/major-stocks/MajorStocks";
 import MarketEvents from "@/components/MarketEvents";
 import SectorPerformance from "@/components/SectorPerformance";
 import MarketMovers from "@/components/market-movers/MarketMovers";
-import SPYChart from "@/components/SPYChart";
+import ES1FuturesChart from "@/components/ES1FuturesChart";
 import StockPicks from "@/components/stock-picks/StockPicks";
 import AIStockPicker from "@/components/stock-picker/AIStockPicker";
 
@@ -36,14 +36,14 @@ const DashboardGrid: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* SPY Chart */}
+      {/* ES1 Futures Chart */}
       {isComponentVisible('es1-futures') && (
         <div className={`${isComponentVisible('es1-futures') ? 'lg:col-span-2' : ''}`}>
           <CollapsibleComponent
             componentId="es1-futures"
-            title="SPY - S&P 500 ETF"
+            title="S&P 500 Futures"
           >
-            <SPYChart />
+            <ES1FuturesChart />
           </CollapsibleComponent>
         </div>
       )}

@@ -1,247 +1,329 @@
 
-// Gemini Stock Analysis Edge Function
-import { serve } from "https://deno.land/std@0.131.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Get the Gemini API key from Supabase secrets
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+
+// Define interface for the request body
+interface RequestBody {
+  stocks: Array<{
+    ticker: string;
+    close: number;
+    changePercent: number;
+    volume?: number; 
+    avgVolume?: number;
+    signals: string[];
+    scores: {
+      composite: number;
+      [key: string]: number;
+    };
+  }>;
+}
 
 serve(async (req) => {
+  // Add detailed logging for debugging
+  console.log("gemini-stock-analysis function called");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get API key from environment variables
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    
-    if (!apiKey) {
+    // Validate API key
+    if (!GEMINI_API_KEY) {
       console.error("GEMINI_API_KEY environment variable is not set");
       return new Response(
         JSON.stringify({ 
-          error: "API key not configured",
+          error: "API key is not configured",
           details: "The GEMINI_API_KEY environment variable is not set in Supabase Edge Function secrets"
         }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
+
     // Parse request body
-    const requestData = await req.json();
-    const stocks = requestData.stocks || [];
-    
-    if (!Array.isArray(stocks) || stocks.length === 0) {
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("Request body parsed successfully");
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
       return new Response(
-        JSON.stringify({
-          error: "Invalid request",
-          details: "Request must include a 'stocks' array with at least one stock"
+        JSON.stringify({ 
+          error: "Invalid request format", 
+          details: "Could not parse JSON request body" 
         }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    console.log(`Analyzing ${stocks.length} stocks with Gemini API`);
+    const { stocks } = requestBody as RequestBody;
     
-    // Format the prompt for Gemini
-    const prompt = formatAnalysisPrompt(stocks);
-    
-    // Call the Gemini API
-    try {
-      // Updated to use the current model name: gemini-1.5-pro
-      // Note: This is the updated model name as of 2025
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: prompt }]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 4096,
-            }
-          })
-        }
+    if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
+      console.error("Invalid request: stocks array is missing or empty");
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid request", 
+          details: "The stocks array is required and cannot be empty" 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    console.log(`Analyzing ${stocks.length} stocks`);
+    
+    // Format the stock data for the AI
+    const stocksContext = stocks.map(s => {
+      const signals = s.signals.join(', ');
+      const volumeInfo = s.volume && s.avgVolume 
+        ? `Volume: ${s.volume.toLocaleString()} (${(s.volume / s.avgVolume).toFixed(1)}x avg)` 
+        : '';
       
+      return `${s.ticker}: Price $${s.close.toFixed(2)}, ${s.changePercent.toFixed(2)}% today, ` +
+        `${volumeInfo}, ` +
+        `Signals: ${signals}, ` +
+        `Composite Score: ${s.scores.composite}/100`;
+    }).join('\n');
+    
+    // Create the prompt
+    const prompt = `
+      Analyze these potential stock picks as if you are a professional stock analyst:
+      
+      TOP STOCK CANDIDATES:
+      ${stocksContext}
+      
+      For each stock (starting with the ticker symbol):
+      1. Provide a brief analysis of why this stock might be showing strength or weakness
+      2. Note any significant technical factors that might be influencing it
+      3. Give context about recent market conditions that might affect this stock
+      
+      After analyzing all stocks, add a section called "Market Insight" with a brief overview of what these stocks collectively indicate about current market conditions.
+      
+      Keep your analysis concise and data-driven.
+    `;
+
+    console.log("Calling Gemini API with prompt...");
+    
+    // Google Gemini API endpoint
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
+    
+    console.log(`Using Gemini API endpoint: ${endpoint}`);
+    console.log(`API key exists: ${!!GEMINI_API_KEY}`);
+    
+    try {
+      const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+          }
+        }),
+      });
+      
+      // Check response status
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Gemini API Error (${response.status}):`, errorText);
+        const status = response.status;
+        console.error(`Gemini API Error (${status}):`, errorText);
         
+        // Return a more detailed error response
         return new Response(
-          JSON.stringify({
+          JSON.stringify({ 
             error: `Gemini API Error: ${response.statusText}`,
             status: response.status,
             details: errorText
           }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
         );
       }
       
+      console.log("Received successful response from Gemini API");
+      
+      // Process successful response
       const data = await response.json();
       
-      // Parse the Gemini response
-      const result = parseGeminiResponse(data, stocks);
+      // Validate response structure
+      if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
+        console.error("Invalid response format from Gemini API:", data);
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid API response format", 
+            details: "The Gemini API returned an unexpected response format",
+            data: data
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
+      const aiResponse = data.candidates[0].content.parts[0].text;
+      
+      // Validate AI response isn't empty
+      if (!aiResponse) {
+        console.error("Empty response from Gemini API");
+        return new Response(
+          JSON.stringify({ 
+            error: "Empty API response", 
+            details: "The Gemini API returned an empty response"
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      console.log("Successfully received response from Gemini API");
+      console.log("AI Response excerpt:", aiResponse.substring(0, 100) + "...");
+
+      // Parse the AI response
+      const stockAnalyses = parseAnalysisResponse(aiResponse, stocks.map(s => s.ticker));
+      const marketInsight = extractMarketInsight(aiResponse);
+      
+      console.log("Extracted analyses for tickers:", Object.keys(stockAnalyses));
+      console.log("Market insight excerpt:", marketInsight.substring(0, 100) + "...");
+      
+      // Create the analysis object
+      const analysis = {
+        stockAnalyses,
+        marketInsight,
+        generatedAt: new Date().toISOString()
+      };
       
       return new Response(
-        JSON.stringify(result),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
+        JSON.stringify(analysis),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } catch (apiError) {
-      console.error("Error calling Gemini API:", apiError);
-      
+    } catch (fetchError) {
+      console.error("Error making API request:", fetchError);
       return new Response(
-        JSON.stringify({
-          error: "Failed to call Gemini API",
-          details: apiError.message
+        JSON.stringify({ 
+          error: "API request failed", 
+          details: fetchError.message
         }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
-  } catch (error) {
-    console.error("Unhandled error in gemini-stock-analysis function:", error);
     
+  } catch (error) {
+    // Log the full error
+    console.error("Error in gemini-stock-analysis function:", error);
+    
+    // Return a detailed error response
     return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-        details: error.message
+      JSON.stringify({ 
+        error: "Failed to generate analysis", 
+        details: error.message,
+        stack: error.stack
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }
 });
 
 /**
- * Format the analysis prompt for Gemini
+ * Parse the AI response to extract individual stock analyses
+ * Improved to make sure we catch all tickers
  */
-function formatAnalysisPrompt(stocks) {
-  const stockList = stocks.map(stock => {
-    const signals = stock.signals?.join(", ") || "None";
-    return `
-    - ${stock.ticker}: Price $${stock.close.toFixed(2)}, Change: ${stock.changePercent?.toFixed(2) || 0}%
-      Signals: ${signals}
-      Overall Score: ${stock.scores?.composite || 'N/A'}/100
-    `;
-  }).join("\n");
+function parseAnalysisResponse(response: string, expectedTickers: string[]): { [ticker: string]: string } {
+  const stockAnalyses: { [ticker: string]: string } = {};
   
-  return `
-  Analyze the following stocks for a retail investor:
+  console.log("Parsing analysis response for", expectedTickers.length, "expected tickers");
   
-  ${stockList}
+  // First, try to find sections that start with a ticker symbol pattern (1-5 capital letters)
+  const tickerPattern = new RegExp(`(${expectedTickers.join('|')}):\\s*([\\s\\S]+?)(?=\\n\\s*(?:${expectedTickers.join('|')}):|\\n\\s*Market Insight:|$)`, 'g');
   
-  For each stock, provide:
-  1. A brief analysis of its current performance and technical signals
-  2. Potential opportunities and risks
-  3. Keep each analysis concise (50-75 words)
-  
-  Also provide a short market insight paragraph (100 words max) based on these stocks' overall performance and signals.
-  
-  Format your response as JSON with this exact structure:
-  {
-    "stockAnalyses": {
-      "TICKER1": "Analysis for ticker 1...",
-      "TICKER2": "Analysis for ticker 2...",
-      ...
-    },
-    "marketInsight": "Overall market insight paragraph..."
+  let match;
+  while ((match = tickerPattern.exec(response)) !== null) {
+    const ticker = match[1].trim();
+    const analysis = match[2].trim();
+    stockAnalyses[ticker] = analysis;
+    console.log(`Found analysis for ${ticker}, length: ${analysis.length} chars`);
   }
   
-  STRICTLY follow the JSON format above. Your entire response must be valid JSON.
-  `;
+  // If we didn't find all expected tickers, try another approach
+  if (Object.keys(stockAnalyses).length < expectedTickers.length) {
+    console.log("Some tickers not found with first method, trying alternative parsing");
+    
+    // Split by lines and look for lines starting with ticker
+    const lines = response.split('\n');
+    let currentTicker = null;
+    let currentAnalysis = '';
+    
+    for (const line of lines) {
+      // Check if line starts with any of our expected tickers
+      const tickerMatch = line.match(new RegExp(`^\\s*(${expectedTickers.join('|')}):\\s*(.*)$`));
+      
+      if (tickerMatch) {
+        // If we were building an analysis for another ticker, save it
+        if (currentTicker && currentAnalysis) {
+          stockAnalyses[currentTicker] = currentAnalysis.trim();
+        }
+        
+        // Start new ticker analysis
+        currentTicker = tickerMatch[1];
+        currentAnalysis = tickerMatch[2];
+      } else if (currentTicker && !line.match(/^Market Insight:/i)) {
+        // Continue adding to current analysis if not a new section
+        currentAnalysis += '\n' + line;
+      }
+    }
+    
+    // Save the last ticker's analysis
+    if (currentTicker && currentAnalysis && !stockAnalyses[currentTicker]) {
+      stockAnalyses[currentTicker] = currentAnalysis.trim();
+    }
+  }
+  
+  // For any missing tickers, provide a fallback
+  for (const ticker of expectedTickers) {
+    if (!stockAnalyses[ticker]) {
+      console.log(`No analysis found for ${ticker}, adding fallback`);
+      stockAnalyses[ticker] = `Analysis for ${ticker} could not be properly extracted. This stock was selected based on technical indicators showing potential strength in current market conditions.`;
+    }
+  }
+  
+  return stockAnalyses;
 }
 
 /**
- * Parse the Gemini API response
+ * Extract market insight from the AI response
  */
-function parseGeminiResponse(geminiResponse, stocks) {
-  try {
-    // Extract the text from Gemini's response
-    const responseText = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!responseText) {
-      console.error("Empty or invalid response from Gemini API:", geminiResponse);
-      throw new Error("Invalid response format from Gemini API");
-    }
-    
-    // Extract the JSON object from the response text
-    // The response might contain markdown or other formatting, so we need to extract just the JSON part
-    let jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("Could not find JSON in Gemini response:", responseText);
-      
-      // Fallback: create a basic analysis for each stock
-      return createFallbackAnalysis(stocks);
-    }
-    
-    // Parse the JSON
-    const jsonText = jsonMatch[0];
-    let parsedData;
-    
-    try {
-      parsedData = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error("Error parsing Gemini response as JSON:", parseError);
-      console.log("Attempted to parse:", jsonText);
-      
-      // Fallback: create a basic analysis for each stock
-      return createFallbackAnalysis(stocks);
-    }
-    
-    // Validate the parsed data
-    if (!parsedData.stockAnalyses || !parsedData.marketInsight) {
-      console.error("Missing required fields in Gemini response:", parsedData);
-      
-      // Fallback: create a basic analysis for each stock
-      return createFallbackAnalysis(stocks);
-    }
-    
-    // Add a timestamp to the response
-    return {
-      ...parsedData,
-      generatedAt: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error("Error parsing Gemini response:", error);
-    return createFallbackAnalysis(stocks);
+function extractMarketInsight(response: string): string {
+  // Look for a section about market conditions or overall analysis
+  const marketSectionMatch = response.match(/(?:Market Insight|Overall Analysis|Market Context|Market Conditions|In Summary):\s*([\s\S]+?)(?:\n\n|\n[A-Z]|$)/i);
+  
+  if (marketSectionMatch && marketSectionMatch[1]) {
+    return marketSectionMatch[1].trim();
   }
-}
-
-/**
- * Create a fallback analysis when the API response cannot be properly parsed
- */
-function createFallbackAnalysis(stocks) {
-  return {
-    stockAnalyses: stocks.reduce((acc, stock) => {
-      acc[stock.ticker] = `${stock.ticker} is currently priced at $${stock.close.toFixed(2)} with a ${stock.changePercent >= 0 ? 'positive' : 'negative'} change of ${Math.abs(stock.changePercent || 0).toFixed(2)}%. Consider reviewing recent news and financial statements for more information.`;
-      return acc;
-    }, {}),
-    marketInsight: "Analysis unavailable at this time. Please try again later or consult other financial resources for current market insights.",
-    generatedAt: new Date().toISOString()
-  };
+  
+  // Fallback: take the last paragraph if no explicit section
+  const paragraphs = response.split('\n\n');
+  return paragraphs[paragraphs.length - 1].trim();
 }

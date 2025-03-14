@@ -1,68 +1,58 @@
 
 /**
  * Polygon.io API Client
- * Handles authentication and base API calls
+ * Main entry point that orchestrates API communication, rate limiting, and error handling
  */
-import { getPolygonApiKey } from "../market/config";
-
-const BASE_URL = 'https://api.polygon.io';
+import { toast } from "sonner";
+import { makeApiCall } from "./api-client";
+import { isRateLimited, queueRequest, incrementCallCount } from "./rate-limiting";
+import { polygonRequestWithRetry } from "./retry-manager";
 
 /**
- * Make a GET request to the Polygon API with authentication
+ * Make an API request to Polygon.io with rate limiting
+ * @param endpoint The API endpoint path (without base URL)
+ * @returns Promise with the API response
  */
-async function get(endpoint: string, params: Record<string, any> = {}) {
+export async function polygonRequest(endpoint: string): Promise<any> {
+  // Check if we're at the rate limit
+  if (isRateLimited()) {
+    // Calculate wait time until reset
+    console.log(`Rate limit reached, queuing request to: ${endpoint}`);
+    
+    // Queue the request
+    return queueRequest(endpoint);
+  }
+  
+  // Increment call counter
+  incrementCallCount();
+  
+  // Make the API call
   try {
-    // Get API key
-    const apiKey = await getPolygonApiKey();
-    
-    // Build URL with query parameters
-    const url = new URL(`${BASE_URL}${endpoint}`);
-    
-    // Add all parameters to URL
-    Object.keys(params).forEach(key => {
-      if (params[key] !== undefined && params[key] !== null) {
-        url.searchParams.append(key, params[key]);
-      }
-    });
-    
-    // Add API key as query parameter (this is how Polygon.io expects it)
-    url.searchParams.append('apiKey', apiKey);
-    
-    console.log(`Making Polygon API request to: ${endpoint}`);
-    
-    // Make request
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
-    // Handle HTTP errors
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Polygon API error (${response.status}): ${errorText} - URL: ${url.toString().replace(apiKey, 'API_KEY_HIDDEN')}`);
-      throw new Error(`Polygon API error (${response.status}): ${errorText}`);
-    }
-    
-    // Parse JSON response
-    const data = await response.json();
-    
-    // Check for API errors
-    if (data.status === 'ERROR') {
-      console.error(`Polygon API error: ${data.error || 'Unknown error'}`);
-      throw new Error(`Polygon API error: ${data.error || 'Unknown error'}`);
-    }
-    
-    // Debug success
-    console.log(`Successfully received data from Polygon API for ${endpoint}`);
-    
-    return data;
+    return await makeApiCall(endpoint);
   } catch (error) {
-    console.error('Polygon API request failed:', error);
+    // Handle specific API errors
+    if (error instanceof Error) {
+      // Check for rate limit errors from Polygon
+      if (error.message.includes("429")) {
+        toast.error("API rate limit exceeded. Please try again later.");
+        
+        // Queue the request to try again later
+        return queueRequest(endpoint);
+      }
+      
+      // Handle auth errors
+      if (error.message.includes("401") || error.message.includes("403")) {
+        toast.error("API authentication error. Please check your API key.");
+      }
+    }
+    
     throw error;
   }
 }
 
+export { polygonRequestWithRetry };
+
 export default {
-  get
+  polygonRequest,
+  polygonRequestWithRetry
 };

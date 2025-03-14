@@ -1,27 +1,17 @@
+
 /**
  * EnhancedChart - A configurable chart component that adapts to different data frequencies
  * and provides consistent formatting and styling
  */
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import TimeFrameSelector, { TimeFrame } from "./TimeFrameSelector";
 import ChartComponent from "./ChartComponent";
 import ChartEmptyState from "./ChartEmptyState";
+import { EnhancedChartProps } from "./types";
 import { ChartConfigProvider, useChartConfig } from "./context/ChartConfigContext";
 import { useChartData } from "./hooks/useChartData";
 import { useChartAxes } from "./hooks/useChartAxes";
 import { useTooltipFormatter } from "./hooks/useTooltipFormatter";
-
-export interface EnhancedChartProps {
-  data: any[];
-  height?: number;
-  dataKeys: string[];
-  xAxisKey: string;
-  stacked?: boolean;
-  title?: string;
-  referenceLines?: any[];
-  timeFrame?: TimeFrame;
-  setTimeFrame?: (timeFrame: TimeFrame) => void;
-}
 
 /**
  * A responsive, configurable chart component that adapts to different data frequencies
@@ -35,18 +25,8 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   stacked = false,
   title,
   referenceLines = [],
-  timeFrame: externalTimeFrame,
-  setTimeFrame: externalSetTimeFrame
 }) => {
-  // Use internal or external time frame state
-  const [internalTimeFrame, setInternalTimeFrame] = useState<TimeFrame>("1Y");
-  
-  // Determine if we're using controlled or uncontrolled timeframe
-  const timeFrame = externalTimeFrame || internalTimeFrame;
-  const setTimeFrame = externalSetTimeFrame || setInternalTimeFrame;
-  
-  // Memoize data to prevent unnecessary reprocessing
-  const memoizedData = useMemo(() => data, [JSON.stringify(data)]);
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>("1Y");
   
   // Process chart data using our custom hook
   const { 
@@ -54,7 +34,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
     normalizedData, 
     dataFrequency, 
     isEmpty 
-  } = useChartData(memoizedData, dataKeys, xAxisKey, timeFrame);
+  } = useChartData(data, dataKeys, xAxisKey, timeFrame);
   
   // Configure chart axes using our custom hook
   const { 
@@ -67,7 +47,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
   // Get tooltip formatters
   const { enhancedTooltipFormatter } = useTooltipFormatter(title);
   
-  // Throttle debug logging to avoid console spam
+  // Add debug logging to trace data flow issues
   useEffect(() => {
     if (data && data.length > 0) {
       console.log(`EnhancedChart data for ${title || 'chart'}:`, {
@@ -78,7 +58,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
         frequency: dataFrequency
       });
     }
-  }, [timeFrame, dataFrequency]); // Reduced dependencies to avoid excessive logging
+  }, [data, filteredData, title, xAxisKey, timeFrame, dataFrequency]);
   
   // Handle empty filtered data by falling back to all data
   useEffect(() => {
@@ -87,7 +67,7 @@ const EnhancedChart: React.FC<EnhancedChartProps> = ({
       console.warn(`No data available for ${title || 'chart'} in timeframe ${timeFrame}, showing all data instead`);
       setTimeFrame('MAX'); // Fall back to showing all data
     }
-  }, [filteredData.length, data, timeFrame, title, setTimeFrame]);
+  }, [filteredData.length, data, timeFrame, title]);
   
   // If no data, show placeholder
   if (isEmpty) {
@@ -172,5 +152,4 @@ const ChartWrapper: React.FC<ChartWrapperProps> = ({
   );
 };
 
-// Export memoized component to prevent unnecessary re-renders
-export default React.memo(EnhancedChart);
+export default EnhancedChart;

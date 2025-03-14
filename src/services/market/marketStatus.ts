@@ -6,14 +6,14 @@
 import cacheUtils from "./cacheUtils";
 import mockData from "./mockData";
 import { MarketStatus } from "@/types/marketTypes";
-import client from "../polygon/client";
+import { polygonRequest } from "../polygon/client";
 
 // Get current market status (open/closed)
 async function getMarketStatus(): Promise<MarketStatus> {
   return cacheUtils.fetchWithCache("market_status", async () => {
     try {
       // Direct API call to avoid circular dependency
-      const status = await client.get("/v1/marketstatus/now");
+      const status = await polygonRequest("/v1/marketstatus/now");
       
       // Transform to our MarketStatus type
       const marketStatus: MarketStatus = {

@@ -3,9 +3,17 @@
  * Polygon.io Market Breadth Service
  * Provides information about market breadth (advancers, decliners, etc.)
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
-import { MarketBreadthData } from '@/types/marketTypes';
+
+export interface MarketBreadthData {
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+  newHighs: number;
+  newLows: number;
+  timestamp: string;
+}
 
 /**
  * Get market breadth data (advancers/decliners, new highs/lows)
@@ -13,20 +21,20 @@ import { MarketBreadthData } from '@/types/marketTypes';
  */
 export async function getMarketBreadth(): Promise<MarketBreadthData> {
   const cacheKey = 'market_breadth';
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_STATUS);
+  const cachedData = getCachedData<MarketBreadthData>(cacheKey, CACHE_TTL.MARKET_STATUS);
   
   if (cachedData) {
-    return cachedData as MarketBreadthData;
+    return cachedData;
   }
   
   try {
     // For advancers/decliners
-    const snapshotResponse = await client.get('/v2/snapshot/locale/us/markets/stocks/tickers');
+    const snapshotResponse = await polygonRequest('/v2/snapshot/locale/us/markets/stocks/tickers');
     
     // For new highs/lows we would ideally use a dedicated endpoint
     // Since Polygon doesn't have a direct endpoint for this, we'll use:
-    const highsResponse = await client.get('/v2/snapshot/locale/us/markets/stocks/gainers?limit=50');
-    const lowsResponse = await client.get('/v2/snapshot/locale/us/markets/stocks/losers?limit=50');
+    const highsResponse = await polygonRequest('/v2/snapshot/locale/us/markets/stocks/gainers?limit=50');
+    const lowsResponse = await polygonRequest('/v2/snapshot/locale/us/markets/stocks/losers?limit=50');
     
     // Process the data
     let advancers = 0;

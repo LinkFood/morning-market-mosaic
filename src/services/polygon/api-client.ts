@@ -3,32 +3,23 @@
  * Polygon.io API Client
  * Handles basic API communication and error handling
  */
-import { getPolygonApiKey } from "../market/config";
+import { POLYGON_BASE_URL } from "../market/config";
+import { getApiKey } from "./api-key";
 
-const BASE_URL = 'https://api.polygon.io';
 const DEBUG_MODE = true; // Set to false in production
 
 /**
- * Makes an API call to Polygon
+ * Makes the actual API call to Polygon
  */
 export async function makeApiCall(endpoint: string) {
   try {
-    const apiKey = await getPolygonApiKey();
-    
-    // Build URL without including API key in the URL
-    const url = `${BASE_URL}${endpoint}`;
+    const key = await getApiKey();
+    const url = `${POLYGON_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${key}`;
     
     if (DEBUG_MODE) console.log(`📡 API Request: ${endpoint}`);
     const startTime = performance.now();
     
-    // Use Authorization header instead of query parameter
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
+    const response = await fetch(url);
     const endTime = performance.now();
     
     if (DEBUG_MODE) {
@@ -48,7 +39,7 @@ export async function makeApiCall(endpoint: string) {
     if (DEBUG_MODE) {
       console.log(`✅ API Response: ${endpoint}`, {
         status: response.status,
-        dataPreview: data.results ? `${data.results.length} results` : 'No results property'
+        dataPreview: JSON.stringify(data).slice(0, 200) + '...'
       });
     }
     

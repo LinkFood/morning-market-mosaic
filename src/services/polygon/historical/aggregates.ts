@@ -3,9 +3,8 @@
  * Polygon.io Historical Aggregates Data
  * Provides aggregated market data
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
-import { CandleData } from '@/types/marketTypes';
 
 /**
  * Get aggregated OHLCV data for a ticker
@@ -22,29 +21,21 @@ export async function getAggregates(
   timespan: string = 'day',
   from: string,
   to: string
-): Promise<CandleData[]> {
+) {
   const cacheKey = `aggs_${ticker}_${multiplier}_${timespan}_${from}_${to}`;
   const cachedData = getCachedData(cacheKey, CACHE_TTL.INDEX_DATA);
   
   if (cachedData) {
-    return cachedData as CandleData[];
+    return cachedData;
   }
   
   try {
-    console.log(`Fetching aggregates for ${ticker} (${multiplier}/${timespan}) from ${from} to ${to}`);
-    
-    const response = await client.get(
-      `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`,
-      { adjusted: 'true', sort: 'asc', limit: '5000' }
+    const response = await polygonRequest(
+      `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`
     );
     
-    if (!response.results || !Array.isArray(response.results)) {
-      console.warn(`Invalid response for ${ticker} aggregates:`, response);
-      return [] as CandleData[];
-    }
-    
     // Format the data
-    const formattedData: CandleData[] = response.results.map((item: any) => ({
+    const formattedData = response.results.map((item: any) => ({
       date: new Date(item.t).toISOString().split('T')[0],
       timestamp: item.t,
       open: item.o,
@@ -52,17 +43,15 @@ export async function getAggregates(
       low: item.l,
       close: item.c,
       volume: item.v,
-      vwap: item.vw || null
     }));
     
     // Cache the result
-    cacheData(cacheKey, formattedData, CACHE_TTL.INDEX_DATA);
+    cacheData(cacheKey, formattedData);
     
-    console.log(`Successfully fetched ${formattedData.length} data points for ${ticker}`);
     return formattedData;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);
-    return [] as CandleData[]; // Return empty array on error
+    throw error;
   }
 }
 

@@ -15,12 +15,6 @@ export const filterDataByTimeFrame = (
   let cutoffDate = new Date();
   
   switch (timeFrame) {
-    case "1D":
-      cutoffDate.setHours(now.getHours() - 24);
-      break;
-    case "1W":
-      cutoffDate.setDate(now.getDate() - 7);
-      break;
     case "1M":
       cutoffDate.setMonth(now.getMonth() - 1);
       break;

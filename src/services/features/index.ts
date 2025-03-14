@@ -23,8 +23,8 @@ declare global {
  * @param geminiApiAvailable Whether Gemini API is available
  */
 export function updateFeatureFlags(
-  polygonApiAvailable: boolean = true, 
-  fredApiAvailable: boolean = true,
+  polygonApiAvailable: boolean, 
+  fredApiAvailable: boolean,
   geminiApiAvailable: boolean = false
 ): void {
   // Update flags based on API availability
@@ -40,15 +40,6 @@ export function updateFeatureFlags(
     useAIStockAnalysis: geminiApiAvailable && polygonApiAvailable  // AI Analysis depends on both Polygon and Gemini APIs
   };
   
-  // Force all flags to true during development to avoid issues
-  if (import.meta.env.DEV) {
-    Object.keys(currentFlags).forEach(key => {
-      if (key !== 'useAIStockAnalysis') { // Only keep AI as optional
-        currentFlags[key as keyof FeatureFlags] = true;
-      }
-    });
-  }
-  
   // Store in localStorage for persistence
   localStorage.setItem('feature_flags', JSON.stringify(currentFlags));
   
@@ -56,9 +47,6 @@ export function updateFeatureFlags(
   window.__FEATURE_FLAGS__ = { ...currentFlags };
   
   console.log("Feature flags updated:", currentFlags);
-  
-  // Dispatch custom event so UI components can respond
-  window.dispatchEvent(new CustomEvent('feature_flags_updated'));
 }
 
 /**
@@ -66,24 +54,6 @@ export function updateFeatureFlags(
  */
 export function initializeFeatureFlags(): void {
   try {
-    // In development mode, always start with all features enabled
-    if (import.meta.env.DEV) {
-      console.log("Development mode: Initializing with all features enabled");
-      
-      // Start with all features enabled in dev mode
-      currentFlags = { ...DEFAULT_FLAGS };
-      Object.keys(currentFlags).forEach(key => {
-        if (key !== 'useAIStockAnalysis') { // Only keep AI as optional
-          currentFlags[key as keyof FeatureFlags] = true;
-        }
-      });
-      
-      // Set global window variable
-      window.__FEATURE_FLAGS__ = { ...currentFlags };
-      return;
-    }
-    
-    // In production, use stored values
     const stored = localStorage.getItem('feature_flags');
     if (stored) {
       const parsed = JSON.parse(stored);
@@ -111,10 +81,6 @@ export function getFeatureFlags(): FeatureFlags {
  * Check if a specific feature is enabled
  */
 export function isFeatureEnabled(feature: keyof FeatureFlags): boolean {
-  // In development mode, almost all features are enabled
-  if (import.meta.env.DEV && feature !== 'useAIStockAnalysis') {
-    return true;
-  }
   return currentFlags[feature];
 }
 
@@ -128,9 +94,6 @@ export function setFeatureFlag(feature: keyof FeatureFlags, enabled: boolean): v
   window.__FEATURE_FLAGS__ = { ...currentFlags };
   
   localStorage.setItem('feature_flags', JSON.stringify(currentFlags));
-  
-  // Dispatch custom event so UI components can respond
-  window.dispatchEvent(new CustomEvent('feature_flags_updated'));
 }
 
 // Initialize on module load

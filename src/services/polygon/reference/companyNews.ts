@@ -3,7 +3,7 @@
  * Polygon.io Company News Service
  * Provides news articles and press releases for companies
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData } from '../cache';
 
 /**
@@ -29,7 +29,7 @@ export async function getCompanyNews(ticker: string, limit: number = 10) {
     from.setDate(from.getDate() - 30);
     const fromDate = from.toISOString().split('T')[0];
     
-    const response = await client.get(
+    const response = await polygonRequest(
       `/v2/reference/news?ticker=${ticker}&order=desc&limit=${limit}&sort=published_utc&published_utc.gte=${fromDate}&published_utc.lte=${to}`
     );
     

@@ -4,10 +4,9 @@
  * Historical price data and candlestick charts
  */
 import cacheUtils from "../cacheUtils";
+import mockData from "../mockData";
 import { getPolygonApiKey } from "../config";
-import { getStockCandles as polygonGetStockCandles } from "../../polygon/historical";
-import { CandleData } from "@/types/marketTypes";
-import { toast } from "sonner";
+import polygonService from "../../polygon";
 
 // Get candlestick data for charts
 async function getStockCandles(
@@ -15,42 +14,54 @@ async function getStockCandles(
   timeframe: string = "day",
   fromDate: string,
   toDate: string
-): Promise<CandleData[]> {
+): Promise<any[]> {
   const cacheKey = `stock_candles_${ticker}_${timeframe}_${fromDate}_${toDate}`;
   
   return cacheUtils.fetchWithCache(cacheKey, async () => {
     try {
-      // Get API key from config (not used here but initializes the key)
-      await getPolygonApiKey();
+      // Get API key from Supabase
+      const apiKey = await getPolygonApiKey();
       
-      // Request candle data from API with direct call to Polygon service
-      console.log(`Requesting ${ticker} candle data for ${timeframe} from ${fromDate} to ${toDate}`);
-      
-      // Make the request with proper error handling
-      try {
-        const candles = await polygonGetStockCandles(ticker, timeframe, fromDate, toDate);
+      if (apiKey === "DEMO_API_KEY") {
+        console.log("Using demo API key for candle data, returning mock data");
+        // Generate mock candle data
+        const days = Math.ceil((new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60 * 24));
+        const mockCandles = [];
         
-        if (!candles || candles.length === 0) {
-          console.warn(`No data returned for ${ticker}`);
-          return [];
+        let basePrice = 100 + Math.random() * 100;
+        const startDate = new Date(fromDate);
+        
+        for (let i = 0; i < days; i++) {
+          const date = new Date(startDate);
+          date.setDate(date.getDate() + i);
+          
+          // Skip weekends
+          if (date.getDay() === 0 || date.getDay() === 6) continue;
+          
+          const change = (Math.random() - 0.5) * 5;
+          const open = basePrice;
+          const close = basePrice + change;
+          basePrice = close;
+          
+          mockCandles.push({
+            date: date.toISOString().split("T")[0],
+            timestamp: date.getTime(),
+            open,
+            high: Math.max(open, close) + Math.random() * 2,
+            low: Math.min(open, close) - Math.random() * 2,
+            close,
+            volume: Math.floor(Math.random() * 10000000)
+          });
         }
         
-        console.log(`Received ${candles.length} candles for ${ticker}`);
-        return candles;
-      } catch (apiError) {
-        console.error(`API error for ${ticker}:`, apiError);
-        
-        // Show error toast for better feedback
-        if (apiError instanceof Error) {
-          toast.error(`Error fetching ${ticker} data: ${apiError.message}`);
-        }
-        
-        // Return empty array instead of throwing to prevent UI errors
-        return [];
+        return mockCandles;
       }
+      
+      // Get candle data from Polygon
+      return await polygonService.getAggregates(ticker, 1, timeframe, fromDate, toDate);
     } catch (error) {
       console.error(`Error fetching candles for ${ticker}:`, error);
-      // Return empty array on error - UI should handle this
+      // Return empty array as fallback
       return [];
     }
   });

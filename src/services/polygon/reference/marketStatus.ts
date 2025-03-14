@@ -3,7 +3,7 @@
  * Polygon.io Market Status Service
  * Provides real-time market status information
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 
 /**
@@ -19,7 +19,7 @@ export async function getMarketStatus() {
   }
   
   try {
-    const response = await client.get('/v1/marketstatus/now');
+    const response = await polygonRequest('/v1/marketstatus/now');
     
     // Format the response
     const marketStatus = {
@@ -33,7 +33,7 @@ export async function getMarketStatus() {
     // If market is closed, get the next opening time
     if (!marketStatus.isOpen) {
       try {
-        const calendarResponse = await client.get('/v1/calendar/trading/next');
+        const calendarResponse = await polygonRequest('/v1/calendar/trading/next');
         marketStatus.nextOpeningTime = calendarResponse.open;
       } catch (e) {
         console.error("Error fetching next trading day:", e);

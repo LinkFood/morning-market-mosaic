@@ -3,7 +3,7 @@
  * Polygon.io Sector Performance Service
  * Provides performance data for market sectors
  */
-import client from '../client';
+import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
 import { SectorPerformance } from '@/types/marketTypes';
 
@@ -13,10 +13,10 @@ import { SectorPerformance } from '@/types/marketTypes';
  */
 export async function getSectorPerformance(): Promise<SectorPerformance[]> {
   const cacheKey = 'sector_performance';
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.SECTOR_PERFORMANCE);
+  const cachedData = getCachedData<SectorPerformance[]>(cacheKey, CACHE_TTL.SECTOR_PERFORMANCE);
   
   if (cachedData) {
-    return cachedData as SectorPerformance[];
+    return cachedData;
   }
   
   try {
@@ -36,7 +36,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
     
     const tickersParam = sectors.map(s => s.ticker).join(',');
     
-    const response = await client.get(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
+    const response = await polygonRequest(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickersParam}`);
     
     // Map the response to our data format
     const sectorData: SectorPerformance[] = response.tickers.map((item: any) => {
@@ -58,8 +58,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
     return sectorData;
   } catch (error) {
     console.error('Error fetching sector performance:', error);
-    // Return empty array with proper type instead of {}
-    return [] as SectorPerformance[];
+    throw error;
   }
 }
 

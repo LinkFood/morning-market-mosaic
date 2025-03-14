@@ -32,27 +32,6 @@ export async function initializeServices(): Promise<boolean> {
   console.log("Initializing application services...");
   
   try {
-    // In development mode, set all services to true for better testing
-    // This helps avoid the connectivity warning during development
-    if (import.meta.env.DEV) {
-      console.log("Development mode: Forcing all services to available");
-      serviceStatus = {
-        polygonApi: true,
-        fredApi: true,
-        geminiApi: false, // Keep AI disabled as it's not critical
-        initialized: true,
-        error: null
-      };
-      
-      // Update feature flags to match service status
-      updateFeatureFlags(true, true, false);
-      
-      // No need for toast notification in development
-      return true;
-    }
-    
-    // For production, do the actual initialization
-    
     // Initialize API key
     let apiKey = null;
     try {
