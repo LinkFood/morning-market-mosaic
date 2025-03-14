@@ -21,7 +21,7 @@ export interface MarketBreadthData {
  */
 export async function getMarketBreadth(): Promise<MarketBreadthData> {
   const cacheKey = 'market_breadth';
-  const cachedData = getCachedData<MarketBreadthData>(cacheKey, CACHE_TTL.MARKET_STATUS);
+  const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_STATUS);
   
   if (cachedData) {
     return cachedData;

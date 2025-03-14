@@ -10,7 +10,13 @@ export const CACHE_TTL = {
   MEDIUM: 300, // 5 minutes
   LONG: 3600, // 1 hour
   EXTENDED: 86400, // 24 hours
-  INDEX_DATA: 300 // 5 minutes for index data
+  INDEX_DATA: 300, // 5 minutes for index data
+  MARKET_STATUS: 300, // 5 minutes for market status
+  MARKET_HOLIDAYS: 86400, // 24 hours for market holidays
+  TICKER_DETAILS: 3600, // 1 hour for ticker details
+  SECTOR_PERFORMANCE: 300, // 5 minutes for sector performance
+  MARKET_MOVERS: 300, // 5 minutes for market movers
+  STOCK_SNAPSHOT: 60 // 1 minute for stock snapshots
 };
 
 // Simple in-memory cache
@@ -29,7 +35,7 @@ const cache: Record<string, CacheEntry> = {};
  * @param ttl TTL in seconds (optional)
  * @returns Cached data or null if not found or expired
  */
-export function getCachedData(key: string, ttl?: number): any | null {
+export function getCachedData<T>(key: string, ttl?: number): T | null {
   const entry = cache[key];
   
   if (!entry) {
@@ -46,7 +52,7 @@ export function getCachedData(key: string, ttl?: number): any | null {
   }
   
   console.log(`Using cached data for ${key}`);
-  return entry.data;
+  return entry.data as T;
 }
 
 /**
@@ -56,7 +62,7 @@ export function getCachedData(key: string, ttl?: number): any | null {
  * @param ttl TTL in seconds (optional)
  * @returns The cached data
  */
-export function cacheData(key: string, data: any, ttl = CACHE_TTL.MEDIUM): any {
+export function cacheData<T>(key: string, data: T, ttl = CACHE_TTL.MEDIUM): T {
   cache[key] = {
     data,
     timestamp: Date.now(),
@@ -75,9 +81,24 @@ export function clearCache(): void {
   });
 }
 
+/**
+ * Get cache timestamp for a specific key
+ * @param key Cache key
+ * @returns Timestamp or null if not found
+ */
+export function getCacheTimestamp(key: string): number | null {
+  const entry = cache[key];
+  return entry ? entry.timestamp : null;
+}
+
+// Alias for backward compatibility
+export const clearAllCache = clearCache;
+
 export default {
   getCachedData,
   cacheData,
   clearCache,
+  clearAllCache,
+  getCacheTimestamp,
   CACHE_TTL
 };

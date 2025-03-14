@@ -13,7 +13,7 @@ import { SectorPerformance } from '@/types/marketTypes';
  */
 export async function getSectorPerformance(): Promise<SectorPerformance[]> {
   const cacheKey = 'sector_performance';
-  const cachedData = getCachedData<SectorPerformance[]>(cacheKey, CACHE_TTL.SECTOR_PERFORMANCE);
+  const cachedData = getCachedData(cacheKey, CACHE_TTL.SECTOR_PERFORMANCE);
   
   if (cachedData) {
     return cachedData;

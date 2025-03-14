@@ -13,7 +13,7 @@ import { StockData } from '@/types/marketTypes';
  */
 export async function getStockSnapshot(ticker: string): Promise<StockData> {
   const cacheKey = `snapshot_${ticker}`;
-  const cachedData = getCachedData<StockData>(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
+  const cachedData = getCachedData(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
   
   if (cachedData) {
     return cachedData;
@@ -58,7 +58,7 @@ export async function getBatchStockSnapshots(
   // For gainers/losers, use separate endpoint
   if (type) {
     const cacheKey = `market_${type}_${limit}`;
-    const cachedData = getCachedData<StockData[]>(cacheKey, CACHE_TTL.MARKET_MOVERS);
+    const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_MOVERS);
     
     if (cachedData) {
       return cachedData;
@@ -106,7 +106,7 @@ export async function getBatchStockSnapshots(
   // Check each ticker in the cache
   tickers.forEach(ticker => {
     const cacheKey = `snapshot_${ticker}`;
-    const cachedData = getCachedData<StockData>(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
+    const cachedData = getCachedData(cacheKey, CACHE_TTL.STOCK_SNAPSHOT);
     
     if (cachedData) {
       cachedResults.push(cachedData);

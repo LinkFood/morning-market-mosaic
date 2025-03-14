@@ -24,7 +24,7 @@ import {
   getMarketBreadth
 } from './reference';
 import { realtime } from './realtime';
-import { clearAllCache, getCacheTimestamp } from './cache';
+import { clearCache, getCacheTimestamp } from './cache';
 
 // Export all functions
 export default {
@@ -51,7 +51,7 @@ export default {
   realtime,
   
   // Cache management
-  clearCache: clearAllCache,
+  clearCache,
   getCacheTimestamp
 };
 
@@ -80,6 +80,6 @@ export {
   realtime,
   
   // Cache management
-  clearAllCache as clearCache,
+  clearCache,
   getCacheTimestamp
 };

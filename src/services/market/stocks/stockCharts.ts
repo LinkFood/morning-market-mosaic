@@ -1,9 +1,10 @@
+
 /**
  * Stock Charts Service
  * Historical price data and candlestick charts
  */
 import cacheUtils from "../cacheUtils";
-import { getPolygonApiKey } from "../market/config";
+import { getPolygonApiKey } from "../../market/config";
 import { CandleData } from "@/types/marketTypes";
 import { TimeFrame } from "@/components/chart/TimeFrameSelector";
 import { generateMockSPYData } from "@/services/mockdata/spyData";
