@@ -7,7 +7,7 @@ import { StockData } from "@/types/marketTypes";
 import cacheUtils from "../cacheUtils";
 import mockData from "../mockData";
 import { getPolygonApiKey } from "../config";
-import polygonService from "../../polygon";
+import { polygonRequest } from "../../polygon/client";
 
 // Cache management variables
 const CACHE_COOLDOWN = 30000; // 30 seconds between API calls
@@ -65,7 +65,7 @@ async function getMajorStocks(tickers: string[] = ["AAPL", "MSFT", "AMZN", "GOOG
       
       // Get batch stock snapshots with retries
       console.log("Fetching stock data for", tickers.length, "stocks");
-      const stockData = await polygonService.polygonRequest(
+      const stockData = await polygonRequest(
         `/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(',')}`
       ).then(response => {
         // Map response data to StockData format
@@ -144,7 +144,7 @@ async function getStockSparkline(ticker: string): Promise<number[]> {
       const toDate = now.toISOString().split('T')[0];
       
       // Get candle data for the ticker with retry
-      const candles = await polygonService.polygonRequest(
+      const candles = await polygonRequest(
         `/v2/aggs/ticker/${ticker}/range/1/day/${fromDate}/${toDate}`
       ).then(response => {
         if (response.results && Array.isArray(response.results)) {
