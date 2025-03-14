@@ -1,4 +1,3 @@
-
 /**
  * Stock Charts Service
  * Historical price data and candlestick charts
@@ -71,7 +70,7 @@ async function getStockCandles(
       // Otherwise return empty array
       return [] as CandleData[];
     }
-  }, 60 * 5); // Fixed: passing only two arguments as expected
+  });
 }
 
 // Map timeframe string to Polygon parameters
