@@ -132,8 +132,13 @@ export async function getBatchIndexData(
     return indexData;
   } catch (error) {
     console.error('Error fetching batch index data:', error);
-    // Fix: Return empty object with the correct type annotation
-    return {} as Record<string, CandleData[]>;
+    // Create and return empty object with the correct type
+    const emptyResult: Record<string, CandleData[]> = {};
+    indexTickers.forEach(ticker => {
+      const cleanTicker = ticker.replace('I:', '');
+      emptyResult[cleanTicker] = [];
+    });
+    return emptyResult;
   }
 }
 
