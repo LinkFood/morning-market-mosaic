@@ -46,7 +46,7 @@ async function getStockCandles(
       // Generate empty array on error - UI should handle this
       return [];
     }
-  }, 60 * 5); // Cache for 5 minutes to avoid excessive API calls
+  });
 }
 
 export default {
