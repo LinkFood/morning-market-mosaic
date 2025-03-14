@@ -33,6 +33,13 @@ const ApiDiagnostics = () => {
     gemini: null
   });
   
+  const [geminiDetails, setGeminiDetails] = useState<{
+    model?: string;
+    version?: string;
+    endpoint?: string;
+    timestamp?: string;
+  }>({});
+  
   useEffect(() => {
     const status = getServiceStatus();
     setServiceStatus(status);
@@ -125,6 +132,11 @@ const ApiDiagnostics = () => {
               scores: { composite: 50 }
             }
           ] 
+        },
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'x-request-id': `diagnostics-${Date.now()}`
         }
       });
       
@@ -142,6 +154,13 @@ const ApiDiagnostics = () => {
           geminiError: "No data returned from edge function" 
         };
       }
+      
+      setGeminiDetails({
+        model: data.model,
+        version: data.functionVersion,
+        endpoint: data.modelEndpoint,
+        timestamp: data.timestamp
+      });
       
       if (data.error) {
         console.error("Gemini API error:", data.error);
@@ -275,6 +294,16 @@ const ApiDiagnostics = () => {
               <div className="ml-6 p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-sm rounded border border-amber-200 dark:border-amber-800">
                 <p className="font-medium">Error details:</p>
                 <p className="font-mono text-xs break-all">{errorDetails.gemini}</p>
+              </div>
+            )}
+            
+            {geminiDetails.model && (
+              <div className="ml-6 p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-sm rounded border border-blue-200 dark:border-blue-800">
+                <p className="font-medium">Gemini API Details:</p>
+                <p>Model: {geminiDetails.model}</p>
+                <p>Function version: {geminiDetails.version || 'unknown'}</p>
+                {geminiDetails.endpoint && <p className="font-mono text-xs break-all">Endpoint: {geminiDetails.endpoint}</p>}
+                {geminiDetails.timestamp && <p>Last updated: {new Date(geminiDetails.timestamp).toLocaleString()}</p>}
               </div>
             )}
           </div>

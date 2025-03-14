@@ -5,6 +5,11 @@ import { corsHeaders } from "../_shared/cors.ts";
 // Get the Gemini API key from Supabase secrets
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
+// Constants for model versions
+const GEMINI_MODEL = "gemini-1.5-pro";
+const GEMINI_API_VERSION = "v1beta";
+const GEMINI_API_ENDPOINT = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${GEMINI_MODEL}:generateContent`;
+
 // Define interface for the request body
 interface RequestBody {
   stocks: Array<{
@@ -56,9 +61,75 @@ function getCachedResponse(requestHash: string): any | null {
   return entry.data;
 }
 
+// New function to verify Gemini API key
+async function verifyGeminiApiKey(apiKey: string): Promise<{isValid: boolean, errorMessage?: string}> {
+  try {
+    console.log("Verifying Gemini API key access rights...");
+    
+    // Make a minimal test request to verify the API key
+    const testPrompt = "Hello, this is a test request to verify API key access.";
+    
+    const response = await fetch(GEMINI_API_ENDPOINT + `?key=${apiKey}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: testPrompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 10,
+        }
+      })
+    });
+    
+    if (response.status === 200) {
+      console.log("Gemini API key verification successful");
+      return { isValid: true };
+    }
+    
+    const errorData = await response.json();
+    console.error("Gemini API key verification failed:", errorData);
+    
+    if (response.status === 404) {
+      return { 
+        isValid: false, 
+        errorMessage: `Model ${GEMINI_MODEL} not found. Your API key may not have access to this model.` 
+      };
+    } else if (response.status === 403) {
+      return { 
+        isValid: false, 
+        errorMessage: "API key unauthorized. Please check your permissions." 
+      };
+    } else {
+      return { 
+        isValid: false, 
+        errorMessage: `API error (${response.status}): ${JSON.stringify(errorData)}` 
+      };
+    }
+  } catch (error) {
+    console.error("Error during API key verification:", error);
+    return { 
+      isValid: false, 
+      errorMessage: `Verification error: ${error.message}` 
+    };
+  }
+}
+
 serve(async (req) => {
   // Add detailed logging for debugging
-  console.log("gemini-stock-analysis function called");
+  const functionVersion = "v1.0.2"; // Increment this with each deployment
+  const deployTimestamp = new Date().toISOString();
+  
+  console.log(`gemini-stock-analysis function called (Version: ${functionVersion}, Deployed: ${deployTimestamp})`);
+  console.log(`Using Gemini Model: ${GEMINI_MODEL}`);
+  console.log(`Using API Endpoint: ${GEMINI_API_ENDPOINT}`);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -72,9 +143,28 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: "API key is not configured",
-          details: "The GEMINI_API_KEY environment variable is not set in Supabase Edge Function secrets"
+          details: "The GEMINI_API_KEY environment variable is not set in Supabase Edge Function secrets",
+          timestamp: new Date().toISOString(),
+          functionVersion,
+          model: GEMINI_MODEL
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Verify API key has access to the requested model
+    const keyVerification = await verifyGeminiApiKey(GEMINI_API_KEY);
+    if (!keyVerification.isValid) {
+      console.error("Gemini API key verification failed:", keyVerification.errorMessage);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid API key configuration",
+          details: keyVerification.errorMessage,
+          timestamp: new Date().toISOString(),
+          functionVersion,
+          model: GEMINI_MODEL
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -88,7 +178,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: "Invalid request format", 
-          details: "Could not parse JSON request body" 
+          details: "Could not parse JSON request body",
+          timestamp: new Date().toISOString(),
+          functionVersion,
+          model: GEMINI_MODEL
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -101,7 +194,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: "Invalid request", 
-          details: "The stocks array is required and cannot be empty" 
+          details: "The stocks array is required and cannot be empty",
+          timestamp: new Date().toISOString(),
+          functionVersion,
+          model: GEMINI_MODEL
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -115,12 +211,18 @@ serve(async (req) => {
     if (cachedResponse) {
       console.log("Returning cached response");
       return new Response(
-        JSON.stringify(cachedResponse),
+        JSON.stringify({
+          ...cachedResponse,
+          fromCache: true,
+          timestamp: new Date().toISOString(),
+          functionVersion,
+          model: GEMINI_MODEL
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Analyzing ${stocks.length} stocks`);
+    console.log(`Analyzing ${stocks.length} stocks with ${GEMINI_MODEL}`);
     
     // Limit number of stocks to analyze for performance
     const stocksToAnalyze = stocks.slice(0, Math.min(stocks.length, 8));
@@ -155,7 +257,7 @@ serve(async (req) => {
       Keep your analysis concise and data-driven.
     `;
 
-    console.log("Calling Gemini API...");
+    console.log(`Calling Gemini API (${GEMINI_MODEL}) via endpoint: ${GEMINI_API_ENDPOINT}`);
     
     // Implement the fetch API call with retries
     let response = null;
@@ -165,15 +267,12 @@ serve(async (req) => {
       try {
         console.log(`API call attempt ${attempt + 1} of ${MAX_RETRIES}`);
         
-        // Updated Gemini API endpoint to use 1.5-pro model
-        const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
-        
         // Create AbortController for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
         
         try {
-          response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
+          response = await fetch(`${GEMINI_API_ENDPOINT}?key=${GEMINI_API_KEY}`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -198,8 +297,26 @@ serve(async (req) => {
           
           clearTimeout(timeoutId);
           
+          console.log(`API response status: ${response.status}`);
+          
           if (!response.ok) {
             const errorText = await response.text();
+            console.error(`Gemini API Error (${response.status}):`, errorText);
+            
+            try {
+              // Try to parse the error as JSON for better debugging
+              const errorJson = JSON.parse(errorText);
+              console.error("Parsed API error:", JSON.stringify(errorJson, null, 2));
+              
+              // Check for model-specific errors
+              if (errorJson.error?.message?.includes("not found") || response.status === 404) {
+                throw new Error(`Model ${GEMINI_MODEL} not found or not accessible with your API key. Status: ${response.status}`);
+              }
+            } catch (parseError) {
+              // If not JSON, use the raw text
+              throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
+            }
+            
             throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
           }
           
@@ -242,7 +359,12 @@ serve(async (req) => {
         stockAnalyses: fallbackAnalyses,
         marketInsight: "Market analysis is currently unavailable. The selected stocks were chosen based on technical indicators and algorithmic screening. Please check back later for detailed market insights.",
         generatedAt: new Date().toISOString(),
-        fromFallback: true
+        fromFallback: true,
+        error: apiError ? apiError.message : "API connection failed",
+        timestamp: new Date().toISOString(),
+        functionVersion,
+        model: GEMINI_MODEL,
+        modelEndpoint: GEMINI_API_ENDPOINT
       };
       
       // Cache fallback response (short TTL)
@@ -294,7 +416,11 @@ serve(async (req) => {
       const analysis = {
         stockAnalyses,
         marketInsight,
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+        functionVersion,
+        model: GEMINI_MODEL,
+        modelEndpoint: GEMINI_API_ENDPOINT
       };
       
       // Cache successful response
@@ -321,7 +447,12 @@ serve(async (req) => {
         stockAnalyses: fallbackAnalyses,
         marketInsight: "Analysis could not be processed. Using algorithmic results instead.",
         generatedAt: new Date().toISOString(),
-        fromFallback: true
+        fromFallback: true,
+        error: parseError.message,
+        timestamp: new Date().toISOString(),
+        functionVersion,
+        model: GEMINI_MODEL,
+        modelEndpoint: GEMINI_API_ENDPOINT
       };
       
       return new Response(
@@ -338,7 +469,11 @@ serve(async (req) => {
       JSON.stringify({ 
         error: "Failed to generate analysis", 
         details: error.message,
-        stack: error.stack
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+        functionVersion,
+        model: GEMINI_MODEL,
+        modelEndpoint: GEMINI_API_ENDPOINT
       }),
       { 
         status: 500, 

@@ -14,6 +14,12 @@ export interface StockAnalysis {
   marketInsight: string;
   generatedAt: string;
   fromFallback?: boolean;
+  timestamp?: string;
+  functionVersion?: string;
+  model?: string;
+  modelEndpoint?: string;
+  error?: string;
+  fromCache?: boolean;
 }
 
 // Edge function response error interface
@@ -73,6 +79,14 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
       
       // Try to get AI analysis
       const analysis = await fetchAIAnalysis(stocks);
+      
+      // If we detect a model version mismatch, notify the user
+      if (analysis.model && analysis.model !== "gemini-1.5-pro") {
+        console.warn(`Model version mismatch. Expected gemini-1.5-pro but got ${analysis.model}`);
+        toast.warning(`Using ${analysis.model} instead of gemini-1.5-pro for analysis`, {
+          duration: 5000,
+        });
+      }
       
       // Check if this is a fallback response from the edge function
       if (analysis.fromFallback) {
@@ -177,12 +191,27 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
       throw new Error("Invalid response structure from analysis function");
     }
     
-    // Create the analysis object
+    // Log model information for debugging
+    if (data.model) {
+      console.log(`Using Gemini model: ${data.model}`);
+      console.log(`Function version: ${data.functionVersion || 'unknown'}`);
+      if (data.modelEndpoint) {
+        console.log(`Model endpoint: ${data.modelEndpoint}`);
+      }
+    }
+    
+    // Create the analysis object with all additional metadata
     const analysis: StockAnalysis = {
       stockAnalyses: data.stockAnalyses,
       marketInsight: data.marketInsight,
       generatedAt: data.generatedAt || new Date().toISOString(),
-      fromFallback: data.fromFallback || false
+      fromFallback: data.fromFallback || false,
+      timestamp: data.timestamp,
+      functionVersion: data.functionVersion,
+      model: data.model,
+      modelEndpoint: data.modelEndpoint,
+      error: data.error,
+      fromCache: data.fromCache
     };
     
     console.log("Successfully parsed AI analysis for", Object.keys(analysis.stockAnalyses).length, "stocks");
