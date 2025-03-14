@@ -165,8 +165,8 @@ serve(async (req) => {
       try {
         console.log(`API call attempt ${attempt + 1} of ${MAX_RETRIES}`);
         
-        // Google Gemini API endpoint  
-        const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent";
+        // Updated Gemini API endpoint to use 1.5-pro model
+        const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
         
         // Create AbortController for timeout
         const controller = new AbortController();
