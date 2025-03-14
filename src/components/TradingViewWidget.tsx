@@ -13,10 +13,16 @@ interface TradingViewWidgetProps {
   className?: string;
 }
 
+interface TradingViewWidgetInstance {
+  options: any;
+  iframe?: HTMLIFrameElement;
+  remove: () => void;
+}
+
 declare global {
   interface Window {
     TradingView?: {
-      widget: new (config: any) => any;
+      widget: new (config: any) => TradingViewWidgetInstance;
     };
   }
 }
@@ -30,98 +36,91 @@ const TradingViewWidget = ({
   className = "",
 }: TradingViewWidgetProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const widgetRef = useRef<TradingViewWidgetInstance | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const { theme } = useTheme();
   
+  // Generate a stable container ID that won't change on re-renders
+  const containerId = useRef(`tradingview_${symbol.replace(/[^a-zA-Z0-9]/g, '_')}_${Math.floor(Math.random() * 1000000)}`);
+  
+  // Function to initialize or update the widget
+  const initializeWidget = () => {
+    if (!containerRef.current || !window.TradingView) return;
+    
+    try {
+      // Clean up previous widget instance if it exists
+      if (widgetRef.current) {
+        widgetRef.current.remove();
+        widgetRef.current = null;
+      }
+      
+      // Create new widget instance
+      widgetRef.current = new window.TradingView.widget({
+        width: "100%",
+        height: height - 40, // Adjust for card padding
+        symbol: symbol,
+        interval: interval,
+        timezone: "exchange",
+        theme: theme === "dark" ? "dark" : "light",
+        style: "1", // Candles
+        toolbar_bg: theme === "dark" ? "#1a1a1a" : "#f1f3f6",
+        enable_publishing: false,
+        hide_side_toolbar: true,
+        allow_symbol_change: true,
+        container_id: containerId.current,
+        save_image: false,
+      });
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error initializing TradingView widget:", error);
+      setHasError(true);
+      setIsLoading(false);
+    }
+  };
+  
+  // Effect to load the TradingView script only once
   useEffect(() => {
-    // Function to load and initialize the TradingView widget
-    const loadTradingViewScript = () => {
-      // Create script element
+    // Only load the script if it hasn't been loaded yet
+    if (!document.getElementById('tradingview-widget-script') && !window.TradingView) {
       const script = document.createElement('script');
       script.src = 'https://s3.tradingview.com/tv.js';
       script.async = true;
       script.id = 'tradingview-widget-script';
       
-      // Handle script load event
       script.onload = () => {
-        if (window.TradingView && containerRef.current) {
-          try {
-            new window.TradingView.widget({
-              width: "100%",
-              height: height - 40, // Adjust for card padding
-              symbol: symbol,
-              interval: interval,
-              timezone: "exchange",
-              theme: theme === "dark" ? "dark" : "light",
-              style: "1", // Candles
-              toolbar_bg: theme === "dark" ? "#1a1a1a" : "#f1f3f6",
-              enable_publishing: false,
-              hide_side_toolbar: true,
-              allow_symbol_change: true,
-              container_id: containerRef.current.id,
-              save_image: false,
-            });
-            
-            setIsLoading(false);
-          } catch (error) {
-            console.error("Error initializing TradingView widget:", error);
-            setHasError(true);
-            setIsLoading(false);
-          }
-        }
+        initializeWidget();
       };
       
-      // Handle script error
       script.onerror = () => {
         console.error("Failed to load TradingView script");
         setHasError(true);
         setIsLoading(false);
       };
       
-      // Add script to document
       document.head.appendChild(script);
-    };
-    
-    // Check if script is already loaded
-    if (!document.getElementById('tradingview-widget-script')) {
-      loadTradingViewScript();
-    } else if (window.TradingView && containerRef.current) {
-      // If script is already loaded, initialize widget directly
-      try {
-        new window.TradingView.widget({
-          width: "100%",
-          height: height - 40,
-          symbol: symbol,
-          interval: interval,
-          timezone: "exchange",
-          theme: theme === "dark" ? "dark" : "light",
-          style: "1",
-          toolbar_bg: theme === "dark" ? "#1a1a1a" : "#f1f3f6",
-          enable_publishing: false,
-          hide_side_toolbar: true,
-          allow_symbol_change: true,
-          container_id: containerRef.current.id,
-          save_image: false,
-        });
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error initializing TradingView widget:", error);
-        setHasError(true);
-        setIsLoading(false);
-      }
+    } else if (window.TradingView) {
+      // If script is already loaded, initialize widget
+      initializeWidget();
     }
     
-    // Cleanup function
+    // Cleanup function to remove widget when component unmounts
     return () => {
-      // No need to remove the script as it might be used by other instances
-      // Just clean up the container if needed
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
+      if (widgetRef.current) {
+        widgetRef.current.remove();
+        widgetRef.current = null;
       }
     };
-  }, [symbol, interval, height, theme]);
+  }, []); // Only run on mount and unmount
+  
+  // Separate effect to handle theme changes
+  useEffect(() => {
+    // Skip initial render, only update on theme changes after initial setup
+    if (!isLoading && window.TradingView && containerRef.current) {
+      initializeWidget();
+    }
+  }, [theme]); // Only re-run when theme changes
   
   return (
     <Card className={`shadow-md transition-all duration-300 hover:shadow-lg ${className}`}>
@@ -144,7 +143,7 @@ const TradingViewWidget = ({
           </div>
         ) : (
           <div 
-            id={`tradingview_container_${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`}
+            id={containerId.current}
             ref={containerRef} 
             className="w-full rounded-md overflow-hidden"
             style={{ height: `${height - 40}px` }}
