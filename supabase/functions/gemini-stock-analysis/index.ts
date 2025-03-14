@@ -4,8 +4,8 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 // Get the Gemini API key from Supabase secrets
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_MODEL = "gemini-1.5-pro";
-const FUNCTION_VERSION = "1.1.0";  // Version tracking for debugging
+const GEMINI_MODEL = "gemini-1.5-pro"; // Using the latest model
+const FUNCTION_VERSION = "1.2.0";  // Increment version for tracking
 
 // Define interface for the request body
 interface RequestBody {
@@ -27,7 +27,7 @@ interface RequestBody {
 // Configurable retry settings
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2500; // 2.5 seconds
-const API_TIMEOUT = 20000; // 20 seconds
+const API_TIMEOUT = 25000; // 25 seconds (increased timeout)
 
 // Placeholder in-memory cache
 type CacheEntry = {
@@ -41,8 +41,9 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // Simple function to hash request body for cache key
 function hashRequest(stocks: any[]): string {
-  // Use ticker + timestamp as a simple hash
-  return stocks.map(s => s.ticker).sort().join(',');
+  // Use ticker + timestamp rounded to nearest 15 minutes for cache key
+  const timeKey = Math.floor(Date.now() / (15 * 60 * 1000));
+  return stocks.map(s => s.ticker).sort().join(',') + '_' + timeKey;
 }
 
 // Function to get from cache
@@ -205,7 +206,7 @@ serve(async (req) => {
     // Limit number of stocks to analyze for performance
     const stocksToAnalyze = stocks.slice(0, Math.min(stocks.length, 8));
     
-    // Format the stock data for the AI
+    // Format the stock data for the AI with more details
     const stocksContext = stocksToAnalyze.map(s => {
       const signals = s.signals?.join(', ') || 'No signals';
       const volumeInfo = s.volume && s.avgVolume 
@@ -215,24 +216,30 @@ serve(async (req) => {
       return `${s.ticker}: Price $${s.close.toFixed(2)}, ${s.changePercent.toFixed(2)}% today, ` +
         `${volumeInfo}, ` +
         `Signals: ${signals}, ` +
+        `Scores: Momentum ${s.scores?.momentum || 'N/A'}, Volume ${s.scores?.volume || 'N/A'}, ` +
+        `Trend ${s.scores?.trend || 'N/A'}, Volatility ${s.scores?.volatility || 'N/A'}, ` +
         `Composite Score: ${s.scores?.composite || 'N/A'}/100`;
     }).join('\n');
     
-    // Create the prompt
+    // Create an improved prompt with more structured output instructions
     const prompt = `
-      Analyze these potential stock picks as if you are a professional stock analyst:
+      Analyze these potential stock picks as a professional stock analyst:
       
       TOP STOCK CANDIDATES:
       ${stocksContext}
       
-      For each stock (starting with the ticker symbol):
-      1. Provide a brief analysis of why this stock might be showing strength or weakness
-      2. Note any significant technical factors that might be influencing it
-      3. Give context about recent market conditions that might affect this stock
+      For each stock, provide a structured analysis with the following sections:
+      1. TICKER: Start with the ticker symbol followed by a brief summary
+      2. TECHNICAL FACTORS: Key technical indicators and what they suggest
+      3. CONTEXT: Relevant market conditions or sector trends
       
-      After analyzing all stocks, add a section called "Market Insight" with a brief overview of what these stocks collectively indicate about current market conditions.
+      After analyzing all stocks, provide a "MARKET INSIGHT" section with:
+      1. Overall market trends suggested by these stocks
+      2. Sector patterns or rotations if evident
+      3. A brief outlook based on these indicators
       
-      Keep your analysis concise and data-driven.
+      Keep analysis factual, concise, and focus on the technical indicators seen in the data.
+      Maintain a balanced perspective, noting both bullish and bearish signals.
     `;
 
     console.log("Calling Gemini API...");
@@ -272,7 +279,26 @@ serve(async (req) => {
                 topK: 40,
                 topP: 0.95,
                 maxOutputTokens: 2048,
-              }
+              },
+              // Add safety settings to reduce chances of rejection
+              safetySettings: [
+                {
+                  category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  threshold: "BLOCK_ONLY_HIGH"
+                },
+                {
+                  category: "HARM_CATEGORY_HATE_SPEECH",
+                  threshold: "BLOCK_ONLY_HIGH"
+                },
+                {
+                  category: "HARM_CATEGORY_HARASSMENT",
+                  threshold: "BLOCK_ONLY_HIGH"
+                },
+                {
+                  category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  threshold: "BLOCK_ONLY_HIGH"
+                }
+              ]
             }),
             signal: controller.signal
           });
@@ -299,8 +325,10 @@ serve(async (req) => {
           
           // If this is not the last attempt, wait before retrying
           if (attempt < MAX_RETRIES - 1) {
-            console.log(`Retrying in ${RETRY_DELAY/1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            const backOffMultiplier = attempt + 1; // Exponential backoff
+            const retryDelayWithBackoff = RETRY_DELAY * backOffMultiplier;
+            console.log(`Retrying in ${retryDelayWithBackoff/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelayWithBackoff));
           }
         }
       } catch (retryError) {
@@ -442,15 +470,17 @@ serve(async (req) => {
 
 /**
  * Parse the AI response to extract individual stock analyses
- * Improved to make sure we catch all tickers
+ * Improved to handle more response formats
  */
 function parseAnalysisResponse(response: string, expectedTickers: string[]): { [ticker: string]: string } {
   const stockAnalyses: { [ticker: string]: string } = {};
   
   console.log("Parsing analysis response for", expectedTickers.length, "expected tickers");
   
-  // First, try to find sections that start with a ticker symbol pattern (1-5 capital letters)
-  const tickerPattern = new RegExp(`(${expectedTickers.join('|')}):\\s*([\\s\\S]+?)(?=\\n\\s*(?:${expectedTickers.join('|')}):|\\n\\s*Market Insight:|$)`, 'g');
+  // First, try to find sections that start with a ticker symbol
+  // Improved regex pattern to match various formats like "AAPL:", "AAPL -", etc.
+  const tickerPatternStr = expectedTickers.map(t => escapeRegExp(t)).join('|');
+  const tickerPattern = new RegExp(`(${tickerPatternStr})(?::|\\s-|\\n)\\s*([\\s\\S]+?)(?=\\n\\s*(?:${tickerPatternStr})(?::|\\s-|\\n)|\\n\\s*(?:MARKET INSIGHT|Market Insight):|$)`, 'gi');
   
   let match;
   while ((match = tickerPattern.exec(response)) !== null) {
@@ -460,37 +490,26 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
     console.log(`Found analysis for ${ticker}, length: ${analysis.length} chars`);
   }
   
-  // If we didn't find all expected tickers, try another approach
+  // If we didn't find all expected tickers with the first pattern, try another approach
   if (Object.keys(stockAnalyses).length < expectedTickers.length) {
     console.log("Some tickers not found with first method, trying alternative parsing");
     
-    // Split by lines and look for lines starting with ticker
-    const lines = response.split('\n');
-    let currentTicker = null;
-    let currentAnalysis = '';
+    // Split by sections using double newlines
+    const sections = response.split(/\n\s*\n/);
     
-    for (const line of lines) {
-      // Check if line starts with any of our expected tickers
-      const tickerMatch = line.match(new RegExp(`^\\s*(${expectedTickers.join('|')}):\\s*(.*)$`));
-      
-      if (tickerMatch) {
-        // If we were building an analysis for another ticker, save it
-        if (currentTicker && currentAnalysis && !stockAnalyses[currentTicker]) {
-          stockAnalyses[currentTicker] = currentAnalysis.trim();
-        }
+    for (const section of sections) {
+      // Check if this section starts with a ticker
+      for (const ticker of expectedTickers) {
+        // Skip tickers we've already found
+        if (stockAnalyses[ticker]) continue;
         
-        // Start new ticker analysis
-        currentTicker = tickerMatch[1];
-        currentAnalysis = tickerMatch[2];
-      } else if (currentTicker && !line.match(/^Market Insight:/i)) {
-        // Continue adding to current analysis if not a new section
-        currentAnalysis += '\n' + line;
+        // Check if section starts with this ticker
+        if (section.trim().startsWith(ticker)) {
+          stockAnalyses[ticker] = section.trim();
+          console.log(`Found analysis for ${ticker} using alternative method`);
+          break;
+        }
       }
-    }
-    
-    // Save the last ticker's analysis
-    if (currentTicker && currentAnalysis && !stockAnalyses[currentTicker]) {
-      stockAnalyses[currentTicker] = currentAnalysis.trim();
     }
   }
   
@@ -498,7 +517,7 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
   for (const ticker of expectedTickers) {
     if (!stockAnalyses[ticker]) {
       console.log(`No analysis found for ${ticker}, adding fallback`);
-      stockAnalyses[ticker] = `Analysis for ${ticker} is not available at this moment. This stock was selected by our algorithm based on technical indicators and scoring algorithms.`;
+      stockAnalyses[ticker] = `${ticker}: Analysis unavailable. This stock was selected by our algorithm based on technical indicators showing a composite score of ${stockAnalyses[ticker]?.scores?.composite || 'favorable'}.`;
     }
   }
   
@@ -506,59 +525,107 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
 }
 
 /**
+ * Helper function to escape special regex characters
+ */
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Extract market insight from the AI response
  */
 function extractMarketInsight(response: string): string {
   // Look for a section about market conditions or overall analysis
-  const marketSectionMatch = response.match(/(?:Market Insight|Overall Analysis|Market Context|Market Conditions|In Summary):\s*([\s\S]+?)(?:\n\n|\n[A-Z]|$)/i);
+  const marketSectionRegex = /(?:MARKET INSIGHT|Market Insight|MARKET OVERVIEW|Overall Analysis|Market Summary)(?::|;|\n)?\s*([^]*?)(?:\n\s*\n\s*\w+:|$)/i;
+  const marketSectionMatch = response.match(marketSectionRegex);
   
   if (marketSectionMatch && marketSectionMatch[1]) {
     return marketSectionMatch[1].trim();
   }
   
   // Fallback: take the last paragraph if no explicit section
-  const paragraphs = response.split('\n\n');
-  return paragraphs[paragraphs.length - 1].trim();
+  const paragraphs = response.split(/\n\s*\n/);
+  const lastParagraph = paragraphs[paragraphs.length - 1].trim();
+  
+  // Check if the last paragraph actually looks like a conclusion
+  if (lastParagraph.length > 100 && !lastParagraph.match(/^[A-Z]{2,5}:/)) {
+    return lastParagraph;
+  }
+  
+  // Second fallback: create a generic insight
+  return "These stocks represent a mix of technical patterns in the current market environment. Consider them alongside broader market conditions and your investment goals.";
 }
 
 /**
  * Generate fallback analysis when the API is unavailable
+ * Improved with more detailed commentary
  */
 function generateFallbackAnalysis(stock: RequestBody['stocks'][0]): string {
   // Check if we have enough data to generate a meaningful fallback
-  if (!stock.signals || !stock.scores) {
-    return `${stock.ticker} was selected by our algorithm as having potential based on technical indicators.`;
+  if (!stock) {
+    return "Stock analysis is unavailable. Please try again later.";
   }
   
-  let analysis = `${stock.ticker} shows `;
+  let analysis = `${stock.ticker}: `;
+  
+  // Add price information
+  analysis += `Currently trading at $${stock.close.toFixed(2)}`;
+  
+  // Add performance commentary
+  if (stock.changePercent !== undefined) {
+    if (stock.changePercent > 3) {
+      analysis += `, showing strong upward momentum with a ${stock.changePercent.toFixed(2)}% gain today. `;
+    } else if (stock.changePercent > 0) {
+      analysis += `, up ${stock.changePercent.toFixed(2)}% today. `;
+    } else if (stock.changePercent < -3) {
+      analysis += `, experiencing significant selling pressure with a ${Math.abs(stock.changePercent).toFixed(2)}% decline today. `;
+    } else if (stock.changePercent < 0) {
+      analysis += `, down ${Math.abs(stock.changePercent).toFixed(2)}% today. `;
+    } else {
+      analysis += `, unchanged today. `;
+    }
+  }
   
   // Add sentiment based on score
-  if (stock.scores.composite > 80) {
-    analysis += "strong potential based on our algorithm. ";
-  } else if (stock.scores.composite > 60) {
-    analysis += "good potential based on our algorithm. ";
+  if (stock.scores?.composite > 80) {
+    analysis += "Our algorithm indicates strong bullish technical signals with a high composite score of " + 
+      stock.scores.composite + "/100. ";
+  } else if (stock.scores?.composite > 60) {
+    analysis += "Technical indicators are generally positive with a composite score of " + 
+      stock.scores.composite + "/100. ";
+  } else if (stock.scores?.composite > 40) {
+    analysis += "Technical indicators show mixed signals with a moderate composite score of " + 
+      stock.scores.composite + "/100. ";
   } else {
-    analysis += "some potential based on our algorithm. ";
+    analysis += "Technical indicators suggest caution may be warranted based on a composite score of " + 
+      (stock.scores?.composite || "N/A") + "/100. ";
   }
   
   // Add information about signals if available
-  if (stock.signals.length > 0) {
-    analysis += `Technical indicators that triggered include: ${stock.signals.join(', ')}. `;
+  if (stock.signals && stock.signals.length > 0) {
+    analysis += `Key technical signals identified: ${stock.signals.join(', ')}. `;
   }
   
-  // Add price action comment if available
-  if (stock.changePercent !== undefined) {
-    if (stock.changePercent > 0) {
-      analysis += `The stock is up ${stock.changePercent.toFixed(2)}% today, showing positive momentum. `;
-    } else if (stock.changePercent < 0) {
-      analysis += `Despite being down ${Math.abs(stock.changePercent).toFixed(2)}% today, our algorithm sees potential. `;
-    } else {
-      analysis += `The stock is flat today. `;
+  // Add volume commentary if available
+  if (stock.volume && stock.avgVolume) {
+    const volumeRatio = stock.volume / stock.avgVolume;
+    if (volumeRatio > 2) {
+      analysis += `Trading volume is notably high at ${volumeRatio.toFixed(1)}x the average, `;
+      
+      if (stock.changePercent > 0) {
+        analysis += "suggesting strong buying interest. ";
+      } else if (stock.changePercent < 0) {
+        analysis += "indicating potential distribution. ";
+      } else {
+        analysis += "which may signal increased investor attention. ";
+      }
+    } else if (volumeRatio < 0.5) {
+      analysis += `Volume is light at ${volumeRatio.toFixed(1)}x the average, suggesting low conviction in the current price action. `;
     }
   }
   
   // Add final recommendation
-  analysis += "Consider doing additional research before making any investment decisions.";
+  analysis += "This analysis is based on algorithmic scoring and should be considered alongside fundamental research and broader market conditions before making investment decisions.";
   
   return analysis;
 }
