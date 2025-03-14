@@ -5,6 +5,7 @@
  */
 import { polygonRequest } from '../client';
 import { getCachedData, cacheData, CACHE_TTL } from '../cache';
+import { CandleData } from '@/types/marketTypes';
 
 /**
  * Get aggregated OHLCV data for a ticker
@@ -21,7 +22,7 @@ export async function getAggregates(
   timespan: string = 'day',
   from: string,
   to: string
-) {
+): Promise<CandleData[]> {
   const cacheKey = `aggs_${ticker}_${multiplier}_${timespan}_${from}_${to}`;
   const cachedData = getCachedData(cacheKey, CACHE_TTL.INDEX_DATA);
   
@@ -36,7 +37,7 @@ export async function getAggregates(
     
     if (!response.results || !Array.isArray(response.results)) {
       console.warn(`Invalid response for ${ticker} aggregates:`, response);
-      return [];
+      return [] as CandleData[];
     }
     
     // Format the data
@@ -57,7 +58,7 @@ export async function getAggregates(
     return formattedData;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);
-    return []; // Return empty array on error
+    return [] as CandleData[]; // Return empty array on error
   }
 }
 

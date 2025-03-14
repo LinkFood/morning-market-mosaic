@@ -28,7 +28,7 @@ async function getStockCandles(
       const apiKey = await getPolygonApiKey();
       
       console.log(`Requesting candle data for ${ticker} from Polygon API`);
-      // Use direct import from the historical module instead of non-existent nested property
+      // Use direct import from the historical module
       const data = await getAggregates(ticker, multiplier, timespan, fromDate, toDate);
       
       if (!data || !Array.isArray(data) || data.length === 0) {

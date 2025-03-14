@@ -57,7 +57,7 @@ export async function getStockCandles(
     return formattedData;
   } catch (error) {
     console.error(`Error fetching candles for ${ticker}:`, error);
-    throw error;
+    return [] as CandleData[]; // Return empty array with the correct type
   }
 }
 
