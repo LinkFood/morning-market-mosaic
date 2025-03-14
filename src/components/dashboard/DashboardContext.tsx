@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { getFeatureFlags } from "@/services/features"; // Fixed import path
 import { DashboardContextType, defaultSettings } from "./types";
 import { useDashboardData } from "./useDashboardData";
@@ -50,33 +50,39 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Initialize refresh scheduler
   const { scheduleNextRefresh } = useRefreshScheduler(marketStatusData, settings, loadData);
   
-  // Initialize feature flags state - convert from FeatureFlags to ExtendedFeatureFlags
-  const [featureFlags, setFeatureFlags] = React.useState<ExtendedFeatureFlags>(() => {
-    // Call getFeatureFlags from the featureFlags service instead of the features service
-    // This returns the ExtendedFeatureFlags type with UI-related flags
-    return import("@/services/featureFlags").then(module => module.getFeatureFlags()).catch(() => {
-      console.error("Failed to load ExtendedFeatureFlags, using defaults");
-      // Provide default ExtendedFeatureFlags if the import fails
-      return {
-        useRealTimeData: true,
-        showMarketMovers: true,
-        enableDetailedCharts: true,
-        enableNewsSection: true,
-        useFredEconomicData: true,
-        enableDataRefresh: true,
-        useStockPickerAlgorithm: true,
-        useAIStockAnalysis: true,
-        enableDarkMode: true,
-        enableAnimations: true,
-        showExperimentalCharts: false,
-        useTouchGestures: true,
-        useBatteryOptimization: true,
-        showDebugInfo: false,
-        allowCustomWatchlists: true,
-        allowThemeCustomization: true
-      };
-    });
+  // Initialize feature flags state with default extended feature flags
+  const [featureFlags, setFeatureFlags] = useState<ExtendedFeatureFlags>({
+    useRealTimeData: true,
+    showMarketMovers: true,
+    enableDetailedCharts: true,
+    enableNewsSection: true,
+    useFredEconomicData: true,
+    enableDataRefresh: true,
+    useStockPickerAlgorithm: true,
+    useAIStockAnalysis: true,
+    enableDarkMode: true,
+    enableAnimations: true,
+    showExperimentalCharts: false,
+    useTouchGestures: true,
+    useBatteryOptimization: true,
+    showDebugInfo: false,
+    allowCustomWatchlists: true,
+    allowThemeCustomization: true
   });
+  
+  // Effect to load feature flags asynchronously after initial render
+  useEffect(() => {
+    const loadFeatureFlags = async () => {
+      try {
+        const featureFlagsModule = await import("@/services/featureFlags");
+        setFeatureFlags(featureFlagsModule.getFeatureFlags());
+      } catch (error) {
+        console.error("Failed to load feature flags service:", error);
+      }
+    };
+    
+    loadFeatureFlags();
+  }, []);
   
   // Effect to load settings from localStorage
   useEffect(() => {
@@ -96,13 +102,6 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (error) {
       console.error("Failed to parse saved settings:", error);
     }
-    
-    // Update feature flags - use the featureFlags service instead
-    import("@/services/featureFlags").then(module => {
-      setFeatureFlags(module.getFeatureFlags());
-    }).catch(error => {
-      console.error("Failed to load feature flags service:", error);
-    });
   }, []);
   
   // Update refresh scheduling after loading data
@@ -117,12 +116,13 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   // Update feature flags whenever services change
   useEffect(() => {
-    const handleFlagsUpdate = () => {
-      import("@/services/featureFlags").then(module => {
-        setFeatureFlags(module.getFeatureFlags());
-      }).catch(error => {
+    const handleFlagsUpdate = async () => {
+      try {
+        const featureFlagsModule = await import("@/services/featureFlags");
+        setFeatureFlags(featureFlagsModule.getFeatureFlags());
+      } catch (error) {
         console.error("Failed to update feature flags:", error);
-      });
+      }
     };
     
     window.addEventListener('feature_flags_updated', handleFlagsUpdate);
