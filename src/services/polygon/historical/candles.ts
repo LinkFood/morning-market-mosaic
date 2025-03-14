@@ -37,7 +37,7 @@ export async function getStockCandles(
     // Validate response
     if (!response.results || !Array.isArray(response.results)) {
       console.warn(`Invalid response from Polygon for ${ticker} candles:`, response);
-      return [];
+      return [] as CandleData[]; // Return empty array with correct type
     }
     
     // Transform the response to the CandleData format

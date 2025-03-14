@@ -34,6 +34,11 @@ export async function getAggregates(
       `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${from}/${to}`
     );
     
+    if (!response.results || !Array.isArray(response.results)) {
+      console.warn(`Invalid response for ${ticker} aggregates:`, response);
+      return [];
+    }
+    
     // Format the data
     const formattedData = response.results.map((item: any) => ({
       date: new Date(item.t).toISOString().split('T')[0],
@@ -43,6 +48,7 @@ export async function getAggregates(
       low: item.l,
       close: item.c,
       volume: item.v,
+      vwap: item.vw
     }));
     
     // Cache the result
@@ -51,7 +57,7 @@ export async function getAggregates(
     return formattedData;
   } catch (error) {
     console.error(`Error fetching aggregates for ${ticker}:`, error);
-    throw error;
+    return []; // Return empty array on error
   }
 }
 
