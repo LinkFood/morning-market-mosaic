@@ -13,6 +13,7 @@ export interface ServiceStatus {
   geminiApi: boolean;
   initialized: boolean;
   error: string | null;
+  geminiModel?: string; // Track which Gemini model is active
 }
 
 // Global service status
@@ -21,7 +22,8 @@ let serviceStatus: ServiceStatus = {
   fredApi: false,
   geminiApi: false,
   initialized: false,
-  error: null
+  error: null,
+  geminiModel: undefined
 };
 
 /**
@@ -59,7 +61,26 @@ export async function initializeServices(): Promise<boolean> {
     // Update service status based on results
     serviceStatus.polygonApi = marketResult.status === 'fulfilled' ? marketResult.value : false;
     serviceStatus.fredApi = fredResult.status === 'fulfilled' ? fredResult.value : false;
-    serviceStatus.geminiApi = geminiResult.status === 'fulfilled' ? geminiResult.value : false;
+    
+    // Handle the Gemini result which now includes model information
+    if (geminiResult.status === 'fulfilled') {
+      if (typeof geminiResult.value === 'object') {
+        serviceStatus.geminiApi = geminiResult.value.success;
+        serviceStatus.geminiModel = geminiResult.value.model;
+        
+        // Show a warning if using the wrong model version
+        if (serviceStatus.geminiApi && serviceStatus.geminiModel && !serviceStatus.geminiModel.includes('1.5')) {
+          console.warn(`Using Gemini model ${serviceStatus.geminiModel} instead of expected 1.5 version`);
+          toast.warning(`Using Gemini ${serviceStatus.geminiModel} instead of 1.5. Some features may be limited.`, {
+            duration: 8000
+          });
+        }
+      } else {
+        serviceStatus.geminiApi = geminiResult.value;
+      }
+    } else {
+      serviceStatus.geminiApi = false;
+    }
     
     // Set initialization status - consider success if any API initialized
     serviceStatus.initialized = serviceStatus.polygonApi || serviceStatus.fredApi;
@@ -142,13 +163,14 @@ async function initializeFredData(): Promise<boolean> {
 
 /**
  * Test Gemini API connection via the Supabase Edge Function
+ * @returns Object containing success status and model information
  */
-async function testGeminiApiConnection(): Promise<boolean> {
+async function testGeminiApiConnection(): Promise<{success: boolean, model?: string}> {
   try {
     console.log("Testing Gemini API connection...");
     const { supabase } = await import('@/integrations/supabase/client');
     
-    // Send a minimal test request to the edge function
+    // Send a minimal test request to the edge function with a flag to return version info
     const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
       body: { 
         stocks: [
@@ -159,25 +181,36 @@ async function testGeminiApiConnection(): Promise<boolean> {
             signals: ["test"],
             scores: { composite: 50 }
           }
-        ] 
+        ],
+        checkModelVersion: true  // Special flag to request model version check
       }
     });
     
     if (error) {
       console.error("Gemini API connection test failed:", error);
-      return false;
+      return { success: false };
     }
     
     // Check if we got a proper response structure
     const success = data && !data.error && data.stockAnalyses;
+    
+    // Extract the model information if available
+    const model = data?.model || data?.modelVersion || null;
+    
     console.log("Gemini API connection test:", success ? "Success" : "Failed");
-    serviceStatus.geminiApi = success;
-    return success;
+    if (model) {
+      console.log("Using Gemini model:", model);
+    }
+    
+    // Return both the success status and model information
+    return { 
+      success, 
+      model: model || undefined
+    };
     
   } catch (e) {
     console.error("Failed to test Gemini API connection:", e);
-    serviceStatus.geminiApi = false;
-    return false;
+    return { success: false };
   }
 }
 
