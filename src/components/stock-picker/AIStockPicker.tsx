@@ -122,16 +122,16 @@ const AIStockPicker = () => {
         try {
           console.log("Requesting AI analysis for selected stocks...");
           
-          // Show loading state for AI analysis
+          // Show loading state for AI analysis (increased duration from 15s to 40s)
           toast.loading('Loading AI analysis...', {
             id: 'ai-analysis-loading',
-            duration: 15000 // 15 seconds max
+            duration: 40000 // 40 seconds max
           });
           
-          // Make async call with timeout
+          // Make async call with timeout (increased from 25s to 45s)
           const analysisPromise = apiService.getStockAnalysis(scoredStocks);
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Analysis request timed out')), 25000);
+            setTimeout(() => reject(new Error('Analysis request timed out')), 45000);
           });
           
           // Race the promises
@@ -199,10 +199,10 @@ const AIStockPicker = () => {
       return;
     }
     
-    // Show loading toast with ID for dismissal
+    // Show loading toast with ID for dismissal (increased duration from 20s to 40s)
     toast.loading("Requesting AI analysis...", { 
       id: 'manual-ai-analysis',
-      duration: 20000 // 20 second max display
+      duration: 40000 // 40 second max display
     });
     
     // Track if we've been refreshing too frequently
@@ -220,9 +220,9 @@ const AIStockPicker = () => {
     window.localStorage.setItem('lastAIRefresh', now.toString());
     
     try {
-      // Use Promise with timeout for better handling
+      // Use Promise with timeout for better handling (increased from 30s to 45s)
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Analysis request timed out")), 30000);
+        setTimeout(() => reject(new Error("Analysis request timed out")), 45000);
       });
       
       const analysisPromise = apiService.getStockAnalysis(topStocks);
@@ -384,9 +384,22 @@ const AIStockPicker = () => {
                   Analyze
                 </button>
                 <button
+                  className="p-1 px-1 text-xs border border-l-0 hover:bg-secondary"
+                  onClick={() => {
+                    apiService.clearAIAnalysisCache();
+                    toast.success("Cache cleared - click Analyze to fetch fresh data");
+                  }}
+                  title="Clear AI analysis cache"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+                <button
                   className="p-1 px-1 text-xs border border-l-0 rounded-r hover:bg-secondary"
                   onClick={async () => {
-                    toast.loading("Checking AI API status...", { id: "api-health-check" });
+                    toast.loading("Checking AI API status...", { 
+                      id: "api-health-check",
+                      duration: 20000  // 20 second timeout
+                    });
                     const isHealthy = await checkApiHealth();
                     toast.dismiss("api-health-check");
                     if (isHealthy) {

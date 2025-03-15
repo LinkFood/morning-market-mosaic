@@ -55,7 +55,8 @@ export const {
 // Re-export stock picker services
 export const {
   getTopPicks,
-  getStockAnalysis
+  getStockAnalysis,
+  clearAIAnalysisCache
 } = stockPickerService;
 
 // Get economic indicators from FRED
@@ -271,5 +272,8 @@ export default {
   getHighQualityMarketMovers,
   
   // API Health Checks
-  checkGeminiAPIHealth
+  checkGeminiAPIHealth,
+  
+  // Additional utilities
+  clearAIAnalysisCache
 };

@@ -34,7 +34,7 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 2500; // 2.5 seconds
 const RETRY_BACKOFF_FACTOR = 1.5; // Increase delay by 50% for each retry
 const JITTER_FACTOR = 0.2; // Add 20% random jitter
-const API_TIMEOUT = 30000; // 30 seconds (increased timeout to match frontend)
+const API_TIMEOUT = 45000; // 45 seconds (increased timeout to match frontend)
 
 // Helper function to determine if an error indicates model unavailability
 function errorIndicatesModelUnavailable(error: any): boolean {
@@ -626,11 +626,19 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
   const stockAnalyses: { [ticker: string]: string } = {};
   
   console.log("Parsing analysis response for", expectedTickers.length, "expected tickers");
+  console.log("Response starts with:", response.substring(0, 100) + "...");
+  
+  // Enhanced logging to diagnose response format issues
+  const firstTickerMention = expectedTickers.map(ticker => {
+    const index = response.indexOf(ticker);
+    return index > -1 ? `${ticker} at position ${index}` : `${ticker} not found`;
+  });
+  console.log("Ticker mentions:", firstTickerMention);
   
   // First, try to find sections that start with a ticker symbol
   // Improved regex pattern to match various formats like "AAPL:", "AAPL -", etc.
   const tickerPatternStr = expectedTickers.map(t => escapeRegExp(t)).join('|');
-  const tickerPattern = new RegExp(`(${tickerPatternStr})(?::|\\s-|\\n)\\s*([\\s\\S]+?)(?=\\n\\s*(?:${tickerPatternStr})(?::|\\s-|\\n)|\\n\\s*(?:MARKET INSIGHT|Market Insight):|$)`, 'gi');
+  const tickerPattern = new RegExp(`(${tickerPatternStr})(?::|\\s-|\\n)\\s*([\\s\\S]+?)(?=\\n\\s*(?:${tickerPatternStr})(?::|\\s-|\\n)|\\n\\s*(?:MARKET INSIGHT|Market Insight|Overall):|$)`, 'gi');
   
   let match;
   while ((match = tickerPattern.exec(response)) !== null) {
@@ -646,18 +654,42 @@ function parseAnalysisResponse(response: string, expectedTickers: string[]): { [
     
     // Split by sections using double newlines
     const sections = response.split(/\n\s*\n/);
+    console.log(`Analyzing ${sections.length} sections from split response`);
     
     for (const section of sections) {
-      // Check if this section starts with a ticker
+      // Check if this section contains a ticker
       for (const ticker of expectedTickers) {
         // Skip tickers we've already found
         if (stockAnalyses[ticker]) continue;
         
-        // Check if section starts with this ticker
-        if (section.trim().startsWith(ticker)) {
+        // Check if section starts with or contains this ticker
+        // This handles both formats like "AAPL: analysis" and "1. AAPL - analysis"
+        if (section.trim().startsWith(ticker) || 
+            section.includes(`\n${ticker}:`) || 
+            section.includes(`. ${ticker}:`) || 
+            section.includes(`. ${ticker} -`)) {
+              
           stockAnalyses[ticker] = section.trim();
           console.log(`Found analysis for ${ticker} using alternative method`);
           break;
+        }
+      }
+    }
+    
+    // Third attempt with even more flexible matching
+    if (Object.keys(stockAnalyses).length < expectedTickers.length) {
+      console.log("Still missing some tickers, trying more flexible matching");
+      
+      for (const ticker of expectedTickers) {
+        if (stockAnalyses[ticker]) continue;
+        
+        // Find any paragraph that contains the ticker
+        const tickerMention = new RegExp(`([^\\n]*${ticker}[^\\n]*(?:\\n(?![A-Z]{2,5}:)[^\\n]*){0,10})`, 'i');
+        const mentionMatch = response.match(tickerMention);
+        
+        if (mentionMatch && mentionMatch[1]) {
+          stockAnalyses[ticker] = mentionMatch[1].trim();
+          console.log(`Found mention of ${ticker} using flexible matching`);
         }
       }
     }
@@ -685,24 +717,60 @@ function escapeRegExp(string: string) {
  * Extract market insight from the AI response
  */
 function extractMarketInsight(response: string): string {
+  console.log("Extracting market insight from response");
+  
   // Look for a section about market conditions or overall analysis
-  const marketSectionRegex = /(?:MARKET INSIGHT|Market Insight|MARKET OVERVIEW|Overall Analysis|Market Summary)(?::|;|\n)?\s*([^]*?)(?:\n\s*\n\s*\w+:|$)/i;
+  // Enhanced pattern to match more variations of the market insight header
+  const marketSectionRegex = /(?:MARKET INSIGHT|Market Insight|MARKET OVERVIEW|Overall Analysis|Market Summary|Market Trends|Market Outlook|Market Context|Market Conditions)(?::|;|\n)?\s*([^]*?)(?:\n\s*\n\s*\w+:|$)/i;
   const marketSectionMatch = response.match(marketSectionRegex);
   
   if (marketSectionMatch && marketSectionMatch[1]) {
+    console.log("Found dedicated market insight section");
     return marketSectionMatch[1].trim();
   }
   
-  // Fallback: take the last paragraph if no explicit section
+  console.log("No dedicated market insight section found, looking for conclusion");
+  
+  // Fallback: try to find a conclusion section
+  const conclusionRegex = /(?:CONCLUSION|Conclusion|In summary|Overall|Summary|To summarize)(?::|;|\n)?\s*([^]*?)(?:\n\s*\n\s*\w+:|$)/i;
+  const conclusionMatch = response.match(conclusionRegex);
+  
+  if (conclusionMatch && conclusionMatch[1]) {
+    console.log("Found conclusion section");
+    return conclusionMatch[1].trim();
+  }
+  
+  // Second fallback: take the last paragraph if no explicit section
   const paragraphs = response.split(/\n\s*\n/);
   const lastParagraph = paragraphs[paragraphs.length - 1].trim();
   
+  // Log paragraph analysis
+  console.log(`Last paragraph length: ${lastParagraph.length} chars`);
+  console.log(`Last paragraph starts with: ${lastParagraph.substring(0, 30)}...`);
+  
   // Check if the last paragraph actually looks like a conclusion
-  if (lastParagraph.length > 100 && !lastParagraph.match(/^[A-Z]{2,5}:/)) {
+  if (lastParagraph.length > 80 && !lastParagraph.match(/^[A-Z]{2,5}:/)) {
+    console.log("Using last paragraph as market insight");
     return lastParagraph;
   }
   
-  // Second fallback: create a generic insight
+  // Third fallback: try to find any paragraph mentioning "market" or "sector"
+  for (const paragraph of paragraphs.reverse()) { // Start from the end
+    if (
+      paragraph.toLowerCase().includes("market") || 
+      paragraph.toLowerCase().includes("sector") ||
+      paragraph.toLowerCase().includes("trend") ||
+      paragraph.toLowerCase().includes("overall")
+    ) {
+      if (paragraph.length > 60) {
+        console.log("Found paragraph discussing market/sectors");
+        return paragraph.trim();
+      }
+    }
+  }
+  
+  // Final fallback: create a generic insight
+  console.log("Using generic market insight as fallback");
   return "These stocks represent a mix of technical patterns in the current market environment. Consider them alongside broader market conditions and your investment goals.";
 }
 

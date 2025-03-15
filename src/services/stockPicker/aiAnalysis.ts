@@ -50,7 +50,7 @@ const RETRY_BACKOFF_FACTOR = 1.5; // Increase delay by 50% for each retry
 const JITTER_FACTOR = 0.2; // Add 20% random jitter
 const EXTENDED_CACHE_TTL = 48 * 60 * 60 * 1000; // 48 hours - extended for better fallback availability
 const ERROR_CACHE_TTL = 30 * 60 * 1000; // 30 min TTL when errors occur
-const API_TIMEOUT = 35000; // 35 seconds
+const API_TIMEOUT = 45000; // 45 seconds - increased from 35s to allow more time for response
 
 // Track consecutive errors to adapt caching strategy
 let consecutiveErrorCount = 0;
@@ -388,6 +388,18 @@ function createFallbackAnalysis(stocks: ScoredStock[], reason: string = "AI anal
   };
 }
 
+/**
+ * Clear the AI analysis cache
+ */
+export function clearAIAnalysisCache(): void {
+  console.log("Clearing AI analysis cache");
+  cacheStore.clear();
+  consecutiveErrorCount = 0;
+  lastRequestTimestamp = 0;
+  toast.success("AI analysis cache cleared");
+}
+
 export default {
-  getAIAnalysis
+  getAIAnalysis,
+  clearAIAnalysisCache
 };
