@@ -47,7 +47,13 @@ const REQUEST_DEBOUNCE = 15 * 1000; // 15 seconds - increased to reduce API pres
 const MAX_RETRIES = 4; // Increased to 4 retries
 const RETRY_DELAY = 3000; // 3 seconds
 const RETRY_BACKOFF_FACTOR = 1.5; // Increase delay by 50% for each retry
+const JITTER_FACTOR = 0.2; // Add 20% random jitter
 const EXTENDED_CACHE_TTL = 48 * 60 * 60 * 1000; // 48 hours - extended for better fallback availability
+const ERROR_CACHE_TTL = 30 * 60 * 1000; // 30 min TTL when errors occur
+const API_TIMEOUT = 35000; // 35 seconds
+
+// Track consecutive errors to adapt caching strategy
+let consecutiveErrorCount = 0;
 
 // Helper function to get cache key
 function getCacheKey(stocks: ScoredStock[]): string {
@@ -122,6 +128,9 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
         }
       }
       
+      // Reset consecutive error count on success
+      consecutiveErrorCount = 0;
+      
       // Cache successful result
       cacheStore.set(cacheKey, {
         data: analysis,
@@ -135,16 +144,30 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
       lastError = error;
       console.error(`AI analysis attempt ${attempt} failed:`, error);
       
+      // Track consecutive errors for adaptive cache strategy
+      consecutiveErrorCount++;
+      console.log(`Consecutive error count: ${consecutiveErrorCount}`);
+      
       if (attempt < MAX_RETRIES) {
-        // Calculate backoff with exponential factor
+        // Calculate backoff with exponential factor and jitter
         const backoffDelay = RETRY_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt - 1);
-        console.log(`Retrying in ${Math.round(backoffDelay/1000)}s...`);
-        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        const jitter = backoffDelay * JITTER_FACTOR * (Math.random() - 0.5);
+        const finalDelay = Math.max(1000, backoffDelay + jitter); // Ensure minimum 1s delay
+        
+        console.log(`Retrying in ${Math.round(finalDelay/1000)}s (with jitter)...`);
+        await new Promise(resolve => setTimeout(resolve, finalDelay));
       } else {
         console.log("All retry attempts failed");
         
+        // Calculate adaptive cache TTL based on error frequency
+        const adaptiveCacheTTL = consecutiveErrorCount > 3 
+          ? Math.min(CACHE_TTL * 2, 8 * 60 * 60 * 1000) // Max 8 hours if many errors
+          : EXTENDED_CACHE_TTL;
+        
+        console.log(`Using adaptive cache TTL: ${Math.round(adaptiveCacheTTL/1000/60)} minutes due to ${consecutiveErrorCount} consecutive errors`);
+        
         // Check if we have a stale cache that's still usable in emergency
-        if (cachedEntry && (now - cachedEntry.timestamp < EXTENDED_CACHE_TTL)) {
+        if (cachedEntry && (now - cachedEntry.timestamp < adaptiveCacheTTL)) {
           console.log("Using stale cache as fallback from", new Date(cachedEntry.timestamp).toISOString());
           toast.warning("Using cached analysis due to connection issues.");
           return cachedEntry.data;
@@ -162,7 +185,7 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
         toast.error("AI analysis unavailable. Showing algorithmic picks only.");
         const fallback = createFallbackAnalysis(stocks, "Failed to connect to analysis service.");
         
-        // Cache the fallback analysis so we don't keep retrying
+        // Cache the fallback analysis with appropriate TTL
         cacheStore.set(cacheKey, {
           data: fallback,
           timestamp: now,
@@ -225,9 +248,9 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   const payload = { stocks: stocks.slice(0, 10) }; // Limit to 10 stocks to reduce payload size
   console.log("Request payload prepared with", payload.stocks.length, "stocks");
   
-  // Set timeout for the function call
+  // Set timeout for the function call with improved value
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("Function invocation timed out")), 30000); // Increased to 30s timeout
+    setTimeout(() => reject(new Error("Function invocation timed out")), API_TIMEOUT);
   });
   
   // Call the Supabase Edge Function
@@ -235,9 +258,9 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   const startTime = performance.now();
   
   try {
-    // Add a request ID for better tracking
+    // Generate a more structured request ID for better cross-system tracing
     const requestId = `stock-analysis-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    console.log(`Request ID: ${requestId}`);
+    console.log(`[${requestId}] Starting API request`);
     
     // Use Promise.race to implement timeout
     const functionCallPromise = supabase.functions.invoke('gemini-stock-analysis', {
@@ -256,37 +279,42 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
     const { data, error } = result;
     
     const endTime = performance.now();
-    console.log(`Edge function response time: ${Math.round(endTime - startTime)}ms for request ${requestId}`);
+    console.log(`[${requestId}] Edge function response time: ${Math.round(endTime - startTime)}ms`);
+    
+    // Log complete response for debugging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[${requestId}] Full response:`, JSON.stringify(result).substring(0, 500) + '...');
+    }
     
     if (error) {
-      console.error("Supabase function invocation error:", error);
+      console.error(`[${requestId}] Supabase function invocation error:`, error);
       throw new Error(`Function invocation error: ${error.message}`);
     }
     
     if (!data) {
-      console.error("Empty response from function");
+      console.error(`[${requestId}] Empty response from function`);
       throw new Error("Empty response from analysis function");
     }
     
     // Check for error in the response
     const responseError = data as EdgeFunctionError;
     if (responseError.error) {
-      console.error("Error in function response:", responseError);
+      console.error(`[${requestId}] Error in function response:`, responseError);
       throw new Error(`Analysis error: ${responseError.error}${responseError.details ? ` - ${responseError.details}` : ''}`);
     }
     
     // Validate required fields
     if (!data.stockAnalyses || !data.marketInsight) {
-      console.error("Invalid response structure:", data);
+      console.error(`[${requestId}] Invalid response structure:`, data);
       throw new Error("Invalid response structure from analysis function");
     }
     
     // Log model information for debugging
     if (data.model) {
-      console.log(`Using Gemini model: ${data.model}`);
-      console.log(`Function version: ${data.functionVersion || 'unknown'}`);
+      console.log(`[${requestId}] Using Gemini model: ${data.model}`);
+      console.log(`[${requestId}] Function version: ${data.functionVersion || 'unknown'}`);
       if (data.modelEndpoint) {
-        console.log(`Model endpoint: ${data.modelEndpoint}`);
+        console.log(`[${requestId}] Model endpoint: ${data.modelEndpoint}`);
       }
     }
     
@@ -304,14 +332,14 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
       fromCache: data.fromCache
     };
     
-    console.log("Successfully parsed AI analysis for", Object.keys(analysis.stockAnalyses).length, "stocks");
+    console.log(`[${requestId}] Successfully parsed AI analysis for ${Object.keys(analysis.stockAnalyses).length} stocks`);
     
     return analysis;
   } catch (error) {
-    // Improved error logging with more detail
-    console.error("Failed to get AI analysis:", error);
+    // Improved error logging with more detail and request ID
+    console.error(`[${requestId}] Failed to get AI analysis:`, error);
     if (error instanceof Error && error.stack) {
-      console.error("Error stack:", error.stack);
+      console.error(`[${requestId}] Error stack:`, error.stack);
     }
     throw error;
   }

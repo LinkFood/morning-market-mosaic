@@ -4,8 +4,13 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 // Get the Gemini API key from Supabase secrets
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_MODEL = "gemini-1.5-pro"; // Using the latest model
-const FUNCTION_VERSION = "1.2.0";  // Increment version for tracking
+
+// Model configuration with fallbacks
+const PRIMARY_MODEL = "gemini-1.5-pro"; // Using the latest model as primary
+const FALLBACK_MODELS = ["gemini-pro", "gemini-1.0-pro"]; // Ordered fallback models
+const GEMINI_MODEL = PRIMARY_MODEL; // Initial model (will try fallbacks if needed)
+
+const FUNCTION_VERSION = "1.3.0";  // Incrementing version for tracking
 
 // Define interface for the request body
 interface RequestBody {
@@ -27,7 +32,25 @@ interface RequestBody {
 // Configurable retry settings
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2500; // 2.5 seconds
-const API_TIMEOUT = 25000; // 25 seconds (increased timeout)
+const RETRY_BACKOFF_FACTOR = 1.5; // Increase delay by 50% for each retry
+const JITTER_FACTOR = 0.2; // Add 20% random jitter
+const API_TIMEOUT = 30000; // 30 seconds (increased timeout to match frontend)
+
+// Helper function to determine if an error indicates model unavailability
+function errorIndicatesModelUnavailable(error: any): boolean {
+  if (!error) return false;
+  
+  // Check error message or status for model availability issues
+  const errorText = error.toString().toLowerCase();
+  return errorText.includes('model') && 
+         (errorText.includes('unavailable') || 
+          errorText.includes('not available') || 
+          errorText.includes('capacity') ||
+          errorText.includes('overloaded') ||
+          errorText.includes('currently unavailable') ||
+          errorText.includes('rate limit')
+         );
+}
 
 // Placeholder in-memory cache
 type CacheEntry = {
@@ -303,101 +326,143 @@ serve(async (req) => {
     console.log("Calling Gemini API...");
     console.log(`Using model: ${GEMINI_MODEL}`);
     
-    // Implement the fetch API call with retries
+    // Implement the fetch API call with retries and model fallbacks
     let response = null;
     let apiError = null;
+    let currentModelIndex = -1; // Start with primary model (incremented to 0 in first loop)
+    let modelsToTry = [PRIMARY_MODEL, ...FALLBACK_MODELS];
+    let currentModel = PRIMARY_MODEL;
     
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        console.log(`API call attempt ${attempt + 1} of ${MAX_RETRIES}`);
-        
-        // Using the configured Gemini model endpoint
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-        
-        // Create AbortController for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
-        
+    // Generate a request ID for tracing
+    const requestId = `gemini-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    console.log(`[${requestId}] Starting stock analysis API request`);
+    
+    // Loop through models with retries for each model
+    modelLoop: for (let modelAttempt = 0; modelAttempt < modelsToTry.length; modelAttempt++) {
+      currentModelIndex++;
+      currentModel = modelsToTry[currentModelIndex];
+      console.log(`[${requestId}] Trying model ${currentModel} (${modelAttempt + 1}/${modelsToTry.length})`);
+      
+      // Retry loop for current model
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-          response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: prompt }
-                  ]
-                }
-              ],
-              generationConfig: {
-                temperature: 0.2,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 2048,
+          console.log(`[${requestId}] API call attempt ${attempt + 1} of ${MAX_RETRIES} for model ${currentModel}`);
+          
+          // Using the current model endpoint
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent`;
+          
+          // Create AbortController for timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+          
+          try {
+            response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Request-ID": requestId
               },
-              // Add safety settings to reduce chances of rejection
-              safetySettings: [
-                {
-                  category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                  threshold: "BLOCK_ONLY_HIGH"
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      { text: prompt }
+                    ]
+                  }
+                ],
+                generationConfig: {
+                  temperature: 0.2,
+                  topK: 40,
+                  topP: 0.95,
+                  maxOutputTokens: 2048,
                 },
-                {
-                  category: "HARM_CATEGORY_HATE_SPEECH",
-                  threshold: "BLOCK_ONLY_HIGH"
-                },
-                {
-                  category: "HARM_CATEGORY_HARASSMENT",
-                  threshold: "BLOCK_ONLY_HIGH"
-                },
-                {
-                  category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                  threshold: "BLOCK_ONLY_HIGH"
-                }
-              ]
-            }),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
+                // Add safety settings to reduce chances of rejection
+                safetySettings: [
+                  {
+                    category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold: "BLOCK_ONLY_HIGH"
+                  },
+                  {
+                    category: "HARM_CATEGORY_HATE_SPEECH",
+                    threshold: "BLOCK_ONLY_HIGH"
+                  },
+                  {
+                    category: "HARM_CATEGORY_HARASSMENT",
+                    threshold: "BLOCK_ONLY_HIGH"
+                  },
+                  {
+                    category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold: "BLOCK_ONLY_HIGH"
+                  }
+                ]
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              const error = new Error(`Gemini API Error (${response.status}): ${errorText}`);
+              
+              // If the error indicates model unavailability, try next model
+              if (errorIndicatesModelUnavailable(error) && currentModelIndex < modelsToTry.length - 1) {
+                console.log(`[${requestId}] Model ${currentModel} unavailable, will try next model`);
+                // Skip remaining retries for this model and move to next model
+                break;
+              }
+              
+              throw error;
+            }
+            
+            console.log(`[${requestId}] Successfully received response from model ${currentModel}`);
+            break modelLoop; // Success, exit both retry and model loops
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            
+            // Check if this was a timeout error
+            if (fetchError.name === 'AbortError') {
+              console.error(`[${requestId}] Request timed out after ${API_TIMEOUT/1000}s`);
+              apiError = new Error("Request timed out");
+            } else {
+              console.error(`[${requestId}] Fetch error on attempt ${attempt + 1}:`, fetchError);
+              apiError = fetchError;
+            }
+            
+            // If model-specific error, and we have more models to try, move to next model
+            if (errorIndicatesModelUnavailable(fetchError) && currentModelIndex < modelsToTry.length - 1) {
+              console.log(`[${requestId}] Model ${currentModel} error indicates unavailability, will try next model`);
+              break; // Skip remaining retries for this model
+            }
+            
+            // If this is not the last attempt, wait before retrying
+            if (attempt < MAX_RETRIES - 1) {
+              // Calculate backoff with exponential factor and jitter
+              const backoffDelay = RETRY_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt);
+              const jitter = backoffDelay * JITTER_FACTOR * (Math.random() - 0.5);
+              const finalDelay = Math.max(1000, backoffDelay + jitter);
+              
+              console.log(`[${requestId}] Retrying in ${Math.round(finalDelay/1000)}s (with jitter)...`);
+              await new Promise(resolve => setTimeout(resolve, finalDelay));
+            }
           }
-          
-          break; // Success, exit retry loop
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-          
-          // Check if this was a timeout error
-          if (fetchError.name === 'AbortError') {
-            console.error(`Request timed out after ${API_TIMEOUT/1000}s`);
-            apiError = new Error("Request timed out");
-          } else {
-            console.error(`Fetch error on attempt ${attempt + 1}:`, fetchError);
-            apiError = fetchError;
-          }
-          
-          // If this is not the last attempt, wait before retrying
-          if (attempt < MAX_RETRIES - 1) {
-            const backOffMultiplier = attempt + 1; // Exponential backoff
-            const retryDelayWithBackoff = RETRY_DELAY * backOffMultiplier;
-            console.log(`Retrying in ${retryDelayWithBackoff/1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelayWithBackoff));
-          }
+        } catch (retryError) {
+          console.error(`[${requestId}] Error during retry logic:`, retryError);
+          apiError = retryError;
         }
-      } catch (retryError) {
-        console.error(`Error during retry logic:`, retryError);
-        apiError = retryError;
       }
+    }
+    
+    // Log at the end of all attempts
+    if (response && response.ok) {
+      console.log(`[${requestId}] Successfully completed API call with model ${currentModel}`);
+    } else {
+      console.error(`[${requestId}] Failed after trying all models and retries`);
     }
     
     // If all attempts failed, provide a fallback response
     if (!response || !response.ok) {
-      console.error("All API attempts failed, using fallback");
+      console.error(`[${requestId}] All API attempts failed, using fallback`);
       
       // Generate fallback analysis based on algorithmic scores
       const fallbackAnalyses = stocks.reduce((acc, stock) => {
@@ -410,9 +475,11 @@ serve(async (req) => {
         marketInsight: "Market analysis is currently unavailable. The selected stocks were chosen based on technical indicators and algorithmic screening. Please check back later for detailed market insights.",
         generatedAt: new Date().toISOString(),
         fromFallback: true,
-        model: GEMINI_MODEL,
+        model: "fallback",
+        attemptedModels: modelsToTry.slice(0, currentModelIndex + 1), // List all models that were attempted
         functionVersion: FUNCTION_VERSION,
-        error: apiError?.message || "Failed to call Gemini API"
+        error: apiError?.message || "Failed to call Gemini API",
+        requestId: requestId
       };
       
       // Cache fallback response (short TTL)
@@ -425,20 +492,24 @@ serve(async (req) => {
       return new Response(
         JSON.stringify(fallbackResponse),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Request-ID': requestId
+          } 
         }
       );
     }
     
     // Process successful response
     try {
-      console.log("Received successful response from Gemini API");
+      console.log(`[${requestId}] Received successful response from model ${currentModel}`);
       
       const data = await response.json();
       
       // Validate response structure
       if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-        console.error("Invalid response format from Gemini API:", data);
+        console.error(`[${requestId}] Invalid response format from Gemini API:`, data);
         throw new Error("Invalid API response format");
       }
       
@@ -446,28 +517,30 @@ serve(async (req) => {
       
       // Validate AI response isn't empty
       if (!aiResponse) {
-        console.error("Empty response from Gemini API");
+        console.error(`[${requestId}] Empty response from Gemini API`);
         throw new Error("Empty API response");
       }
 
-      console.log("Successfully received response from Gemini API");
-      console.log("AI Response excerpt:", aiResponse.substring(0, 100) + "...");
+      console.log(`[${requestId}] Successfully received response from model ${currentModel}`);
+      console.log(`[${requestId}] AI Response excerpt:`, aiResponse.substring(0, 100) + "...");
 
       // Parse the AI response
       const stockAnalyses = parseAnalysisResponse(aiResponse, stocks.map(s => s.ticker));
       const marketInsight = extractMarketInsight(aiResponse);
       
-      console.log("Extracted analyses for tickers:", Object.keys(stockAnalyses));
-      console.log("Market insight excerpt:", marketInsight.substring(0, 100) + "...");
+      console.log(`[${requestId}] Extracted analyses for tickers:`, Object.keys(stockAnalyses));
+      console.log(`[${requestId}] Market insight excerpt:`, marketInsight.substring(0, 100) + "...");
       
-      // Create the analysis object with model information
+      // Create the analysis object with enhanced model information
       const analysis = {
         stockAnalyses,
         marketInsight,
         generatedAt: new Date().toISOString(),
-        model: GEMINI_MODEL,
+        model: currentModel, // Use the actual model that succeeded
+        attemptedModels: currentModelIndex > 0 ? modelsToTry.slice(0, currentModelIndex + 1) : undefined, // Include if we tried fallbacks
         functionVersion: FUNCTION_VERSION,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        requestId: requestId
       };
       
       // Cache successful response
@@ -479,10 +552,16 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify(analysis),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Request-ID': requestId
+          } 
+        }
       );
     } catch (parseError) {
-      console.error("Error parsing Gemini API response:", parseError);
+      console.error(`[${requestId}] Error parsing Gemini API response:`, parseError);
       
       // Generate fallback for parse errors
       const fallbackAnalyses = stocks.reduce((acc, stock) => {
@@ -495,19 +574,27 @@ serve(async (req) => {
         marketInsight: "Analysis could not be processed. Using algorithmic results instead.",
         generatedAt: new Date().toISOString(),
         fromFallback: true,
-        model: GEMINI_MODEL,
+        model: "parse_error",
+        attemptedModel: currentModel,
         functionVersion: FUNCTION_VERSION,
-        error: parseError.message
+        error: parseError.message,
+        requestId: requestId
       };
       
       return new Response(
         JSON.stringify(fallbackResponse),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Request-ID': requestId
+          } 
+        }
       );
     }
   } catch (error) {
     // Log the full error
-    console.error("Error in gemini-stock-analysis function:", error);
+    console.error(`[${requestId}] Error in gemini-stock-analysis function:`, error);
     
     // Return a detailed error response
     return new Response(
@@ -516,11 +603,16 @@ serve(async (req) => {
         details: error.message,
         stack: error.stack,
         functionVersion: FUNCTION_VERSION,
-        model: GEMINI_MODEL
+        model: "error",
+        requestId: requestId
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId
+        } 
       }
     );
   }
