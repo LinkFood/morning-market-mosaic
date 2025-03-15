@@ -13,6 +13,7 @@ import MarketMovers from "@/components/market-movers/MarketMovers";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import StockPicks from "@/components/stock-picks/StockPicks";
 import AIStockPicker from "@/components/stock-picker/AIStockPicker";
+import { SectorHeatMap } from "@/components/chart/heatmap";
 
 const DashboardGrid: React.FC = () => {
   const { 
@@ -51,6 +52,24 @@ const DashboardGrid: React.FC = () => {
               interval="D"
               cardTitle="S&P 500 E-mini Futures"
               cardDescription="Real-time market data powered by TradingView"
+            />
+          </CollapsibleComponent>
+        </div>
+      )}
+      
+      {/* Market Heat Map */}
+      {isComponentVisible('market-heat-map') && (
+        <div className={`${isComponentVisible('market-heat-map') ? 'lg:col-span-2' : 'hidden'}`}>
+          <CollapsibleComponent
+            componentId="market-heat-map"
+            title="Market Heat Map"
+          >
+            <SectorHeatMap 
+              title="Market Performance Heat Map" 
+              onStockClick={(ticker) => {
+                console.log(`Selected stock: ${ticker}`);
+                // In the future, we can integrate with stock detail view
+              }}
             />
           </CollapsibleComponent>
         </div>

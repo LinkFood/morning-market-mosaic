@@ -58,11 +58,13 @@ export const defaultSettings: UserSettings = {
     "market-events", 
     "market-movers",
     "stock-picks",
-    "ai-stock-picker"
+    "ai-stock-picker",
+    "market-heat-map"
   ],
   componentOrder: [
     "market-overview", 
     "es1-futures", 
+    "market-heat-map",
     "major-stocks", 
     "economic-data", 
     "sector-performance", 
