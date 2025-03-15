@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { InfoCircle } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -189,7 +189,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
         
         {filteredData.length === 0 && !loading && (
           <div className="flex items-center justify-center h-32 text-muted-foreground">
-            <InfoCircle className="mr-2 h-4 w-4" />
+            <Info className="mr-2 h-4 w-4" />
             <span>No data available</span>
           </div>
         )}
