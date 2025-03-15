@@ -120,70 +120,117 @@ const ApiDiagnostics = () => {
   
   const testGeminiFunction = async (): Promise<{ geminiResult: boolean, geminiError: string | null }> => {
     try {
-      console.log("Testing Gemini function...");
-      const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
-        body: { 
-          stocks: [
-            {
-              ticker: "TEST",
-              close: 100,
-              changePercent: 0,
-              signals: ["test"],
-              scores: { composite: 50 }
-            }
-          ] 
-        },
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'x-request-id': `diagnostics-${Date.now()}`
+      // Generate a unique request ID for tracing
+      const requestId = `diagnostics-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      console.log(`[${requestId}] Testing Gemini function...`);
+      
+      // First try the simpler version check which is less likely to timeout
+      try {
+        console.log(`[${requestId}] Trying model version check...`);
+        
+        const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
+          body: { 
+            stocks: [
+              {
+                ticker: "TEST",
+                close: 100,
+                changePercent: 0,
+                signals: ["test"],
+                scores: { composite: 50 }
+              }
+            ],
+            checkModelVersion: true  // Special flag for lightweight version check
+          },
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'x-request-id': requestId,
+            'x-client-timestamp': Date.now().toString()
+          }
+        });
+        
+        if (error) {
+          console.error(`[${requestId}] Edge function error:`, error);
+          
+          // Check for specific error types
+          if (error.message?.includes('Failed to send')) {
+            return { 
+              geminiResult: false, 
+              geminiError: `Edge function connection error: ${error.message}\n\nThis indicates a network issue between your browser and Supabase. Try refreshing or check your internet connection.` 
+            };
+          }
+          
+          return { 
+            geminiResult: false, 
+            geminiError: `Edge function error: ${error.message || error.name || 'Unknown error'}` 
+          };
         }
-      });
-      
-      if (error) {
-        console.error("Gemini function error:", error);
-        return { 
-          geminiResult: false, 
-          geminiError: `Edge function error: ${error.message || error.name || 'Unknown error'}` 
-        };
+        
+        if (!data) {
+          return { 
+            geminiResult: false, 
+            geminiError: "No data returned from edge function" 
+          };
+        }
+        
+        setGeminiDetails({
+          model: data.model,
+          version: data.functionVersion,
+          endpoint: data.modelEndpoint,
+          timestamp: data.timestamp
+        });
+        
+        if (data.error) {
+          console.error(`[${requestId}] Gemini API error:`, data.error);
+          return { 
+            geminiResult: false, 
+            geminiError: `API error: ${data.error}${data.details ? ` - ${data.details}` : ''}` 
+          };
+        }
+        
+        if (data.fromFallback) {
+          return {
+            geminiResult: true,
+            geminiError: "Connected, but using fallback mechanism (AI may be unavailable)"
+          };
+        }
+        
+        console.log(`[${requestId}] Gemini function test successful, model: ${data.model || 'unknown'}`);
+        return { geminiResult: true, geminiError: null };
+      } catch (innerError) {
+        // Capture inner errors for better diagnostics
+        console.error(`[${requestId}] Error in inner try block:`, innerError);
+        throw innerError; // Re-throw to be caught by the outer catch
       }
-      
-      if (!data) {
-        return { 
-          geminiResult: false, 
-          geminiError: "No data returned from edge function" 
-        };
-      }
-      
-      setGeminiDetails({
-        model: data.model,
-        version: data.functionVersion,
-        endpoint: data.modelEndpoint,
-        timestamp: data.timestamp
-      });
-      
-      if (data.error) {
-        console.error("Gemini API error:", data.error);
-        return { 
-          geminiResult: false, 
-          geminiError: `API error: ${data.error}${data.details ? ` - ${data.details}` : ''}` 
-        };
-      }
-      
-      if (data.fromFallback) {
-        return {
-          geminiResult: true,
-          geminiError: "Connected, but using fallback mechanism (AI may be unavailable)"
-        };
-      }
-      
-      console.log("Gemini function test successful");
-      return { geminiResult: true, geminiError: null };
     } catch (error) {
       console.error("Error testing Gemini function:", error);
+      
+      // Enhanced error messages for common issues
+      if (error instanceof Error) {
+        if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+          return { 
+            geminiResult: false, 
+            geminiError: "Network error connecting to Supabase Edge Function. Check your internet connection and Supabase service status." 
+          };
+        }
+        
+        if (error.message.includes('timeout') || error.message.includes('timed out')) {
+          return { 
+            geminiResult: false, 
+            geminiError: "Connection to Edge Function timed out. The service may be under heavy load or temporarily unavailable." 
+          };
+        }
+        
+        return { 
+          geminiResult: false, 
+          geminiError: error.message 
+        };
+      }
+      
       return { 
         geminiResult: false, 
-        geminiError: error instanceof Error ? error.message : "Unknown error" 
+        geminiError: "Unknown error occurred during connection test" 
       };
     }
   };
