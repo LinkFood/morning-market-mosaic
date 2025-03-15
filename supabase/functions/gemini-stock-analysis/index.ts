@@ -83,7 +83,65 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
+    // Special case for health check endpoint (GET request)
+    if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
+      console.log("Health check endpoint requested");
+      try {
+        // Simple health check to verify API key and model access
+        if (!GEMINI_API_KEY) {
+          return new Response(
+            JSON.stringify({
+              status: "error",
+              error: "API key not configured",
+              timestamp: new Date().toISOString(),
+              functionVersion: FUNCTION_VERSION
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Do a minimal API call to check if Gemini is responding
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`;
+        const response = await fetch(`${endpoint}?key=${GEMINI_API_KEY}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          return new Response(
+            JSON.stringify({
+              status: "error",
+              error: `API error: ${response.status}`,
+              details: errorText,
+              timestamp: new Date().toISOString(),
+              functionVersion: FUNCTION_VERSION
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // API is healthy
+        return new Response(
+          JSON.stringify({
+            status: "healthy",
+            model: GEMINI_MODEL,
+            timestamp: new Date().toISOString(),
+            functionVersion: FUNCTION_VERSION
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            functionVersion: FUNCTION_VERSION
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    
+    // Parse request body for normal requests
     let requestBody;
     try {
       requestBody = await req.json();

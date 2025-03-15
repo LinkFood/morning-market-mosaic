@@ -31,19 +31,31 @@ interface EdgeFunctionError {
 }
 
 // Improved cache with TTL and timestamp tracking
-let cachedAnalysis: StockAnalysis | null = null;
-let cacheTimestamp: number = 0;
-let lastRequestTimestamp: number = 0;
-const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
-const REQUEST_DEBOUNCE = 10 * 1000; // 10 seconds
+interface CacheEntry {
+  data: StockAnalysis;
+  timestamp: number;
+  stale: boolean;
+}
 
-// Maximum retries for API calls
-const MAX_RETRIES = 3;
+// Use a Map object for more structured caching
+const cacheStore = new Map<string, CacheEntry>();
+let lastRequestTimestamp: number = 0;
+
+// Cache and retry configuration
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const REQUEST_DEBOUNCE = 15 * 1000; // 15 seconds - increased to reduce API pressure
+const MAX_RETRIES = 4; // Increased to 4 retries
 const RETRY_DELAY = 3000; // 3 seconds
 const RETRY_BACKOFF_FACTOR = 1.5; // Increase delay by 50% for each retry
+const EXTENDED_CACHE_TTL = 48 * 60 * 60 * 1000; // 48 hours - extended for better fallback availability
 
-// Maximum time to consider cache valid even if expired when API fails
-const EXTENDED_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+// Helper function to get cache key
+function getCacheKey(stocks: ScoredStock[]): string {
+  // Use tickers and rounded timestamp for cache key (15 minute window)
+  const timeWindow = Math.floor(Date.now() / (15 * 60 * 1000));
+  const tickers = stocks.slice(0, 10).map(s => s.ticker).sort().join(',');
+  return `${tickers}-${timeWindow}`;
+}
 
 /**
  * Main function to get AI analysis for stock picks
@@ -51,11 +63,18 @@ const EXTENDED_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   console.log("getAIAnalysis called with", stocks.length, "stocks");
   
+  // Generate a cache key based on the stock tickers
+  const cacheKey = getCacheKey(stocks);
+  
   // Debounce requests to prevent excessive API calls
   const now = Date.now();
-  if (now - lastRequestTimestamp < REQUEST_DEBOUNCE && cachedAnalysis) {
-    console.log("Debouncing API request, returning cached data");
-    return cachedAnalysis;
+  if (now - lastRequestTimestamp < REQUEST_DEBOUNCE) {
+    console.log("Debouncing API request, checking cache...");
+    const cachedEntry = cacheStore.get(cacheKey);
+    if (cachedEntry) {
+      console.log("Found cached data during debounce period");
+      return cachedEntry.data;
+    }
   }
   lastRequestTimestamp = now;
   
@@ -65,10 +84,17 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
     return createFallbackAnalysis(stocks, "AI stock analysis is currently disabled.");
   }
   
-  // Check cache first with normal TTL
-  if (cachedAnalysis && (Date.now() - cacheTimestamp < CACHE_TTL)) {
-    console.log("Using cached AI analysis from", new Date(cacheTimestamp).toISOString());
-    return cachedAnalysis;
+  // Check cache with normal TTL
+  const cachedEntry = cacheStore.get(cacheKey);
+  if (cachedEntry && !cachedEntry.stale && (now - cachedEntry.timestamp < CACHE_TTL)) {
+    console.log("Using fresh cached AI analysis from", new Date(cachedEntry.timestamp).toISOString());
+    return cachedEntry.data;
+  }
+  
+  // Mark any existing cache as stale but still potentially usable
+  if (cachedEntry) {
+    cachedEntry.stale = true;
+    console.log("Marking existing cache as stale");
   }
   
   // Implement retry logic with exponential backoff
@@ -97,9 +123,13 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
       }
       
       // Cache successful result
-      cachedAnalysis = analysis;
-      cacheTimestamp = Date.now();
+      cacheStore.set(cacheKey, {
+        data: analysis,
+        timestamp: now,
+        stale: false
+      });
       
+      console.log("Successfully cached new analysis data");
       return analysis;
     } catch (error) {
       lastError = error;
@@ -114,15 +144,32 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
         console.log("All retry attempts failed");
         
         // Check if we have a stale cache that's still usable in emergency
-        if (cachedAnalysis && (Date.now() - cacheTimestamp < EXTENDED_CACHE_TTL)) {
-          console.log("Using stale cache as fallback");
+        if (cachedEntry && (now - cachedEntry.timestamp < EXTENDED_CACHE_TTL)) {
+          console.log("Using stale cache as fallback from", new Date(cachedEntry.timestamp).toISOString());
           toast.warning("Using cached analysis due to connection issues.");
-          return cachedAnalysis;
+          return cachedEntry.data;
         }
         
-        // Show error toast only after all retries fail
+        // Look for any usable cache for these stocks
+        const anyUsableCache = findAnyUsableCacheForStocks(stocks);
+        if (anyUsableCache) {
+          console.log("Found alternative cached data for similar stocks");
+          toast.warning("Using similar stock analysis due to connection issues.");
+          return anyUsableCache;
+        }
+        
+        // Show error toast only after all retries and fallbacks fail
         toast.error("AI analysis unavailable. Showing algorithmic picks only.");
-        return createFallbackAnalysis(stocks, "Failed to connect to analysis service.");
+        const fallback = createFallbackAnalysis(stocks, "Failed to connect to analysis service.");
+        
+        // Cache the fallback analysis so we don't keep retrying
+        cacheStore.set(cacheKey, {
+          data: fallback,
+          timestamp: now,
+          stale: true
+        });
+        
+        return fallback;
       }
     }
   }
@@ -130,6 +177,42 @@ export async function getAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysi
   // This should not be reached due to the retry logic, but just in case
   console.error("Unexpected error in getAIAnalysis", lastError);
   return createFallbackAnalysis(stocks, "An unexpected error occurred while fetching analysis.");
+}
+
+/**
+ * Find any usable cache entry that contains at least some of the same stocks
+ */
+function findAnyUsableCacheForStocks(stocks: ScoredStock[]): StockAnalysis | null {
+  const targetTickers = new Set(stocks.map(s => s.ticker));
+  let bestMatch: StockAnalysis | null = null;
+  let bestMatchCount = 0;
+  
+  // Look through all cache entries
+  for (const [key, entry] of cacheStore.entries()) {
+    // Skip if too old
+    if (Date.now() - entry.timestamp > EXTENDED_CACHE_TTL) {
+      continue;
+    }
+    
+    // Count how many tickers match
+    const cacheTickers = new Set(Object.keys(entry.data.stockAnalyses || {}));
+    let matchCount = 0;
+    
+    for (const ticker of targetTickers) {
+      if (cacheTickers.has(ticker)) {
+        matchCount++;
+      }
+    }
+    
+    // If this is better than our previous best match, keep it
+    if (matchCount > bestMatchCount) {
+      bestMatchCount = matchCount;
+      bestMatch = entry.data;
+    }
+  }
+  
+  // Only use it if we have at least 3 matching stocks
+  return bestMatchCount >= 3 ? bestMatch : null;
 }
 
 /**
@@ -144,7 +227,7 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   
   // Set timeout for the function call
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("Function invocation timed out")), 25000); // 25s timeout
+    setTimeout(() => reject(new Error("Function invocation timed out")), 30000); // Increased to 30s timeout
   });
   
   // Call the Supabase Edge Function
@@ -152,13 +235,20 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   const startTime = performance.now();
   
   try {
+    // Add a request ID for better tracking
+    const requestId = `stock-analysis-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    console.log(`Request ID: ${requestId}`);
+    
     // Use Promise.race to implement timeout
     const functionCallPromise = supabase.functions.invoke('gemini-stock-analysis', {
       body: payload,
       // Add headers to avoid caching issues
       headers: {
-        'Cache-Control': 'no-cache',
-        'x-request-id': `stock-analysis-${Date.now()}`
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'x-request-id': requestId,
+        'x-client-timestamp': Date.now().toString()
       }
     });
     
@@ -166,7 +256,7 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
     const { data, error } = result;
     
     const endTime = performance.now();
-    console.log(`Edge function response time: ${Math.round(endTime - startTime)}ms`);
+    console.log(`Edge function response time: ${Math.round(endTime - startTime)}ms for request ${requestId}`);
     
     if (error) {
       console.error("Supabase function invocation error:", error);

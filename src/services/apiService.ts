@@ -193,6 +193,59 @@ export async function getHighQualityMarketMovers(
 }
 
 // Default export with all methods
+/**
+ * Check the health of the Gemini API service
+ */
+export async function checkGeminiAPIHealth(): Promise<{
+  healthy: boolean;
+  status: string;
+  error?: string;
+  timestamp?: string;
+}> {
+  try {
+    // Call the health check endpoint
+    const { data, error } = await supabase.functions.invoke('gemini-stock-analysis/health', {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'x-request-id': `health-check-${Date.now()}`
+      }
+    });
+    
+    if (error) {
+      console.error("Error checking Gemini API health:", error);
+      return {
+        healthy: false,
+        status: 'error',
+        error: error.message || 'Unknown error'
+      };
+    }
+    
+    // Process response
+    if (data && data.status === 'healthy') {
+      return {
+        healthy: true,
+        status: 'healthy',
+        timestamp: data.timestamp
+      };
+    } else {
+      return {
+        healthy: false,
+        status: data?.status || 'error',
+        error: data?.error || 'Unknown error',
+        timestamp: data?.timestamp
+      };
+    }
+  } catch (error) {
+    console.error("Exception checking Gemini API health:", error);
+    return {
+      healthy: false,
+      status: 'error',
+      error: error.message || 'Exception occurred'
+    };
+  }
+}
+
 export default {
   // Market data APIs
   ...marketService,
@@ -215,5 +268,8 @@ export default {
   getStockNews,
   getInsiderTransactions,
   getEnhancedStockData,
-  getHighQualityMarketMovers
+  getHighQualityMarketMovers,
+  
+  // API Health Checks
+  checkGeminiAPIHealth
 };
