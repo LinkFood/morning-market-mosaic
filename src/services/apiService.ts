@@ -204,109 +204,39 @@ export async function checkGeminiAPIHealth(): Promise<{
   timestamp?: string;
 }> {
   try {
-    // Generate a unique request ID for tracing
-    const requestId = `health-check-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    console.log(`[${requestId}] Checking Gemini API health...`);
+    // Simplified health check that's less likely to cause issues
+    console.log("Checking Gemini API health...");
     
-    // Try the direct model check endpoint first
-    try {
-      console.log(`[${requestId}] Trying health endpoint...`);
-      const { data, error } = await supabase.functions.invoke('gemini-stock-analysis/health', {
-        method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'x-request-id': requestId,
-          'x-client-timestamp': Date.now().toString()
-        }
-      });
-      
-      if (error) {
-        console.error(`[${requestId}] Health endpoint error:`, error);
-        throw new Error(`Health endpoint error: ${error.message || 'Unknown error'}`);
+    // Call the health check endpoint with minimal headers
+    const { data, error } = await supabase.functions.invoke('gemini-stock-analysis/health', {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache'
       }
-      
-      // Process response
-      if (data && data.status === 'healthy') {
-        console.log(`[${requestId}] Health endpoint reports healthy status`);
-        return {
-          healthy: true,
-          status: 'healthy',
-          timestamp: data.timestamp
-        };
-      } else {
-        console.warn(`[${requestId}] Health endpoint reports unhealthy status:`, data?.error || 'Unknown error');
-        return {
-          healthy: false,
-          status: data?.status || 'error',
-          error: data?.error || 'Unknown error',
-          timestamp: data?.timestamp
-        };
-      }
-    } catch (healthError) {
-      // If health endpoint fails, try the main endpoint with a model version check
-      console.warn(`[${requestId}] Health endpoint failed, trying alternate check:`, healthError);
-      
-      console.log(`[${requestId}] Trying model version check...`);
-      const { data, error } = await supabase.functions.invoke('gemini-stock-analysis', {
-        body: { 
-          stocks: [
-            {
-              ticker: "TEST",
-              close: 100,
-              changePercent: 0,
-              signals: ["test"],
-              scores: { composite: 50 }
-            }
-          ],
-          checkModelVersion: true  // Special flag to request model version check
-        },
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'x-request-id': requestId,
-          'x-client-timestamp': Date.now().toString()
-        }
-      });
-      
-      if (error) {
-        console.error(`[${requestId}] Model check error:`, error);
-        return {
-          healthy: false,
-          status: 'error',
-          error: `Edge function error: ${error.message || 'Unknown error'}`
-        };
-      }
-      
-      // Check for an API error in the response
-      if (data && data.error) {
-        console.warn(`[${requestId}] Model check API error:`, data.error);
-        return {
-          healthy: false,
-          status: 'error',
-          error: `API error: ${data.error}`,
-          timestamp: data.timestamp
-        };
-      }
-      
-      // If we get a successful response, even with fallback, consider the connection healthy
-      if (data) {
-        console.log(`[${requestId}] Model check successful:`, data.model || 'unknown model');
-        return {
-          healthy: true,
-          status: data.fromFallback ? 'limited' : 'healthy',
-          timestamp: data.timestamp,
-          error: data.fromFallback ? 'Using fallback mechanism' : undefined
-        };
-      }
-      
-      // If we get here, something unexpected happened
+    });
+    
+    if (error) {
+      console.error("Error checking Gemini API health:", error);
       return {
         healthy: false,
         status: 'error',
-        error: 'Unexpected response from Edge Function'
+        error: error.message || 'Unknown error'
+      };
+    }
+    
+    // Process response
+    if (data && data.status === 'healthy') {
+      return {
+        healthy: true,
+        status: 'healthy',
+        timestamp: data.timestamp
+      };
+    } else {
+      return {
+        healthy: false,
+        status: data?.status || 'error',
+        error: data?.error || 'Unknown error',
+        timestamp: data?.timestamp
       };
     }
   } catch (error) {
