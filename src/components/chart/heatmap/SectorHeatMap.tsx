@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import HeatMap, { HeatMapItem } from './HeatMap';
 import apiService from '@/services/apiService';
-import { StockData } from '@/types/marketTypes';
+import { StockData, SectorPerformance } from '@/types/marketTypes';
 import { toast } from 'sonner';
 
 // Sector categories and mappings
@@ -43,18 +43,37 @@ const SectorHeatMap: React.FC<SectorHeatMapProps> = ({
         
         // Fetch sector performance data
         const sectorPerformance = await apiService.getSectorPerformance();
+        console.log('Sector data:', sectorPerformance);
         
-        // Fetch major stocks for additional data
-        const majorStocks = await apiService.getMajorStocks();
+        // Fetch major stocks for additional data - use an expanded list
+        const stockList = [
+          "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA", "UNH", 
+          "JNJ", "JPM", "V", "PG", "HD", "BAC", "MA", "XOM", "CVX", "AVGO"
+        ];
+        const majorStocks = await apiService.getMajorStocks(stockList);
+        console.log('Stock data count:', majorStocks.length);
         
-        // Combine the data
-        const combinedData = createCombinedHeatMapData(sectorPerformance, majorStocks);
+        // Safety check - ensure we have valid arrays
+        if (!Array.isArray(sectorPerformance) || !Array.isArray(majorStocks)) {
+          console.error('Invalid data format received from API');
+          throw new Error('Received invalid data format');
+        }
         
+        // Combine the data with safety checks
+        const combinedData = createCombinedHeatMapData(
+          sectorPerformance || [], 
+          majorStocks || []
+        );
+        
+        console.log('Combined heat map data count:', combinedData.length);
         setSectorData(combinedData);
       } catch (err) {
         console.error('Error fetching sector data:', err);
         setError('Failed to load sector data');
         toast.error('Failed to load sector data');
+        
+        // Set empty array to prevent undefined errors
+        setSectorData([]);
       } finally {
         setLoading(false);
       }
@@ -79,7 +98,7 @@ const SectorHeatMap: React.FC<SectorHeatMapProps> = ({
   
   // Create combined heat map data from sectors and stocks
   const createCombinedHeatMapData = (
-    sectors: Array<{name: string, performance: number}>,
+    sectors: SectorPerformance[],
     stocks: StockData[]
   ): HeatMapItem[] => {
     const results: HeatMapItem[] = [];
@@ -87,10 +106,10 @@ const SectorHeatMap: React.FC<SectorHeatMapProps> = ({
     // Add sector data
     sectors.forEach(sector => {
       results.push({
-        id: sector.name,
+        id: sector.ticker,
         name: sector.name,
-        value: 0, // Not applicable for sectors
-        change: sector.performance,
+        value: sector.close || 0,
+        change: sector.changePercent || 0, // Use changePercent instead of performance
         category: 'Sectors'
       });
     });

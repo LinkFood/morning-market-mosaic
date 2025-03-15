@@ -56,7 +56,12 @@ const HeatMap: React.FC<HeatMapProps> = ({
   }, {} as Record<string, HeatMapItem[]>);
   
   // Function to determine color based on value/change
-  const getColor = (value: number): string => {
+  const getColor = (value: number | undefined): string => {
+    // Handle undefined or NaN values
+    if (value === undefined || isNaN(value)) {
+      return 'rgba(128, 128, 128, 0.2)'; // Gray for undefined values
+    }
+    
     // For percentages between -10% and +10%
     const normalizedValue = Math.max(-10, Math.min(10, value)) / 10;
     
@@ -139,14 +144,15 @@ const HeatMap: React.FC<HeatMapProps> = ({
                     >
                       <div className="font-medium truncate">{item.name}</div>
                       <div className="flex justify-between items-center text-xs mt-1">
-                        <span>${item.value.toFixed(2)}</span>
+                        <span>${typeof item.value === 'number' ? item.value.toFixed(2) : 'N/A'}</span>
                         <span 
                           className={cn(
                             "font-bold",
                             item.change > 0 ? "text-green-800" : item.change < 0 ? "text-red-800" : ""
                           )}
                         >
-                          {item.change > 0 ? '+' : ''}{item.change.toFixed(2)}%
+                          {item.change > 0 ? '+' : ''}
+                          {typeof item.change === 'number' ? item.change.toFixed(2) : '0.00'}%
                         </span>
                       </div>
                     </div>
@@ -172,14 +178,15 @@ const HeatMap: React.FC<HeatMapProps> = ({
                 >
                   <div className="font-medium truncate">{item.name}</div>
                   <div className="flex justify-between items-center text-xs mt-1">
-                    <span>${item.value.toFixed(2)}</span>
+                    <span>${typeof item.value === 'number' ? item.value.toFixed(2) : 'N/A'}</span>
                     <span 
                       className={cn(
                         "font-bold",
                         item.change > 0 ? "text-green-800" : item.change < 0 ? "text-red-800" : ""
                       )}
                     >
-                      {item.change > 0 ? '+' : ''}{item.change.toFixed(2)}%
+                      {item.change > 0 ? '+' : ''}
+                      {typeof item.change === 'number' ? item.change.toFixed(2) : '0.00'}%
                     </span>
                   </div>
                 </div>
