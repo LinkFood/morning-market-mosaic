@@ -4,6 +4,8 @@
 
 **URL**: https://lovable.dev/projects/c6f9948a-c301-44b1-8caa-46dc5a6bdb3f
 
+**Test Change**: This is a test edit to verify GitHub pushing works.
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
