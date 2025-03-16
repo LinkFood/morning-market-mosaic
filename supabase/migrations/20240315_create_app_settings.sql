@@ -15,7 +15,7 @@ CREATE INDEX IF NOT EXISTS app_settings_key_idx ON public.app_settings (key);
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Create policy for anon access (this is a public app for now)
-CREATE POLICY "Allow anonymous access to app_settings" ON public.app_settings
+CREATE POLICY "Allow_anonymous_access_to_app_settings" ON public.app_settings
   FOR ALL USING (true);
 
 -- Default initial settings for feature flags
