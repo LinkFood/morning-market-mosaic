@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RefreshCw, TrendingUp, Info, Cpu, Activity } from 'lucide-react';
@@ -194,7 +194,8 @@ const AIStockPicker = () => {
       
       const analysisPromise = apiService.getStockAnalysis(topStocks);
       
-      const analysis = await Promise.race([analysisPromise, timeoutPromise]);
+      const result = await Promise.race([analysisPromise, timeoutPromise]);
+      const analysis = result as StockAnalysis;
       
       toast.dismiss('manual-ai-analysis');
       

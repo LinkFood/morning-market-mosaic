@@ -25,7 +25,7 @@ async function getMajorStocks(tickers: string[] = ["AAPL", "MSFT", "AMZN", "GOOG
   const cachedData = await cacheUtils.fetchWithCache(cacheKey, null, true);
   if (cachedData) {
     console.log("Using cached major stocks data");
-    return cachedData;
+    return cachedData as StockData[];
   }
   
   // If another API call is in progress, return the pending promise

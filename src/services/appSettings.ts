@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { FeatureFlags, DEFAULT_FLAGS } from './features/types';
 import { Json } from '@/integrations/supabase/types';
@@ -149,13 +150,25 @@ export async function deleteSetting(key: AppSettingKey): Promise<boolean> {
  */
 async function ensureFeatureFlags(): Promise<void> {
   // Check if feature_flags setting exists
-  const existingFlags = await getSetting<FeatureFlags>('feature_flags');
+  const existingFlags = await getSetting<Record<string, boolean>>('feature_flags');
   
   if (!existingFlags) {
+    // Convert FeatureFlags to a Record that can be stored as Json
+    const flagsRecord: Record<string, boolean> = {
+      useRealTimeData: DEFAULT_FLAGS.useRealTimeData,
+      showMarketMovers: DEFAULT_FLAGS.showMarketMovers,
+      enableDetailedCharts: DEFAULT_FLAGS.enableDetailedCharts,
+      enableNewsSection: DEFAULT_FLAGS.enableNewsSection,
+      useFredEconomicData: DEFAULT_FLAGS.useFredEconomicData,
+      enableDataRefresh: DEFAULT_FLAGS.enableDataRefresh,
+      useStockPickerAlgorithm: DEFAULT_FLAGS.useStockPickerAlgorithm,
+      useAIStockAnalysis: DEFAULT_FLAGS.useAIStockAnalysis
+    };
+    
     // Create feature_flags setting with default values
-    await updateSetting<FeatureFlags>(
+    await updateSetting<Record<string, boolean>>(
       'feature_flags',
-      DEFAULT_FLAGS,
+      flagsRecord,
       'Application feature flags configuration'
     );
     

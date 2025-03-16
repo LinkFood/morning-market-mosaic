@@ -57,6 +57,22 @@ const apiService = {
   },
 
   /**
+   * Gets sparkline data for a specific stock
+   * @param ticker Stock ticker symbol
+   * @returns Promise containing array of price points
+   */
+  async getStockSparkline(ticker: string): Promise<number[]> {
+    try {
+      const response = await axios.get<number[]>(`${API_BASE_URL}/market/stocks/${ticker}/sparkline`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching sparkline for ${ticker}:`, error);
+      // Return empty array as fallback
+      return [];
+    }
+  },
+
+  /**
    * Fetches economic indicators data
    * @returns Promise containing an array of EconomicIndicator objects
    */
