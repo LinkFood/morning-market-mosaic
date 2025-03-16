@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HeatMapProps, HeatMapItem } from './types';
-import HeatMapLegend from './HeatMapLegend';
+import HeatMapLegend from './ColorLegend';
 import HeatMapEmpty from './HeatMapEmpty';
 import SectorView from './views/SectorView';
 import PerformanceView from './views/PerformanceView';

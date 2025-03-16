@@ -23,20 +23,3 @@ export const getColor = (value: number | undefined): string => {
     return `rgba(${100 + intensity}, 0, 0, ${0.5 + -normalizedValue * 0.5})`;
   }
 };
-
-/**
- * Creates color scale indicators for the legend
- */
-export const ColorLegend = () => {
-  return (
-    <div className="flex items-center gap-1">
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(-10) }}></span>
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(-5) }}></span>
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(-1) }}></span>
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(0) }}></span>
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(1) }}></span>
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(5) }}></span>
-      <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: getColor(10) }}></span>
-    </div>
-  );
-};
