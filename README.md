@@ -1,10 +1,8 @@
-# Welcome to your Lovable project
+# Morning Market Mosaic
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/c6f9948a-c301-44b1-8caa-46dc5a6bdb3f
-
-**Test Change**: This is a new test edit to verify GitHub pushing works correctly.
+Morning Market Mosaic is an AI-enhanced stock market dashboard that provides comprehensive market data visualization and AI-powered insights in a single platform.
 
 ## How can I edit this code?
 
@@ -66,6 +64,17 @@ This project is built with .
 
 Simply open [Lovable](https://lovable.dev/projects/c6f9948a-c301-44b1-8caa-46dc5a6bdb3f) and click on Share -> Publish.
 
-## I want to use a custom domain - is that possible?
+## Database Setup
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This application uses Supabase for its backend database. To set up the required database tables:
+
+1. Log into your Supabase project dashboard
+2. Go to the SQL Editor
+3. Create a new query
+4. Copy and paste the contents of `supabase/migrations/20240315_create_app_settings.sql`
+5. Run the query
+
+This will create:
+- The `app_settings` table that stores application configuration
+- Feature flags with default values
+- Dashboard layout settings

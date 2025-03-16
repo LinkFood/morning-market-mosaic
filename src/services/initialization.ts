@@ -86,7 +86,7 @@ export async function initializeServices(): Promise<boolean> {
     serviceStatus.initialized = serviceStatus.polygonApi || serviceStatus.fredApi;
     
     // Update feature flags based on service availability
-    updateFeatureFlags(
+    await updateFeatureFlags(
       serviceStatus.polygonApi, 
       serviceStatus.fredApi,
       serviceStatus.geminiApi
@@ -114,7 +114,7 @@ export async function initializeServices(): Promise<boolean> {
     toast.error("Failed to initialize application services");
     
     // Make sure feature flags are updated even in case of error
-    updateFeatureFlags(false, false, false);
+    await updateFeatureFlags(false, false, false);
     
     return false;
   }
