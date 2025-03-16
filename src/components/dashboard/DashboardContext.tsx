@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { getFeatureFlags, isFeatureEnabled, initializeFeatureFlags } from "@/services/features"; // Fixed imports
 import { DashboardContextType, defaultSettings } from "./types";
@@ -76,7 +75,12 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         // Initialize feature flags from database
         await initializeFeatureFlags();
-        setFeatureFlags(getFeatureFlags());
+        // Convert the core feature flags to extended feature flags by merging with defaults
+        const coreFlags = getFeatureFlags();
+        setFeatureFlags(prevFlags => ({
+          ...prevFlags,
+          ...coreFlags
+        }));
         console.log("Feature flags loaded:", getFeatureFlags());
       } catch (error) {
         console.error("Failed to load feature flags:", error);
@@ -119,7 +123,11 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Update feature flags whenever services change
   useEffect(() => {
     const handleFlagsUpdate = () => {
-      setFeatureFlags(getFeatureFlags());
+      const coreFlags = getFeatureFlags();
+      setFeatureFlags(prevFlags => ({
+        ...prevFlags,
+        ...coreFlags
+      }));
     };
     
     window.addEventListener('feature_flags_updated', handleFlagsUpdate);

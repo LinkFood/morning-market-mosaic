@@ -1,281 +1,229 @@
+import axios from 'axios';
+import { StockData, MarketIndex, SectorPerformance, EconomicIndicator, MarketEvent } from '@/types/marketTypes';
+import { ScoredStock } from './stockPicker/algorithm';
+import { StockAnalysis } from './stockPicker/aiAnalysis';
+import { supabase } from "@/integrations/supabase/client";
+import { clearAIAnalysisCache } from "./stockPicker/aiAnalysis";
 
 /**
  * API Service
- * Main entry point for all API services
+ * Provides methods for accessing market data from various sources
  */
-import { toast } from "sonner";
-import {
-  MarketIndex,
-  SectorPerformance,
-  StockData,
-  MarketStatus,
-  MarketMovers,
-  TickerDetails,
-  CandleData,
-  NewsItem,
-  MarketEvent,
-  EconomicIndicator
-} from "@/types/marketTypes";
-import { ScoredStock } from "@/services/stockPicker/algorithm";
-import { StockAnalysis } from "@/services/stockPicker/aiAnalysis";
 
-// Import specialized services
-import marketService from "./market";
-import stockPickerService from "./stockPicker";
-// Import FRED service methods directly to avoid circular imports
-import {
-  getEconomicCategory,
-  getEconomicSeries,
-  clearFredCacheData,
-  getFredCacheTimestamp,
-  testFredConnection,
-  ECONOMIC_CATEGORIES
-} from "./fred";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
-// Import enhanced Polygon.io features
-import polygonService from "./polygon";
-import { 
-  StockFundamentals, 
-  EarningsData 
-} from "./polygon/enhanced";
+const apiService = {
+  /**
+   * Fetches market indices data
+   * @returns Promise containing an array of MarketIndex objects
+   */
+  async getMarketIndices(): Promise<MarketIndex[]> {
+    try {
+      const response = await axios.get<MarketIndex[]>(`${API_BASE_URL}/market/indices`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching market indices:", error);
+      throw error;
+    }
+  },
 
-// Re-export all services for backward compatibility
-export const {
-  getMarketIndices,
-  getSectorPerformance,
-  getMajorStocks,
-  getStockSparkline,
-  getMarketStatus,
-  getMarketMovers,
-  getStockDetails,
-  getStockCandles,
-  getMarketEvents
-} = marketService;
+  /**
+   * Fetches sector performance data
+   * @returns Promise containing an array of SectorPerformance objects
+   */
+  async getSectorPerformance(): Promise<SectorPerformance[]> {
+    try {
+      const response = await axios.get<SectorPerformance[]>(`${API_BASE_URL}/market/sectors`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching sector performance:", error);
+      throw error;
+    }
+  },
 
-// Re-export stock picker services
-export const {
-  getTopPicks,
-  getStockAnalysis,
-  clearAIAnalysisCache
-} = stockPickerService;
+  /**
+   * Fetches major stocks data
+   * @param tickers Array of stock tickers to fetch
+   * @returns Promise containing an array of StockData objects
+   */
+  async getMajorStocks(tickers: string[]): Promise<StockData[]> {
+    try {
+      const response = await axios.get<StockData[]>(`${API_BASE_URL}/market/stocks?tickers=${tickers.join(',')}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching major stocks:", error);
+      throw error;
+    }
+  },
 
-// Get economic indicators from FRED
-async function getEconomicIndicators(): Promise<EconomicIndicator[]> {
-  try {
-    // Get key economic indicators from FRED 
-    // GDP, GDP Growth, Unemployment, Inflation (CPI)
-    const keySeriesIds = ["GDPC1", "A191RL1Q225SBEA", "UNRATE", "CPIAUCSL"];
-    const promises = keySeriesIds.map(seriesId => getEconomicSeries(seriesId));
-    
-    const results = await Promise.all(promises);
-    
-    // Convert to EconomicIndicator type
-    const fedIndicators: EconomicIndicator[] = results.map(item => ({
-      id: item.id,
-      name: item.name,
-      value: parseFloat(item.value),
-      previous: parseFloat(item.previous),
-      change: parseFloat(item.change),
-      unit: item.unit,
-      date: item.date
-    }));
-    
-    return fedIndicators;
-  } catch (error) {
-    console.error("Error loading economic indicators:", error);
-    toast.error("Failed to load economic indicators");
-    return [];
-  }
-}
+  /**
+   * Fetches economic indicators data
+   * @returns Promise containing an array of EconomicIndicator objects
+   */
+  async getEconomicIndicators(): Promise<EconomicIndicator[]> {
+    try {
+      const response = await axios.get<EconomicIndicator[]>(`${API_BASE_URL}/economic`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching economic indicators:", error);
+      throw error;
+    }
+  },
 
-// Export enhanced Polygon.io APIs
-export const {
-  getStockFundamentals,
-  getStockEarnings,
-  getEnhancedMarketMovers,
-  getOptionsData,
-  getStockNews,
-  getInsiderTransactions
-} = polygonService.enhanced;
+  /**
+   * Fetches market events data
+   * @returns Promise containing an array of MarketEvent objects
+   */
+  async getMarketEvents(): Promise<MarketEvent[]> {
+    try {
+      const response = await axios.get<MarketEvent[]>(`${API_BASE_URL}/market/events`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching market events:", error);
+      throw error;
+    }
+  },
 
-// Re-export cache utilities
-export const {
-  fetchWithCache,
-  clearAllCacheData,
-  getCacheTimestamp
-} = marketService;
+  /**
+   * Fetches market status data
+   * @returns Promise containing market status data
+   */
+  async getMarketStatus(): Promise<any> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/market/status`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching market status:", error);
+      throw error;
+    }
+  },
 
-// Re-export FRED APIs
-export {
-  clearFredCacheData,
-  getFredCacheTimestamp,
-  getEconomicCategory,
-  testFredConnection
+  /**
+   * Fetches market movers data (gainers and losers)
+   * @returns Promise containing market movers data
+   */
+  async getMarketMovers(): Promise<any> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/market/movers`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching market movers:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets the top stock picks based on a scoring algorithm
+   * @param stocks Array of StockData to evaluate
+   * @returns Promise containing an array of ScoredStock objects
+   */
+  async getTopPicks(stocks: StockData[]): Promise<ScoredStock[]> {
+    try {
+      const response = await axios.post<ScoredStock[]>(`${API_BASE_URL}/stock-picker/algorithm`, { stocks });
+      return response.data;
+    } catch (error) {
+      console.error("Error getting top stock picks:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets AI-driven analysis for a list of stocks
+   * @param stocks Array of ScoredStock objects to analyze
+   * @returns Promise containing StockAnalysis data
+   */
+  async getStockAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
+    try {
+      const response = await axios.post<StockAnalysis>(`${API_BASE_URL}/stock-picker/ai-analysis`, { stocks });
+      return response.data;
+    } catch (error) {
+      console.error("Error getting stock analysis:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Checks the health status of the Gemini API
+   * @returns Promise containing health status information
+   */
+  async checkGeminiAPIHealth(): Promise<{ healthy: boolean; error?: string }> {
+    try {
+      const response = await axios.get<{ healthy: boolean }>(`${API_BASE_URL}/stock-picker/ai-analysis/health`);
+      return { healthy: response.data.healthy };
+    } catch (error) {
+      console.error("Error checking Gemini API health:", error);
+      return { healthy: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Clears the AI analysis cache
+   */
+  clearAIAnalysisCache,
 };
 
-// Enhanced Stock Data Interface that includes fundamentals
-export interface EnhancedStockData extends StockData {
-  fundamentals?: StockFundamentals;
-  earnings?: EarningsData;
-  news?: NewsItem[];
-  insiderActivity?: any[];
-}
-
 /**
- * Get enhanced stock data with fundamentals, earnings, news, etc.
+ * Enhanced Market Movers Service
+ * Provides advanced functionality for filtering market movers
  */
-export async function getEnhancedStockData(ticker: string): Promise<EnhancedStockData | null> {
-  try {
-    // Get basic stock data
-    const stockData = await marketService.getStockDetails(ticker);
-    
-    if (!stockData) {
-      console.error(`No stock data found for ${ticker}`);
-      return null;
-    }
-    
-    // Enhance with additional data in parallel
-    const [fundamentals, earnings, news, insiderActivity] = await Promise.all([
-      getStockFundamentals(ticker).catch(() => null),
-      getStockEarnings(ticker).catch(() => null),
-      getStockNews(ticker, 3).catch(() => []),
-      getInsiderTransactions(ticker, 5).catch(() => [])
-    ]);
-    
-    // Create enhanced data object
-    const enhancedData: EnhancedStockData = {
-      ...stockData,
-      fundamentals: fundamentals || undefined,
-      earnings: earnings || undefined,
-      news: news.length > 0 ? news : undefined,
-      insiderActivity: insiderActivity.length > 0 ? insiderActivity : undefined
-    };
-    
-    return enhancedData;
-  } catch (error) {
-    console.error(`Error fetching enhanced stock data for ${ticker}:`, error);
-    toast.error(`Failed to load enhanced data for ${ticker}`);
-    return null;
-  }
-}
 
 /**
- * Get high-quality market movers with enhanced filtering
+ * Get high quality market movers with better filtering and additional data
  */
 export async function getHighQualityMarketMovers(
   minPrice: number = 10,
   minVolume: number = 1000000,
   limit: number = 10
-): Promise<MarketMovers> {
+): Promise<{ gainers: StockData[]; losers: StockData[] }> {
   try {
-    // Try to use enhanced API if available
-    return await getEnhancedMarketMovers(minPrice, minVolume, limit);
+    // Call the API to get enhanced market movers
+    const response = await axios.get<{ gainers: StockData[]; losers: StockData[] }>(
+      `${API_BASE_URL}/market/enhanced-movers?minPrice=${minPrice}&minVolume=${minVolume}&limit=${limit}`
+    );
+    
+    // Check if the API returned valid data
+    if (response.status === 200 && response.data) {
+      return response.data;
+    } else {
+      console.error("Failed to fetch enhanced market movers:", response.statusText);
+      return { gainers: [], losers: [] };
+    }
   } catch (error) {
-    console.error("Error using enhanced market movers, falling back to standard API:", error);
-    
-    // Fallback to standard API with filtering
-    const movers = await marketService.getMarketMovers(limit * 2);
-    
-    // Filter the results
-    const filterQualityStocks = (stocks: StockData[]) => {
-      return stocks
-        .filter(stock => 
-          stock.close >= minPrice && 
-          (stock.volume || 0) >= minVolume
-        )
-        .slice(0, limit);
-    };
-    
-    return {
-      gainers: filterQualityStocks(movers.gainers),
-      losers: filterQualityStocks(movers.losers)
-    };
+    console.error("Error fetching enhanced market movers:", error);
+    return { gainers: [], losers: [] };
   }
 }
 
-// Default export with all methods
 /**
- * Check the health of the Gemini API service
+ * Polygon API Key Service
+ * Provides methods for securely accessing the Polygon API key
  */
-export async function checkGeminiAPIHealth(): Promise<{
-  healthy: boolean;
-  status: string;
-  error?: string;
-  timestamp?: string;
-}> {
+
+/**
+ * Get Polygon API key from Supabase
+ */
+async function getPolygonApiKey(): Promise<string> {
   try {
-    // Simplified health check that's less likely to cause issues
-    console.log("Checking Gemini API health...");
-    
-    // Call the health check endpoint with minimal headers
-    const { data, error } = await supabase.functions.invoke('gemini-stock-analysis/health', {
-      method: 'GET',
-      headers: {
-        'Cache-Control': 'no-cache'
-      }
-    });
+    // Call Supabase function to get API key
+    const { data, error } = await supabase.functions.invoke('get-polygon-api-key');
     
     if (error) {
-      console.error("Error checking Gemini API health:", error);
-      return {
-        healthy: false,
-        status: 'error',
-        error: error.message || 'Unknown error'
-      };
+      console.error("Error fetching Polygon API key from Supabase:", error);
+      return process.env.NEXT_PUBLIC_POLYGON_API_KEY || 'DEMO_API_KEY';
     }
     
-    // Process response
-    if (data && data.status === 'healthy') {
-      return {
-        healthy: true,
-        status: 'healthy',
-        timestamp: data.timestamp
-      };
+    // Check if the function returned a valid API key
+    if (data && data.apiKey) {
+      return data.apiKey;
     } else {
-      return {
-        healthy: false,
-        status: data?.status || 'error',
-        error: data?.error || 'Unknown error',
-        timestamp: data?.timestamp
-      };
+      console.warn("Polygon API key is missing in Supabase function response, using demo key");
+      return process.env.NEXT_PUBLIC_POLYGON_API_KEY || 'DEMO_API_KEY';
     }
   } catch (error) {
-    console.error("Exception checking Gemini API health:", error);
-    return {
-      healthy: false,
-      status: 'error',
-      error: error.message || 'Exception occurred'
-    };
+    console.error("Error invoking Supabase function:", error);
+    return process.env.NEXT_PUBLIC_POLYGON_API_KEY || 'DEMO_API_KEY';
   }
 }
 
-export default {
-  // Market data APIs
-  ...marketService,
-  
-  // Stock picker APIs
-  ...stockPickerService,
-  
-  // Economic data APIs
-  getEconomicIndicators,
-  getEconomicCategory,
-  clearFredCacheData,
-  getFredCacheTimestamp,
-  testFredConnection,
-  
-  // Enhanced Polygon APIs
-  getStockFundamentals,
-  getStockEarnings,
-  getEnhancedMarketMovers,
-  getOptionsData,
-  getStockNews,
-  getInsiderTransactions,
-  getEnhancedStockData,
-  getHighQualityMarketMovers,
-  
-  // API Health Checks
-  checkGeminiAPIHealth,
-  
-  // Additional utilities
-  clearAIAnalysisCache
-};
+export default apiService;
+export { getHighQualityMarketMovers, getPolygonApiKey };

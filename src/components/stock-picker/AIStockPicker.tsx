@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -14,7 +13,6 @@ import MarketInsight from './MarketInsight';
 import apiService from '@/services/apiService';
 import { isFeatureEnabled } from '@/services/features';
 
-// API Health status
 interface ApiHealthStatus {
   isHealthy: boolean;
   lastChecked: Date | null;
@@ -33,10 +31,8 @@ const AIStockPicker = () => {
     lastChecked: null
   });
   
-  // Check for AI analysis feature flag
   const isAIEnabled = isFeatureEnabled('useAIStockAnalysis');
   
-  // Check API health periodically
   const checkApiHealth = async () => {
     try {
       const status = await apiService.checkGeminiAPIHealth();
@@ -46,7 +42,6 @@ const AIStockPicker = () => {
         error: status.error
       });
       
-      // Save to localStorage so status persists between page refreshes
       localStorage.setItem('geminiApiHealth', JSON.stringify({
         isHealthy: status.healthy,
         lastChecked: new Date().toISOString(),
@@ -65,23 +60,14 @@ const AIStockPicker = () => {
     }
   };
   
-  // Function to get well-known liquid stocks
   const getWellKnownStocks = () => {
-    // Focus on large cap, high-volume, well-known stocks
     return [
-      // Big Tech
       "AAPL", "MSFT", "AMZN", "GOOGL", "META", 
-      // Semiconductors
       "NVDA", "AMD", "INTC", "TSM", "MU",
-      // Finance
       "JPM", "BAC", "GS", "V", "MA", 
-      // Healthcare
       "JNJ", "PFE", "MRK", "UNH", "ABBV",
-      // Consumer
       "WMT", "PG", "KO", "PEP", "MCD",
-      // Energy
       "XOM", "CVX", "COP", "EOG", "SLB",
-      // Other Tech
       "CRM", "ADBE", "ORCL", "IBM", "CSCO"
     ];
   };
@@ -93,10 +79,8 @@ const AIStockPicker = () => {
     try {
       console.log("Starting AI Stock Picker data load");
       
-      // Get stock symbols with focus on liquid, well-known stocks
       const stockSymbols = getWellKnownStocks();
       
-      // Get stock data for the symbols
       console.log("Fetching stock data for analysis...");
       const stocksData = await apiService.getMajorStocks(stockSymbols);
       
@@ -106,8 +90,6 @@ const AIStockPicker = () => {
       
       console.log(`Retrieved data for ${stocksData.length} stocks`);
       
-      // Apply the algorithm to get top stock picks
-      console.log("Applying stock picker algorithm...");
       const scoredStocks = await apiService.getTopPicks(stocksData);
       
       if (!scoredStocks || scoredStocks.length === 0) {
@@ -117,27 +99,20 @@ const AIStockPicker = () => {
       console.log(`Algorithm selected ${scoredStocks.length} top stocks: ${scoredStocks.map(s => s.ticker).join(', ')}`);
       setTopStocks(scoredStocks);
       
-      // Get AI analysis if enabled
       if (isFeatureEnabled('useAIStockAnalysis') && scoredStocks.length > 0) {
         try {
-          console.log("Requesting AI analysis for selected stocks...");
-          
-          // Show loading state for AI analysis (increased duration from 15s to 40s)
           toast.loading('Loading AI analysis...', {
             id: 'ai-analysis-loading',
-            duration: 40000 // 40 seconds max
+            duration: 40000
           });
           
-          // Make async call with timeout (increased from 25s to 45s)
           const analysisPromise = apiService.getStockAnalysis(scoredStocks);
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Analysis request timed out')), 45000);
           });
           
-          // Race the promises
           Promise.race([analysisPromise, timeoutPromise])
-            .then(analysis => {
-              // Dismiss loading toast
+            .then((analysis: StockAnalysis) => {
               toast.dismiss('ai-analysis-loading');
               
               console.log("AI analysis received:", analysis ? "success" : "empty");
@@ -145,7 +120,6 @@ const AIStockPicker = () => {
                 console.log("AI analysis contains data for", Object.keys(analysis.stockAnalyses).length, "stocks");
                 setAiAnalysis(analysis);
                 
-                // Show success message if not using fallback
                 if (!analysis.fromFallback) {
                   toast.success('AI analysis updated successfully');
                 } else {
@@ -159,12 +133,10 @@ const AIStockPicker = () => {
               }
             })
             .catch(err => {
-              // Dismiss loading toast
               toast.dismiss('ai-analysis-loading');
               
               console.error('Error processing AI analysis:', err);
               
-              // Show different message based on error type
               if (err.message.includes('timed out')) {
                 toast.error('AI analysis request timed out. Try again later.');
               } else if (err.message.includes('network') || err.message.includes('connection')) {
@@ -192,23 +164,20 @@ const AIStockPicker = () => {
     }
   };
   
-  // Manual trigger for AI analysis
   const triggerAIAnalysis = async () => {
     if (!topStocks || topStocks.length === 0) {
       toast.error("No stocks available for analysis");
       return;
     }
     
-    // Show loading toast with ID for dismissal (increased duration from 20s to 40s)
     toast.loading("Requesting AI analysis...", { 
       id: 'manual-ai-analysis',
-      duration: 40000 // 40 second max display
+      duration: 40000
     });
     
-    // Track if we've been refreshing too frequently
     const now = Date.now();
     const lastRefresh = window.localStorage.getItem('lastAIRefresh');
-    const refreshThreshold = 30000; // 30 seconds between manual refreshes
+    const refreshThreshold = 30000;
     
     if (lastRefresh && now - parseInt(lastRefresh) < refreshThreshold) {
       toast.dismiss('manual-ai-analysis');
@@ -216,21 +185,17 @@ const AIStockPicker = () => {
       return;
     }
     
-    // Set refresh timestamp
     window.localStorage.setItem('lastAIRefresh', now.toString());
     
     try {
-      // Use Promise with timeout for better handling (increased from 30s to 45s)
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Analysis request timed out")), 45000);
       });
       
       const analysisPromise = apiService.getStockAnalysis(topStocks);
       
-      // Race the promises
       const analysis = await Promise.race([analysisPromise, timeoutPromise]);
       
-      // Dismiss loading toast
       toast.dismiss('manual-ai-analysis');
       
       if (analysis && analysis.stockAnalyses && Object.keys(analysis.stockAnalyses).length > 0) {
@@ -246,18 +211,16 @@ const AIStockPicker = () => {
           });
         } else {
           toast.success("AI analysis updated successfully");
-          setLastUpdated(new Date()); // Update the timestamp
+          setLastUpdated(new Date());
         }
       } else {
         toast.error("Received empty analysis from AI");
       }
     } catch (error) {
-      // Dismiss loading toast
       toast.dismiss('manual-ai-analysis');
       
       console.error("Error triggering AI analysis:", error);
       
-      // Show user-friendly error message based on error type
       if (error.message.includes('timed out')) {
         toast.error("AI analysis request timed out. Server may be busy.");
       } else if (error.message.includes('network') || error.message.includes('connection')) {
@@ -270,11 +233,9 @@ const AIStockPicker = () => {
     }
   };
   
-  // Initialize component, load data and check API health
   useEffect(() => {
     loadData();
     
-    // Try to load API health status from localStorage
     const savedHealth = localStorage.getItem('geminiApiHealth');
     if (savedHealth) {
       try {
@@ -289,10 +250,8 @@ const AIStockPicker = () => {
       }
     }
     
-    // Check API health on component mount
     checkApiHealth();
     
-    // Set up periodic health check every 15 minutes
     const healthCheckInterval = setInterval(() => {
       checkApiHealth();
     }, 15 * 60 * 1000);
@@ -342,7 +301,6 @@ const AIStockPicker = () => {
             <Cpu className="mr-2 h-5 w-5" />
             <span>{isAIEnabled ? 'AI-Enhanced Stock Picks' : 'Algorithmic Stock Picks'}</span>
             
-            {/* API Health Indicator */}
             {isAIEnabled && (
               <div 
                 className={`ml-2 px-2 py-0.5 text-xs rounded-full flex items-center ${
@@ -398,7 +356,7 @@ const AIStockPicker = () => {
                   onClick={async () => {
                     toast.loading("Checking AI API status...", { 
                       id: "api-health-check",
-                      duration: 20000  // 20 second timeout
+                      duration: 20000
                     });
                     const isHealthy = await checkApiHealth();
                     toast.dismiss("api-health-check");
@@ -427,7 +385,6 @@ const AIStockPicker = () => {
                 : 'These picks are based on technical indicators. AI analysis is currently unavailable.'}
             </p>
             
-            {/* API Status Last Checked */}
             {isAIEnabled && apiHealth.lastChecked && (
               <span className="ml-auto text-xs text-muted-foreground">
                 API checked {formatDistanceToNow(apiHealth.lastChecked)} ago
@@ -435,7 +392,6 @@ const AIStockPicker = () => {
             )}
           </div>
           
-          {/* Show AI loading state if we're waiting for analysis */}
           {isAIEnabled && !aiAnalysis && topStocks.length > 0 && (
             <div className="p-4 border border-dashed rounded-md flex items-center justify-center">
               <div className="flex flex-col items-center">
@@ -463,7 +419,6 @@ const AIStockPicker = () => {
                 <MarketInsight insight={aiAnalysis.marketInsight} />
               )}
               
-              {/* Add debug information for troubleshooting */}
               {!aiAnalysis?.marketInsight && isAIEnabled && (
                 <div className="text-xs text-muted-foreground mt-6 p-2 border border-dashed rounded-md">
                   <p>AI analysis feature is enabled but no market insight was returned.</p>

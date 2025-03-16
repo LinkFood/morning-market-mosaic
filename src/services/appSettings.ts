@@ -167,16 +167,41 @@ async function ensureFeatureFlags(): Promise<void> {
  * Get feature flags from the app_settings table
  */
 export async function getFeatureFlagsFromDB(): Promise<FeatureFlags | null> {
-  return getSetting<FeatureFlags>('feature_flags');
+  const flags = await getSetting<Record<string, boolean>>('feature_flags');
+  if (!flags) return null;
+  
+  // Convert from Record<string, boolean> to FeatureFlags
+  return {
+    useRealTimeData: flags.useRealTimeData ?? DEFAULT_FLAGS.useRealTimeData,
+    showMarketMovers: flags.showMarketMovers ?? DEFAULT_FLAGS.showMarketMovers,
+    enableDetailedCharts: flags.enableDetailedCharts ?? DEFAULT_FLAGS.enableDetailedCharts,
+    enableNewsSection: flags.enableNewsSection ?? DEFAULT_FLAGS.enableNewsSection,
+    useFredEconomicData: flags.useFredEconomicData ?? DEFAULT_FLAGS.useFredEconomicData,
+    enableDataRefresh: flags.enableDataRefresh ?? DEFAULT_FLAGS.enableDataRefresh,
+    useStockPickerAlgorithm: flags.useStockPickerAlgorithm ?? DEFAULT_FLAGS.useStockPickerAlgorithm,
+    useAIStockAnalysis: flags.useAIStockAnalysis ?? DEFAULT_FLAGS.useAIStockAnalysis
+  };
 }
 
 /**
  * Update feature flags in the app_settings table
  */
 export async function updateFeatureFlagsInDB(flags: FeatureFlags): Promise<boolean> {
-  return updateSetting<FeatureFlags>(
+  // Convert FeatureFlags to a Record that can be stored as Json
+  const flagsRecord: Record<string, boolean> = {
+    useRealTimeData: flags.useRealTimeData,
+    showMarketMovers: flags.showMarketMovers,
+    enableDetailedCharts: flags.enableDetailedCharts,
+    enableNewsSection: flags.enableNewsSection,
+    useFredEconomicData: flags.useFredEconomicData,
+    enableDataRefresh: flags.enableDataRefresh,
+    useStockPickerAlgorithm: flags.useStockPickerAlgorithm,
+    useAIStockAnalysis: flags.useAIStockAnalysis
+  };
+  
+  return updateSetting<Record<string, boolean>>(
     'feature_flags',
-    flags,
+    flagsRecord,
     'Application feature flags configuration'
   );
 }

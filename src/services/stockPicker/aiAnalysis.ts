@@ -1,4 +1,3 @@
-
 /**
  * AI Stock Analysis Service
  * Uses Google's Gemini API through a Supabase Edge Function to enhance stock picks with AI analysis
@@ -259,8 +258,8 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
   
   try {
     // Generate a more structured request ID for better cross-system tracing
-    const requestId = `stock-analysis-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    console.log(`[${requestId}] Starting API request`);
+    const generatedRequestId = `stock-analysis-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    console.log(`[${generatedRequestId}] Starting API request`);
     
     // Use Promise.race to implement timeout
     const functionCallPromise = supabase.functions.invoke('gemini-stock-analysis', {
@@ -270,7 +269,7 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
-        'x-request-id': requestId,
+        'x-request-id': generatedRequestId,
         'x-client-timestamp': Date.now().toString()
       }
     });
@@ -279,42 +278,42 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
     const { data, error } = result;
     
     const endTime = performance.now();
-    console.log(`[${requestId}] Edge function response time: ${Math.round(endTime - startTime)}ms`);
+    console.log(`[${generatedRequestId}] Edge function response time: ${Math.round(endTime - startTime)}ms`);
     
     // Log complete response for debugging (only in development)
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[${requestId}] Full response:`, JSON.stringify(result).substring(0, 500) + '...');
+      console.log(`[${generatedRequestId}] Full response:`, JSON.stringify(result).substring(0, 500) + '...');
     }
     
     if (error) {
-      console.error(`[${requestId}] Supabase function invocation error:`, error);
+      console.error(`[${generatedRequestId}] Supabase function invocation error:`, error);
       throw new Error(`Function invocation error: ${error.message}`);
     }
     
     if (!data) {
-      console.error(`[${requestId}] Empty response from function`);
+      console.error(`[${generatedRequestId}] Empty response from function`);
       throw new Error("Empty response from analysis function");
     }
     
     // Check for error in the response
     const responseError = data as EdgeFunctionError;
     if (responseError.error) {
-      console.error(`[${requestId}] Error in function response:`, responseError);
+      console.error(`[${generatedRequestId}] Error in function response:`, responseError);
       throw new Error(`Analysis error: ${responseError.error}${responseError.details ? ` - ${responseError.details}` : ''}`);
     }
     
     // Validate required fields
     if (!data.stockAnalyses || !data.marketInsight) {
-      console.error(`[${requestId}] Invalid response structure:`, data);
+      console.error(`[${generatedRequestId}] Invalid response structure:`, data);
       throw new Error("Invalid response structure from analysis function");
     }
     
     // Log model information for debugging
     if (data.model) {
-      console.log(`[${requestId}] Using Gemini model: ${data.model}`);
-      console.log(`[${requestId}] Function version: ${data.functionVersion || 'unknown'}`);
+      console.log(`[${generatedRequestId}] Using Gemini model: ${data.model}`);
+      console.log(`[${generatedRequestId}] Function version: ${data.functionVersion || 'unknown'}`);
       if (data.modelEndpoint) {
-        console.log(`[${requestId}] Model endpoint: ${data.modelEndpoint}`);
+        console.log(`[${generatedRequestId}] Model endpoint: ${data.modelEndpoint}`);
       }
     }
     
@@ -332,14 +331,14 @@ async function fetchAIAnalysis(stocks: ScoredStock[]): Promise<StockAnalysis> {
       fromCache: data.fromCache
     };
     
-    console.log(`[${requestId}] Successfully parsed AI analysis for ${Object.keys(analysis.stockAnalyses).length} stocks`);
+    console.log(`[${generatedRequestId}] Successfully parsed AI analysis for ${Object.keys(analysis.stockAnalyses).length} stocks`);
     
     return analysis;
   } catch (error) {
     // Improved error logging with more detail and request ID
-    console.error(`[${requestId}] Failed to get AI analysis:`, error);
+    console.error(`Error failed to get AI analysis:`, error);
     if (error instanceof Error && error.stack) {
-      console.error(`[${requestId}] Error stack:`, error.stack);
+      console.error(`Error stack:`, error.stack);
     }
     throw error;
   }

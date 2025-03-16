@@ -39,6 +39,8 @@ export interface StockData {
   avgVolume?: number;
   lastUpdated?: Date;
   previousClose?: number;
+  marketCap?: number;
+  sector?: string;
 }
 
 export interface EconomicIndicator {

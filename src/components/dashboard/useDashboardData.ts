@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { 
@@ -8,16 +7,16 @@ import {
   EconomicIndicator,
   MarketMovers,
   MarketStatus,
-  MarketEvent
+  MarketEvent,
+  UserSettings
 } from "@/types/marketTypes";
 import { ScoredStock } from "@/services/stockPicker/algorithm";
 import { StockAnalysis } from "@/services/stockPicker/aiAnalysis";
-import { DashboardSettings } from "./types";
 import apiService, { getHighQualityMarketMovers } from "@/services/apiService";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 
 // Hook for managing dashboard data
-export function useDashboardData(settings: DashboardSettings) {
+export function useDashboardData(settings: UserSettings) {
   // Data states
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [sectors, setSectors] = useState<SectorPerformance[]>([]);

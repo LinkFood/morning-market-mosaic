@@ -3,8 +3,15 @@
  * Provides advanced functionality using Polygon APIs
  */
 import { polygonRequest } from '../client';
-import { getCachedData, cacheData, CACHE_TTL } from '../cache';
+import { getCachedData, cacheData } from '../cache';
 import { StockData } from '@/types/marketTypes';
+
+// Define cache TTLs specific to enhanced data
+const ENHANCED_CACHE_TTL = {
+  REFERENCE_DATA: 24 * 60 * 60 * 1000, // 24 hours
+  MARKET_DATA: 5 * 60 * 1000,          // 5 minutes
+  NEWS: 30 * 60 * 1000                 // 30 minutes
+};
 
 // Define new interfaces for enhanced data
 export interface StockFundamentals {
@@ -52,7 +59,7 @@ export interface OptionChain {
  */
 export async function getStockFundamentals(ticker: string): Promise<StockFundamentals | null> {
   const cacheKey = `fundamentals_${ticker}`;
-  const cachedData = getCachedData<StockFundamentals>(cacheKey, CACHE_TTL.REFERENCE_DATA);
+  const cachedData = getCachedData<StockFundamentals>(cacheKey, ENHANCED_CACHE_TTL.REFERENCE_DATA);
   
   if (cachedData) return cachedData;
   
@@ -93,7 +100,7 @@ export async function getStockFundamentals(ticker: string): Promise<StockFundame
  */
 export async function getStockEarnings(ticker: string): Promise<EarningsData | null> {
   const cacheKey = `earnings_${ticker}`;
-  const cachedData = getCachedData<EarningsData>(cacheKey, CACHE_TTL.REFERENCE_DATA);
+  const cachedData = getCachedData<EarningsData>(cacheKey, ENHANCED_CACHE_TTL.REFERENCE_DATA);
   
   if (cachedData) return cachedData;
   
@@ -143,7 +150,7 @@ export async function getEnhancedMarketMovers(
   const requestLimit = limit * 3;
   const cacheKey = `enhanced_movers_${minPrice}_${minVolume}_${limit}`;
   
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.MARKET_MOVERS / 2); // Shorter TTL for enhanced data
+  const cachedData = getCachedData<{ gainers: StockData[]; losers: StockData[] }>(cacheKey, ENHANCED_CACHE_TTL.REFERENCE_DATA / 2); // Shorter TTL for enhanced data
   if (cachedData) return cachedData;
   
   try {
@@ -165,7 +172,7 @@ export async function getEnhancedMarketMovers(
     return result;
   } catch (error) {
     console.error("Error fetching enhanced market movers:", error);
-    throw error;
+    return { gainers: [], losers: [] };
   }
 }
 
@@ -234,7 +241,7 @@ async function processAndFilterMovers(
  */
 export async function getOptionsData(ticker: string): Promise<OptionChain[]> {
   const cacheKey = `options_${ticker}`;
-  const cachedData = getCachedData<OptionChain[]>(cacheKey, CACHE_TTL.MARKET_DATA);
+  const cachedData = getCachedData<OptionChain[]>(cacheKey, ENHANCED_CACHE_TTL.MARKET_DATA);
   
   if (cachedData) return cachedData;
   
@@ -298,7 +305,7 @@ export async function getOptionsData(ticker: string): Promise<OptionChain[]> {
  */
 export async function getStockNews(ticker: string, limit: number = 5): Promise<any[]> {
   const cacheKey = `news_${ticker}_${limit}`;
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.NEWS);
+  const cachedData = getCachedData<any[]>(cacheKey, ENHANCED_CACHE_TTL.NEWS);
   
   if (cachedData) return cachedData;
   
@@ -339,7 +346,7 @@ export async function getStockNews(ticker: string, limit: number = 5): Promise<a
  */
 export async function getInsiderTransactions(ticker: string, limit: number = 10): Promise<any[]> {
   const cacheKey = `insider_${ticker}_${limit}`;
-  const cachedData = getCachedData(cacheKey, CACHE_TTL.REFERENCE_DATA);
+  const cachedData = getCachedData<any[]>(cacheKey, ENHANCED_CACHE_TTL.REFERENCE_DATA);
   
   if (cachedData) return cachedData;
   
