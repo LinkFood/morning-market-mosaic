@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 import { StockData, MarketIndex, SectorPerformance, EconomicIndicator, MarketEvent } from '@/types/marketTypes';
 import { ScoredStock } from './stockPicker/algorithm';
