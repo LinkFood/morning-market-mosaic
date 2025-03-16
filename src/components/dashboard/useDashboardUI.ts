@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserSettings } from "@/types/marketTypes";
-import { isFeatureEnabled } from "@/services/featureFlags";
+import { isFeatureEnabled } from "@/services/features"; // Fixed import from features instead of featureFlags
 import { defaultSettings } from "./types";
 
 export const useDashboardUI = (onSettingsChange: () => void) => {

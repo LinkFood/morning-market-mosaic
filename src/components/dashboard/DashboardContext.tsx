@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { getFeatureFlags } from "@/services/features"; // Fixed import path
+import { getFeatureFlags, isFeatureEnabled, initializeFeatureFlags } from "@/services/features"; // Fixed imports
 import { DashboardContextType, defaultSettings } from "./types";
 import { useDashboardData } from "./useDashboardData";
 import { useRefreshScheduler } from "./useRefreshScheduler";
@@ -70,14 +70,16 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     allowThemeCustomization: true
   });
   
-  // Effect to load feature flags asynchronously after initial render
+  // Effect to initialize feature flags on component mount
   useEffect(() => {
     const loadFeatureFlags = async () => {
       try {
-        const featureFlagsModule = await import("@/services/featureFlags");
-        setFeatureFlags(featureFlagsModule.getFeatureFlags());
+        // Initialize feature flags from database
+        await initializeFeatureFlags();
+        setFeatureFlags(getFeatureFlags());
+        console.log("Feature flags loaded:", getFeatureFlags());
       } catch (error) {
-        console.error("Failed to load feature flags service:", error);
+        console.error("Failed to load feature flags:", error);
       }
     };
     
@@ -116,13 +118,8 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   // Update feature flags whenever services change
   useEffect(() => {
-    const handleFlagsUpdate = async () => {
-      try {
-        const featureFlagsModule = await import("@/services/featureFlags");
-        setFeatureFlags(featureFlagsModule.getFeatureFlags());
-      } catch (error) {
-        console.error("Failed to update feature flags:", error);
-      }
+    const handleFlagsUpdate = () => {
+      setFeatureFlags(getFeatureFlags());
     };
     
     window.addEventListener('feature_flags_updated', handleFlagsUpdate);

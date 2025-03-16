@@ -11,29 +11,30 @@ export type Database = {
     Tables: {
       app_settings: {
         Row: {
+          created_at: string | null
+          description: string | null
           id: number
           key: string
+          updated_at: string | null
           value: Json
-          description: string | null
-          created_at: string
-          updated_at: string
         }
         Insert: {
+          created_at?: string | null
+          description?: string | null
           id?: number
           key: string
+          updated_at?: string | null
           value: Json
-          description?: string | null
-          created_at?: string
-          updated_at?: string
         }
         Update: {
+          created_at?: string | null
+          description?: string | null
           id?: number
           key?: string
+          updated_at?: string | null
           value?: Json
-          description?: string | null
-          created_at?: string
-          updated_at?: string
         }
+        Relationships: []
       }
     }
     Views: {
