@@ -19,7 +19,10 @@ export const API_BASE_URL = (() => {
   }
   
   // For local development, use the full URL with localhost
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+  // Since process.env is not available in the browser, use a fallback
+  const envApiUrl = typeof import.meta !== 'undefined' ? 
+    import.meta.env?.VITE_API_URL : undefined;
+  return envApiUrl || 'http://localhost:3000/api';
 })();
 
 const apiClient = axios.create({
@@ -32,7 +35,7 @@ const apiClient = axios.create({
 
 // Add request interceptor to log requests in development
 apiClient.interceptors.request.use(config => {
-  if (process.env.NODE_ENV !== 'production') {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   }
   return config;

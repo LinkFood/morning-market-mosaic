@@ -4,11 +4,11 @@ import { MarketIndex, SectorPerformance, StockData, MarketEvent } from '@/types/
 
 // Fallback data for when API is unavailable
 const FALLBACK_STOCKS = [
-  { ticker: 'AAPL', name: 'Apple Inc.', close: 173.5, changePercent: 0.5, volume: 65000000 },
-  { ticker: 'MSFT', name: 'Microsoft Corp.', close: 415.3, changePercent: 0.8, volume: 22000000 },
-  { ticker: 'GOOGL', name: 'Alphabet Inc.', close: 149.2, changePercent: -0.3, volume: 18000000 },
-  { ticker: 'AMZN', name: 'Amazon.com Inc.', close: 178.9, changePercent: 1.2, volume: 30000000 },
-  { ticker: 'META', name: 'Meta Platforms Inc.', close: 485.6, changePercent: -0.7, volume: 25000000 }
+  { ticker: 'AAPL', name: 'Apple Inc.', open: 170.5, high: 175.2, low: 169.8, close: 173.5, change: 0.87, changePercent: 0.5, volume: 65000000 },
+  { ticker: 'MSFT', name: 'Microsoft Corp.', open: 410.2, high: 418.0, low: 408.5, close: 415.3, change: 3.32, changePercent: 0.8, volume: 22000000 },
+  { ticker: 'GOOGL', name: 'Alphabet Inc.', open: 150.1, high: 152.3, low: 148.7, close: 149.2, change: -0.45, changePercent: -0.3, volume: 18000000 },
+  { ticker: 'AMZN', name: 'Amazon.com Inc.', open: 176.4, high: 180.1, low: 175.3, close: 178.9, change: 2.15, changePercent: 1.2, volume: 30000000 },
+  { ticker: 'META', name: 'Meta Platforms Inc.', open: 488.1, high: 490.5, low: 483.2, close: 485.6, change: -3.4, changePercent: -0.7, volume: 25000000 }
 ];
 
 /**
@@ -27,11 +27,11 @@ const marketService = {
     } catch (error) {
       console.error("Error fetching market indices:", error);
       
-      // Return fallback data
+      // Return fallback data with all required properties
       return [
-        { ticker: 'SPX', name: 'S&P 500', close: 5200.25, changePercent: 0.2 },
-        { ticker: 'NDX', name: 'Nasdaq 100', close: 18250.75, changePercent: 0.4 },
-        { ticker: 'DJI', name: 'Dow Jones', close: 39150.50, changePercent: 0.1 }
+        { ticker: 'SPX', name: 'S&P 500', open: 5180.75, high: 5210.50, low: 5175.25, close: 5200.25, change: 10.5, changePercent: 0.2 },
+        { ticker: 'NDX', name: 'Nasdaq 100', open: 18200.30, high: 18310.20, low: 18150.80, close: 18250.75, change: 73.0, changePercent: 0.4 },
+        { ticker: 'DJI', name: 'Dow Jones', open: 39100.20, high: 39200.10, low: 39050.80, close: 39150.50, change: 39.15, changePercent: 0.1 }
       ];
     }
   },
@@ -47,11 +47,11 @@ const marketService = {
     } catch (error) {
       console.error("Error fetching sector performance:", error);
       
-      // Return fallback data
+      // Return fallback data with all required properties
       return [
-        { name: 'Technology', ticker: 'XLK', changePercent: 0.8, close: 185.25 },
-        { name: 'Healthcare', ticker: 'XLV', changePercent: -0.3, close: 145.50 },
-        { name: 'Financials', ticker: 'XLF', changePercent: 0.2, close: 39.75 }
+        { name: 'Technology', ticker: 'XLK', open: 183.75, high: 186.20, low: 183.50, close: 185.25, change: 1.48, changePercent: 0.8 },
+        { name: 'Healthcare', ticker: 'XLV', open: 146.10, high: 146.80, low: 145.30, close: 145.50, change: -0.44, changePercent: -0.3 },
+        { name: 'Financials', ticker: 'XLF', open: 39.65, high: 39.90, low: 39.60, close: 39.75, change: 0.08, changePercent: 0.2 }
       ];
     }
   },
