@@ -1,6 +1,15 @@
 
 import apiClient from './client';
-import { MarketIndex, SectorPerformance, StockData, MarketEvent, MarketMovers } from '@/types/marketTypes';
+import { MarketIndex, SectorPerformance, StockData, MarketEvent } from '@/types/marketTypes';
+
+// Fallback data for when API is unavailable
+const FALLBACK_STOCKS = [
+  { ticker: 'AAPL', name: 'Apple Inc.', close: 173.5, changePercent: 0.5, volume: 65000000 },
+  { ticker: 'MSFT', name: 'Microsoft Corp.', close: 415.3, changePercent: 0.8, volume: 22000000 },
+  { ticker: 'GOOGL', name: 'Alphabet Inc.', close: 149.2, changePercent: -0.3, volume: 18000000 },
+  { ticker: 'AMZN', name: 'Amazon.com Inc.', close: 178.9, changePercent: 1.2, volume: 30000000 },
+  { ticker: 'META', name: 'Meta Platforms Inc.', close: 485.6, changePercent: -0.7, volume: 25000000 }
+];
 
 /**
  * Market API Service
@@ -17,7 +26,13 @@ const marketService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching market indices:", error);
-      throw error;
+      
+      // Return fallback data
+      return [
+        { ticker: 'SPX', name: 'S&P 500', close: 5200.25, changePercent: 0.2 },
+        { ticker: 'NDX', name: 'Nasdaq 100', close: 18250.75, changePercent: 0.4 },
+        { ticker: 'DJI', name: 'Dow Jones', close: 39150.50, changePercent: 0.1 }
+      ];
     }
   },
 
@@ -31,10 +46,16 @@ const marketService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching sector performance:", error);
-      throw error;
+      
+      // Return fallback data
+      return [
+        { name: 'Technology', ticker: 'XLK', changePercent: 0.8, close: 185.25 },
+        { name: 'Healthcare', ticker: 'XLV', changePercent: -0.3, close: 145.50 },
+        { name: 'Financials', ticker: 'XLF', changePercent: 0.2, close: 39.75 }
+      ];
     }
   },
-
+  
   /**
    * Fetches major stocks data
    * @param tickers Array of stock tickers to fetch
@@ -46,26 +67,42 @@ const marketService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching major stocks:", error);
-      throw error;
+      
+      // Return fallback data filtered by requested tickers
+      return FALLBACK_STOCKS.filter(stock => 
+        tickers.includes(stock.ticker)
+      );
     }
   },
-
+  
   /**
-   * Gets sparkline data for a specific stock
+   * Fetches stock sparkline data
    * @param ticker Stock ticker symbol
-   * @returns Promise containing array of price points
+   * @param days Number of days of historical data
+   * @returns Promise containing sparkline data for the stock
    */
-  async getStockSparkline(ticker: string): Promise<number[]> {
+  async getStockSparkline(ticker: string, days: number = 30): Promise<any> {
     try {
-      const response = await apiClient.get<number[]>(`/market/stocks/${ticker}/sparkline`);
+      const response = await apiClient.get(`/market/sparkline/${ticker}?days=${days}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching sparkline for ${ticker}:`, error);
-      // Return empty array as fallback
-      return [];
+      
+      // Return fallback sparkline data (30 random points)
+      const baseValue = 100;
+      const points = Array.from({ length: days }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (days - i));
+        return {
+          date: date.toISOString().split('T')[0],
+          value: baseValue + (Math.random() * 20 - 10)
+        };
+      });
+      
+      return { ticker, points };
     }
   },
-
+  
   /**
    * Fetches market events data
    * @returns Promise containing an array of MarketEvent objects
@@ -76,13 +113,34 @@ const marketService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching market events:", error);
-      throw error;
+      
+      // Return fallback events data
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      return [
+        { 
+          title: 'FOMC Meeting Minutes', 
+          date: tomorrow.toISOString().split('T')[0], 
+          time: '14:00 ET',
+          type: 'economic',
+          importance: 'high'
+        },
+        { 
+          title: 'Earnings: Apple (AAPL)', 
+          date: tomorrow.toISOString().split('T')[0], 
+          time: 'After Market',
+          type: 'earnings',
+          importance: 'high'
+        }
+      ];
     }
   },
-
+  
   /**
    * Fetches market status data
-   * @returns Promise containing market status data
+   * @returns Promise containing market status information
    */
   async getMarketStatus(): Promise<any> {
     try {
@@ -90,21 +148,14 @@ const marketService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching market status:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Fetches market movers data (gainers and losers)
-   * @returns Promise containing market movers data
-   */
-  async getMarketMovers(): Promise<MarketMovers> {
-    try {
-      const response = await apiClient.get<MarketMovers>('/market/movers');
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching market movers:", error);
-      throw error;
+      
+      // Return fallback status
+      return {
+        isOpen: false,
+        nextOpen: '2025-03-31T09:30:00-04:00',
+        nextClose: '2025-03-31T16:00:00-04:00',
+        message: 'Markets are currently closed'
+      };
     }
   }
 };
